@@ -7,6 +7,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!customerId || !Array.isArray(items) || !items.length) return res.status(400).json({ error: 'Cliente e itens são obrigatórios.' })
   try {
     const supabase = getSupabaseServer()
+    const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
+    if (!token) return res.status(401).json({ error: 'Autenticação necessária.' })
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
+    if (userError || !user || user.id !== customerId) return res.status(401).json({ error: 'Sessão inválida.' })
     const productIds = items.map((item: { id: string }) => item.id)
     const { data: products, error: productsError } = await supabase.from('products').select('id,name,price,active').in('id', productIds)
     if (productsError) throw productsError

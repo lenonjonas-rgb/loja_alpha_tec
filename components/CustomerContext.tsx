@@ -1,18 +1,19 @@
 import { createContext, useContext, useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
 
-export type Customer = { id?: string; name: string; document: string; email: string; phone: string; cep: string; address: string; number: string; city: string; password: string }
-type CustomerContextValue = { customer: Customer | null; signIn: (email: string, password: string) => boolean; register: (customer: Customer) => boolean; signOut: () => void }
+export type Customer = { id?: string; name: string; document: string; email: string; phone: string; cep: string; address: string; number: string; city: string }
+type CustomerContextValue = { customer: Customer | null; loading: boolean; signIn: (email: string, password: string) => Promise<string | null>; register: (customer: Customer, password: string) => Promise<string | null>; signOut: () => Promise<void> }
 const CustomerContext = createContext<CustomerContextValue | null>(null)
-const accountKey = 'alpha-tec-customer-account'
-const sessionKey = 'alpha-tec-customer-session'
 
 export function CustomerProvider({ children }: { children: React.ReactNode }) {
   const [customer, setCustomer] = useState<Customer | null>(null)
-  useEffect(() => { const session = localStorage.getItem(sessionKey); const account = localStorage.getItem(accountKey); if (session && account) setCustomer(JSON.parse(account)) }, [])
-  function signIn(email: string, password: string) { const account = JSON.parse(localStorage.getItem(accountKey) || 'null') as Customer | null; if (!account || account.email !== email || account.password !== password) return false; localStorage.setItem(sessionKey, 'active'); setCustomer(account); return true }
-  function register(newCustomer: Customer) { localStorage.setItem(accountKey, JSON.stringify(newCustomer)); localStorage.setItem(sessionKey, 'active'); setCustomer(newCustomer); return true }
-  function signOut() { localStorage.removeItem(sessionKey); setCustomer(null) }
-  return <CustomerContext.Provider value={{ customer, signIn, register, signOut }}>{children}</CustomerContext.Provider>
+  const [loading, setLoading] = useState(true)
+  async function loadProfile() { const { data: { session } } = await supabase?.auth.getSession() || { data: { session: null } }; if (!session) { setCustomer(null); setLoading(false); return } const response = await fetch('/api/customers', { headers: { Authorization: `Bearer ${session.access_token}` } }); if (response.ok) setCustomer(await response.json()); setLoading(false) }
+  useEffect(() => { void loadProfile(); const subscription = supabase?.auth.onAuthStateChange(() => { void loadProfile() }); return () => subscription?.data.subscription.unsubscribe() }, [])
+  async function signIn(email: string, password: string) { if (!supabase) return 'Supabase não está configurado.'; const { error } = await supabase.auth.signInWithPassword({ email, password }); return error?.message || null }
+  async function register(newCustomer: Customer, password: string) { if (!supabase) return 'Supabase não está configurado.'; const { data, error } = await supabase.auth.signUp({ email: newCustomer.email, password }); if (error) return error.message; if (!data.session) return 'Cadastro criado. Confirme seu e-mail antes de entrar.'; const response = await fetch('/api/customers', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session.access_token}` }, body: JSON.stringify(newCustomer) }); if (!response.ok) return 'Conta criada, mas não foi possível salvar o perfil.'; setCustomer(await response.json()); return null }
+  async function signOut() { await supabase?.auth.signOut(); setCustomer(null) }
+  return <CustomerContext.Provider value={{ customer, loading, signIn, register, signOut }}>{children}</CustomerContext.Provider>
 }
 
 export function useCustomer() { const context = useContext(CustomerContext); if (!context) throw new Error('useCustomer deve ser usado dentro de CustomerProvider'); return context }

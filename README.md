@@ -20,6 +20,10 @@ Se `npx`/`create-next-app` não estiver disponível no ambiente, este scaffold j
 
 O envio automático dos orçamentos usa SMTP e envia para os destinatários configurados em `lib/store-config.ts`. Sem as variáveis SMTP, o PDF continua funcionando, mas o e-mail não é enviado.
 
+## Fluxo de compra
+
+O cliente pode abrir um produto, adicionar ao carrinho, informar o CEP para cotar o frete, revisar o pedido e preencher o checkout em `/checkout`. PIX e cartão estão representados em modo de teste; para cobrar de verdade, será necessário configurar Stripe ou Mercado Pago e as respectivas chaves secretas na Vercel.
+
 Antes do primeiro deploy, substitua as imagens externas por imagens reais em `public/` e confirme as coordenadas de atendimento em `lib/store-config.ts`. O domínio próprio precisa ser comprado e conectado na Vercel; ele não pode ser criado automaticamente pelo projeto.
 
 ## Imagens de produtos

@@ -1,6 +1,10 @@
 import Link from 'next/link'
+import { useCart } from './CartContext'
+import { useCustomer } from './CustomerContext'
 
 export default function Layout({ children }: { children: React.ReactNode }) {
+  const { count } = useCart()
+  const { customer } = useCustomer()
   return (
     <div className="site-shell">
       <div className="top-strip">ENVIO PARA TODO O BRASIL <span>•</span> ATENDIMENTO TÉCNICO ESPECIALIZADO</div>
@@ -14,8 +18,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <button type="submit" aria-label="Buscar">Buscar</button>
           </form>
           <div className="header-actions">
-            <Link href="/products">Minha conta</Link>
-            <Link href="/products" className="cart-link">Carrinho <span>0</span></Link>
+            <Link href="/account">{customer ? customer.name : 'Minha conta'}</Link>
+            <Link href="/cart" className="cart-link">Carrinho <span>{count}</span></Link>
           </div>
         </div>
         <nav className="category-nav">

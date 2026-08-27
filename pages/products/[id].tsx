@@ -2,10 +2,13 @@ import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
 import { products } from '../../lib/products'
+import { useCart } from '../../components/CartContext'
 
 export default function ProductPage() {
   const router = useRouter()
   const productId = router.query.id
+  const { addItem } = useCart()
+  const [added, setAdded] = useState(false)
   const [product, setProduct] = useState(products.find((item) => item.id === productId) || products[0])
   useEffect(() => { const customProducts = JSON.parse(localStorage.getItem('alpha-tec-admin-products-v2') || '[]'); const customProduct = customProducts.find((item: { id: string }) => item.id === productId); if (customProduct) setProduct(customProduct); else { const catalogProduct = products.find((item) => item.id === productId); if (catalogProduct) setProduct(catalogProduct) } }, [productId])
 
@@ -23,7 +26,7 @@ export default function ProductPage() {
           <p className="detail-description">{product.description}</p>
           <p className="compatible-equipment"><strong>Equipamentos compatíveis</strong><br />{product.compatibleEquipment || 'Consulte a compatibilidade com nossa equipe.'}</p>
           <strong className="detail-price">{product.price ? `R$ ${product.price.toFixed(2).replace('.', ',')}` : 'Consulte o preço'}</strong>
-          <button className="primary-button" type="button">Adicionar ao carrinho <span>+</span></button>
+          {product.price > 0 && <><button className="primary-button" type="button" onClick={() => { addItem(product); setAdded(true) }}>{added ? 'Adicionado ao carrinho' : 'Adicionar ao carrinho'} <span>+</span></button>{added && <Link href="/cart" className="cart-after-add">Ir para o carrinho →</Link>}</>}
         </div>
       </div>
     </section>

@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-export type Customer = { id?: string; name: string; document: string; email: string; phone: string; cep: string; address: string; number: string; city: string }
+export type Customer = { id?: string; name: string; document: string; email: string; phone: string; cep: string; address: string; number: string; complement: string; city: string }
 type CustomerContextValue = { customer: Customer | null; loading: boolean; signIn: (email: string, password: string) => Promise<string | null>; register: (customer: Customer, password: string) => Promise<string | null>; signOut: () => Promise<void> }
 const CustomerContext = createContext<CustomerContextValue | null>(null)
 

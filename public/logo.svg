@@ -1,0 +1,10 @@
+<svg width="360" height="112" viewBox="0 0 360 112" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Alpha Tec</title>
+  <desc id="desc">Alpha Tec - Peças e acessórios</desc>
+  <rect width="360" height="112" fill="white"/>
+  <path d="M14 78L28 15H86L75 78H14Z" fill="#202225" stroke="#d5322f" stroke-width="5"/>
+  <text x="42" y="66" fill="white" font-family="Arial, sans-serif" font-size="47" font-weight="800" font-style="italic">A</text>
+  <text x="103" y="41" fill="#202225" font-family="Arial, sans-serif" font-size="28" font-weight="800" letter-spacing="2">ALPHA</text>
+  <text x="103" y="70" fill="#d5322f" font-family="Arial, sans-serif" font-size="28" font-weight="800" letter-spacing="2">TEC</text>
+  <text x="104" y="95" fill="#202225" font-family="Arial, sans-serif" font-size="10" font-weight="700" letter-spacing="2">PEÇAS &amp; ACESSÓRIOS</text>
+</svg>

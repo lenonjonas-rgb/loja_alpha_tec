@@ -10,7 +10,7 @@ export default function ProductPage() {
   const { addItem } = useCart()
   const [added, setAdded] = useState(false)
   const [product, setProduct] = useState(products.find((item) => item.id === productId) || products[0])
-  useEffect(() => { const customProducts = JSON.parse(localStorage.getItem('alpha-tec-admin-products-v2') || '[]'); const customProduct = customProducts.find((item: { id: string }) => item.id === productId); if (customProduct) setProduct(customProduct); else { const catalogProduct = products.find((item) => item.id === productId); if (catalogProduct) setProduct(catalogProduct) } }, [productId])
+  useEffect(() => { fetch('/api/products').then((response) => response.json()).then((databaseProducts) => { const databaseProduct = databaseProducts.find((item: { id: string }) => item.id === productId); if (databaseProduct) setProduct(databaseProduct); else { const catalogProduct = products.find((item) => item.id === productId); if (catalogProduct) setProduct(catalogProduct) } }).catch(() => undefined) }, [productId])
 
   if (!product) return <section className="container product-detail"><Link href="/products" className="back-link">← Voltar para produtos</Link><h1>Produto não encontrado</h1></section>
 

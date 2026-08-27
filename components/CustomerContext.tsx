@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 
-export type Customer = { name: string; document: string; email: string; phone: string; cep: string; address: string; number: string; city: string; password: string }
+export type Customer = { id?: string; name: string; document: string; email: string; phone: string; cep: string; address: string; number: string; city: string; password: string }
 type CustomerContextValue = { customer: Customer | null; signIn: (email: string, password: string) => boolean; register: (customer: Customer) => boolean; signOut: () => void }
 const CustomerContext = createContext<CustomerContextValue | null>(null)
 const accountKey = 'alpha-tec-customer-account'

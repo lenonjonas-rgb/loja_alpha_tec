@@ -8,6 +8,10 @@ export type Product = {
   image: string
   compatibleEquipment?: string
   active?: boolean
+  stock?: number
+  discountPercent?: number
+  flashSale?: boolean
+  showInBanner?: boolean
 }
 
 import generatedProducts from './catalog.generated.json'

@@ -25,8 +25,10 @@ export default function ProductPage() {
           <p className="detail-code">Código do produto: AT-{productId || '001'}</p>
           <p className="detail-description">{product.description}</p>
           <p className="compatible-equipment"><strong>Equipamentos compatíveis</strong><br />{product.compatibleEquipment || 'Consulte a compatibilidade com nossa equipe.'}</p>
-          <strong className="detail-price">{product.price ? `R$ ${product.price.toFixed(2).replace('.', ',')}` : 'Consulte o preço'}</strong>
-          {product.price > 0 && <><button className="primary-button" type="button" onClick={() => { addItem(product); setAdded(true) }}>{added ? 'Adicionado ao carrinho' : 'Adicionar ao carrinho'} <span>+</span></button>{added && <Link href="/cart" className="cart-after-add">Ir para o carrinho →</Link>}</>}
+          {product.discountPercent ? <del className="detail-old-price">R$ {product.price.toFixed(2).replace('.', ',')}</del> : null}
+          <strong className="detail-price">{product.price ? `R$ ${(product.price * (1 - (product.discountPercent || 0) / 100)).toFixed(2).replace('.', ',')}` : 'Consulte o preço'}</strong>
+          <p className="stock-note">{product.stock === 0 ? 'Produto indisponível' : `${product.stock} unidades disponíveis`}</p>
+          {product.price > 0 && (product.stock || 0) > 0 && <><button className="primary-button" type="button" onClick={() => { addItem({ ...product, price: product.price * (1 - (product.discountPercent || 0) / 100) }); setAdded(true) }}>{added ? 'Adicionado ao carrinho' : 'Adicionar ao carrinho'} <span>+</span></button>{added && <Link href="/cart" className="cart-after-add">Ir para o carrinho →</Link>}</>}
         </div>
       </div>
     </section>

@@ -2,19 +2,20 @@ import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
 import Link from 'next/link'
 import AdminOrders from '../components/AdminOrders'
 import AdminBulkProducts from '../components/AdminBulkProducts'
+import AdminCoupons from '../components/AdminCoupons'
 
 type LeadStatus = 'new' | 'contacted' | 'proposal' | 'won' | 'lost'
 type Lead = { id: string; created_at: string; name: string; email: string; phone: string; cep: string; city: string; state: string; service_type: string; details: string; equipment: { name: string; quantity: number }[]; estimated_total: number; status: LeadStatus; notes: string }
-type Product = { id: string; name: string; brand: string; category: string; compatibleEquipment: string; description: string; image: string; price: number; active: boolean }
+type Product = { id: string; name: string; brand: string; category: string; compatibleEquipment: string; description: string; image: string; price: number; active: boolean; stock: number; discountPercent: number; flashSale: boolean; showInBanner: boolean }
 const categories = ['Esteiras', 'Musculação', 'Bicicletas', 'Acessórios', 'Peças diversas']
-const emptyProduct: Product = { id: '', name: '', brand: '', category: categories[0], compatibleEquipment: '', description: '', image: '', price: 0, active: true }
+const emptyProduct: Product = { id: '', name: '', brand: '', category: categories[0], compatibleEquipment: '', description: '', image: '', price: 0, active: true, stock: 0, discountPercent: 0, flashSale: false, showInBanner: false }
 const money = (value: number) => `R$ ${Number(value || 0).toFixed(2).replace('.', ',')}`
 
 export default function Admin() {
   const [authenticated, setAuthenticated] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
   const [login, setLogin] = useState({ username: '', password: '' })
-  const [tab, setTab] = useState<'leads' | 'orders' | 'products' | 'bulk'>('leads')
+  const [tab, setTab] = useState<'leads' | 'orders' | 'products' | 'bulk' | 'coupons'>('leads')
   const [leads, setLeads] = useState<Lead[]>([])
   const [leadFilter, setLeadFilter] = useState('all')
   const [products, setProducts] = useState<Product[]>([])

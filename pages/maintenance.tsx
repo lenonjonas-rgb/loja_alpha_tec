@@ -63,7 +63,7 @@ export default function Maintenance() {
     if (!coverage?.withinRadius) return setStatus('Consulte um CEP dentro da área de atendimento antes de continuar.')
     if (!Object.values(selectedEquipment).some((quantity) => quantity > 0)) return setStatus('Selecione ao menos um equipamento para gerar o orçamento.')
     setQuoteReady(true)
-    setStatus('Orçamento gerado. O PDF foi aberto em uma nova aba.')
+    setStatus('Gerando orçamento em PDF...')
     void downloadQuote()
   }
 
@@ -82,9 +82,15 @@ export default function Maintenance() {
   const visitTotal = technicalVisitFee + equipmentTotal
 
   async function downloadQuote() {
-    const { jsPDF } = await import('jspdf')
-    const pdf = new jsPDF()
-    const money = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`
+    try {
+      const leadResponse = await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, serviceType: serviceType === 'seasonal' ? 'Visita Técnica' : 'Contrato mensal', details: form.details, equipment: selectedRows.map((equipment) => ({ name: equipment.name, quantity: equipment.quantity, unitPrice: equipment.price })), estimatedTotal: quoteTotal }) })
+      if (!leadResponse.ok) {
+        const leadResult = await leadResponse.json().catch(() => ({}))
+        throw new Error(leadResult.error || 'Não foi possível registrar a solicitação.')
+      }
+      const { jsPDF } = await import('jspdf')
+      const pdf = new jsPDF()
+      const money = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`
     pdf.setFontSize(18); pdf.text('ALPHA TEC', 20, 22); pdf.setFontSize(10); pdf.text('ORÇAMENTO DE MANUTENÇÃO', 20, 30)
     pdf.line(20, 35, 190, 35); pdf.text(`Tipo: ${serviceType === 'seasonal' ? 'Visita Técnica' : 'Contrato mensal'}`, 20, 45); pdf.text(`Cliente: ${form.name || 'Não informado'}`, 20, 52); pdf.text(`CPF/CNPJ: ${form.document || 'Não informado'}`, 20, 59); pdf.text(`Endereço: ${form.street}, ${form.number} - ${form.city}/${form.state}`, 20, 66); pdf.text(`CEP: ${form.cep}`, 20, 73)
     let y = 87; pdf.setFontSize(11); pdf.text('ITEM', 20, y); pdf.text('QTD.', 125, y); pdf.text('UNITÁRIO', 145, y); pdf.text('TOTAL', 177, y); y += 8; pdf.setFontSize(10)
@@ -107,20 +113,28 @@ export default function Maintenance() {
       let infoY = 44; pdf.setFontSize(10)
       information.split('\n').forEach((paragraph) => { const lines = pdf.splitTextToSize(paragraph, 170); if (infoY + lines.length * 5 > 275) { pdf.addPage(); infoY = 22 } pdf.text(lines, 20, infoY); infoY += lines.length * 5 + (paragraph ? 3 : 1) })
     }
-    const pdfUrl = URL.createObjectURL(pdf.output('blob'))
-    window.open(pdfUrl, '_blank', 'noopener,noreferrer')
-    const pdfBlob = pdf.output('blob')
-    const pdfBase64 = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onloadend = () => resolve(String(reader.result).split(',')[1] || '')
-      reader.onerror = reject
-      reader.readAsDataURL(pdfBlob)
-    })
-    try {
-      const response = await fetch('/api/send-quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pdfBase64, customerName: form.name, cep: form.cep, serviceType: serviceType === 'seasonal' ? 'Visita Técnica' : 'Contrato mensal' }) })
-      const result = await response.json()
-      if (result.sent) setStatus('Orçamento gerado, aberto em PDF e enviado por e-mail.')
-    } catch { setStatus('Orçamento gerado e aberto em PDF. O envio por e-mail ficará pendente.') }
+      const pdfBlob = pdf.output('blob')
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+      const downloadLink = document.createElement('a')
+      downloadLink.href = pdfUrl
+      downloadLink.download = `orcamento-alpha-tec-${form.cep || 'manutencao'}.pdf`
+      document.body.appendChild(downloadLink)
+      downloadLink.click()
+      downloadLink.remove()
+      setStatus('Orçamento gerado. O download do PDF foi iniciado.')
+      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000)
+      const pdfBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(String(reader.result).split(',')[1] || '')
+        reader.onerror = reject
+        reader.readAsDataURL(pdfBlob)
+      })
+      try {
+        const response = await fetch('/api/send-quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pdfBase64, customerName: form.name, cep: form.cep, serviceType: serviceType === 'seasonal' ? 'Visita Técnica' : 'Contrato mensal' }) })
+        const result = await response.json()
+        if (result.sent) setStatus('Orçamento gerado, aberto em PDF e enviado por e-mail.')
+      } catch { setStatus('Orçamento gerado e aberto em PDF. O envio por e-mail ficará pendente.') }
+    } catch { setStatus('Não foi possível gerar o PDF. Atualize a página e tente novamente.') }
   }
 
   function openEmailDraft() {
@@ -139,7 +153,7 @@ export default function Maintenance() {
       {coverage?.withinRadius && <><fieldset><legend>2. Seus dados</legend><div className="form-grid"><label>CPF ou CNPJ<input required value={form.document} onChange={(event) => update('document', event.target.value)} /></label><label>Nome completo ou empresa<input required value={form.name} onChange={(event) => update('name', event.target.value)} /></label><label>E-mail<input required type="email" value={form.email} onChange={(event) => update('email', event.target.value)} /></label><label>Telefone<input required value={form.phone} onChange={(event) => update('phone', event.target.value)} /></label></div></fieldset>
       <fieldset><legend>3. Endereço do atendimento</legend><div className="form-grid"><label>Rua / avenida<input required value={form.street} onChange={(event) => update('street', event.target.value)} /></label><label>Número<input required value={form.number} onChange={(event) => update('number', event.target.value)} /></label><label>Complemento<input value={form.complement} onChange={(event) => update('complement', event.target.value)} /></label><label>Bairro<input required value={form.neighborhood} onChange={(event) => update('neighborhood', event.target.value)} /></label><label>Cidade<input required value={form.city} onChange={(event) => update('city', event.target.value)} /></label><label>Estado<input required maxLength={2} value={form.state} onChange={(event) => update('state', event.target.value)} /></label></div></fieldset>
       <fieldset><legend>4. Equipamentos e detalhes</legend><p className="form-hint">Selecione os equipamentos e informe as quantidades necessárias.</p><div className="equipment-list">{equipmentList.map((equipment) => <label className="equipment-row" key={equipment.id}><input type="checkbox" checked={Boolean(selectedEquipment[equipment.id])} onChange={(event) => toggleEquipment(equipment.id, event.target.checked)} /><span><strong>{equipment.name}</strong><small>{equipment.description}</small></span>{selectedEquipment[equipment.id] && <input className="quantity" type="number" min="1" value={selectedEquipment[equipment.id]} onChange={(event) => setEquipmentQuantity(equipment.id, event.target.value)} aria-label={`Quantidade de ${equipment.name}`} />}</label>)}</div><p className="form-hint">Pedágios aplicáveis serão verificados pela Alpha Tec na análise da rota.</p><label className="wide">Descreva o problema / observações<textarea required rows={4} value={form.details} onChange={(event) => update('details', event.target.value)} /></label></fieldset>
-      <button className="primary-button" type="submit">Gerar orçamento <span>→</span></button>{quoteReady && <div className="quote-result"><strong>Orçamento disponível em PDF</strong><div className="quote-actions"><button className="download-button" type="button" onClick={downloadQuote}>Abrir PDF do orçamento</button><button className="email-button" type="button" onClick={openEmailDraft}>Preparar e-mail</button></div></div>}</>}
+      <button className="primary-button" type="submit">Gerar orçamento <span>→</span></button>{quoteReady && <div className="quote-result"><strong>Orçamento disponível em PDF</strong><div className="quote-actions"><button className="download-button" type="button" onClick={downloadQuote}>Baixar PDF do orçamento</button><button className="email-button" type="button" onClick={openEmailDraft}>Preparar e-mail</button></div></div>}</>}
     </form>}
   </section>
 }

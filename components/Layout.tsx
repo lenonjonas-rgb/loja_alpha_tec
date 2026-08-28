@@ -11,7 +11,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <header className="site-header">
         <div className="header-main container">
           <Link href="/" className="brand" aria-label="Alpha Tec página inicial">
-            <img src="/logo.png.jpg" alt="Alpha Tec - Peças e acessórios" />
+            <img src="/logo-header-uniform.jpg" alt="Alpha Tec - Peças e acessórios" />
           </Link>
           <form className="search-box" action="/products">
             <input name="q" placeholder="Busque por peça, modelo ou categoria" aria-label="Buscar produtos" />
@@ -34,7 +34,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </nav>
       </header>
       <main>{children}</main>
-      <footer className="site-footer"><div className="container"><strong>ALPHA TEC</strong><span>Peças que mantêm seu treino em movimento.</span></div></footer>
+      <footer className="site-footer"><div className="container"><strong>ALPHA TEC</strong><span>Peças que mantêm seu treino em movimento.</span><Link href="/admin" className="admin-access">Acesso administrativo</Link></div></footer>
     </div>
   )
 }

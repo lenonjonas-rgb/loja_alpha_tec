@@ -13,6 +13,11 @@ const formatPrice = (price: number) => price ? `R$ ${price.toFixed(2).replace('.
 function HeroCarousel({ items }: { items: Product[] }) {
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
+  const [imgError, setImgError] = useState(false)
+
+  useEffect(() => {
+    setImgError(false)
+  }, [index])
 
   useEffect(() => {
     if (!items.length || paused) return
@@ -42,7 +47,11 @@ function HeroCarousel({ items }: { items: Product[] }) {
     >
       <Link href={`/products/${current.id}`} className="hero-carousel-content">
         <div className="hero-carousel-img">
-          <img src={current.image} alt={current.name} />
+          <img
+            src={imgError || !current.image ? '/logo-header-uniform.jpg' : current.image}
+            alt={current.name}
+            onError={() => setImgError(true)}
+          />
         </div>
         <div className="hero-carousel-info">
           <span className="hero-badge">{badgeText}</span>

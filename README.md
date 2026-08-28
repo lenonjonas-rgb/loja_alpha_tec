@@ -24,7 +24,7 @@ O login com Google usa OAuth. No Google Cloud Console, crie uma credencial **OAu
 
 ## Código de acesso por e-mail
 
-O cadastro e o login usam código de uso único (OTP). No Supabase, abra `Authentication > Emails > Email Templates > Magic Link` e ajuste o conteúdo para incluir `{{ .Token }}`. O cliente receberá o código numérico e deverá digitá-lo em `/account`; não é necessário clicar em link.
+O cadastro e o login usam código de uso único (OTP). No Supabase, configure um SMTP em `Project Settings > Authentication > SMTP Settings` e confirme que o remetente está autorizado. Depois abra `Authentication > Emails > Email Templates > Magic Link` e mantenha `{{ .Token }}` no corpo do e-mail, por exemplo: `Seu código Alpha Tec é {{ .Token }}`. Sem `{{ .Token }}`, o Supabase pode enviar somente o link e a tela não terá um código numérico para confirmar. Verifique também spam/lixo eletrônico e o limite de envio em `Authentication > Rate Limits`.
 
 ## Fluxo de compra
 

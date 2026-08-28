@@ -3,7 +3,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../../lib/supabase-server'
 
 type ProductInput = { id?: string; name: string; brand?: string; category: string; compatibleEquipment?: string; description: string; image: string; price: number; active: boolean; stock?: number; discountPercent?: number; flashSale?: boolean; showInBanner?: boolean }
-export const config = { api: { bodyParser: { sizeLimit: '3mb' } } }
+export const config = { api: { bodyParser: { sizeLimit: '8mb' } } }
 function isAdmin(req: NextApiRequest) { const [username, provided] = (req.cookies.alpha_admin_session || '.').split('.'); const expected = crypto.createHmac('sha256', process.env.ADMIN_SESSION_SECRET || '').update(username || '').digest('hex'); return Boolean(username === process.env.ALPHA_MASTER_USER && provided && provided.length === expected.length && crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected))) }
 function toRow(product: ProductInput) { return { name: product.name, brand: product.brand || null, category: product.category, compatible_equipment: product.compatibleEquipment || null, description: product.description, image_url: product.image, price: product.price, active: product.active, stock: Math.max(0, Number(product.stock) || 0), discount_percent: Math.min(100, Math.max(0, Number(product.discountPercent) || 0)), flash_sale: Boolean(product.flashSale), show_in_banner: Boolean(product.showInBanner) } }
 async function persistImage(image: string, id?: string) {

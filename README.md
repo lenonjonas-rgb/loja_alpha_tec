@@ -22,6 +22,10 @@ O envio automático dos orçamentos usa SMTP e envia para os destinatários conf
 
 O login com Google usa OAuth. No Google Cloud Console, crie uma credencial **OAuth Client ID** do tipo aplicação Web e adicione os callbacks `http://localhost:3000/api/auth/callback/google` e `https://SEU-DOMINIO.vercel.app/api/auth/callback/google`. Cadastre `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_URL` e `NEXTAUTH_SECRET` nas variáveis da Vercel.
 
+## Código de acesso por e-mail
+
+O cadastro e o login usam código de uso único (OTP). No Supabase, abra `Authentication > Emails > Email Templates > Magic Link` e ajuste o conteúdo para incluir `{{ .Token }}`. O cliente receberá o código numérico e deverá digitá-lo em `/account`; não é necessário clicar em link.
+
 ## Fluxo de compra
 
 O cliente pode abrir um produto, adicionar ao carrinho, informar o CEP para cotar o frete, revisar o pedido e preencher o checkout em `/checkout`. PIX e cartão estão representados em modo de teste; para cobrar de verdade, será necessário configurar Stripe ou Mercado Pago e as respectivas chaves secretas na Vercel.

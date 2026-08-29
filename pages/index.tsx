@@ -62,21 +62,20 @@ function HeroBanner({ products }: { products: Product[] }) {
 
   return (
     <div
-      className="hero-banner-carousel relative overflow-hidden rounded-2xl bg-gradient-to-br from-neutral-900 via-neutral-950 to-black p-6 sm:p-8 border border-neutral-800 shadow-2xl"
+      className="hero-banner-carousel relative overflow-hidden rounded-2xl bg-neutral-950 p-6 sm:p-8 border border-neutral-800 shadow-xl"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
       <div className="flex flex-col md:flex-row items-center justify-between gap-6 min-h-[360px]">
         
-        {/* Lado Esquerdo: Informações do Produto */}
+        {/* Lado Esquerdo: Informações do Produto (Visual Suave) */}
         <div className="flex-1 flex flex-col items-start gap-3 z-10 w-full">
-          {/* Tag / Badge Promocional Chamativa */}
-          <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500 via-red-600 to-red-700 text-white font-black text-xs sm:text-sm uppercase tracking-wider px-4 py-1.5 rounded-full shadow-lg shadow-red-600/40 animate-pulse border border-red-400/30">
+          <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold text-xs sm:text-sm uppercase tracking-wider px-4 py-1.5 rounded-full shadow-md">
             {prod.flashSale
               ? '⚡ OFERTA RELÂMPAGO'
               : discountNum > 0
-              ? `🔥 IMPERDÍVEL -${discountNum}%`
-              : '⭐ DESTAQUE DA SEMANA'}
+              ? `OFERTA -${discountNum}%`
+              : 'DESTAQUE DA SEMANA'}
           </span>
 
           <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight mt-1">
@@ -94,13 +93,13 @@ function HeroBanner({ products }: { products: Product[] }) {
             </strong>
           </div>
 
-          <Link href={`/products/${prod.id}`} className="primary-button hero-product-btn mt-2 inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl transition-all shadow-lg hover:shadow-red-600/30">
+          <Link href={`/products/${prod.id}`} className="primary-button hero-product-btn mt-2 inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl transition-all shadow-md">
             Ver oferta <span>→</span>
           </Link>
         </div>
 
-        {/* Lado Direito: Imagem do Produto Expandida */}
-        <div className="w-full md:w-[50%] h-[260px] sm:h-[340px] flex items-center justify-center p-3 bg-neutral-900/60 rounded-xl border border-white/10 shadow-inner group relative">
+        {/* Lado Direito: Imagem Preenchendo 100% da Área */}
+        <div className="w-full md:w-[50%] h-[280px] sm:h-[360px] rounded-2xl overflow-hidden border border-neutral-800 shadow-lg relative group">
           <img
             src={
               imgError[prod.id] || !prod.image
@@ -109,7 +108,7 @@ function HeroBanner({ products }: { products: Product[] }) {
             }
             alt={prod.name || 'Produto'}
             onError={() => setImgError((prev) => ({ ...prev, [prod.id]: true }))}
-            className="w-full h-full object-contain p-1 transform group-hover:scale-105 transition-transform duration-300 drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]"
+            className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500"
           />
         </div>
 
@@ -119,7 +118,7 @@ function HeroBanner({ products }: { products: Product[] }) {
         <div className="hero-carousel-nav mt-4 flex items-center justify-between w-full pt-2 border-t border-neutral-800/60">
           <button
             type="button"
-            className="hero-nav-btn text-white text-2xl px-3 py-1 bg-neutral-800/80 hover:bg-neutral-700 rounded-lg transition"
+            className="hero-nav-btn text-white text-2xl px-3 py-1 bg-neutral-900 hover:bg-neutral-800 rounded-lg transition"
             onClick={() => setIndex((prev) => ((prev - 1) % totalSlides + totalSlides) % totalSlides)}
             aria-label="Anterior"
           >
@@ -130,7 +129,7 @@ function HeroBanner({ products }: { products: Product[] }) {
               <button
                 key={i}
                 type="button"
-                className={`w-3 h-3 rounded-full transition-all ${i === safeIndex ? 'bg-red-600 w-6' : 'bg-neutral-600 hover:bg-neutral-400'}`}
+                className={`w-3 h-3 rounded-full transition-all ${i === safeIndex ? 'bg-red-600 w-6' : 'bg-neutral-700 hover:bg-neutral-500'}`}
                 onClick={() => setIndex(i)}
                 aria-label={`Slide ${i + 1}`}
               />
@@ -138,7 +137,7 @@ function HeroBanner({ products }: { products: Product[] }) {
           </div>
           <button
             type="button"
-            className="hero-nav-btn text-white text-2xl px-3 py-1 bg-neutral-800/80 hover:bg-neutral-700 rounded-lg transition"
+            className="hero-nav-btn text-white text-2xl px-3 py-1 bg-neutral-900 hover:bg-neutral-800 rounded-lg transition"
             onClick={() => setIndex((prev) => (prev + 1) % totalSlides)}
             aria-label="Próximo"
           >

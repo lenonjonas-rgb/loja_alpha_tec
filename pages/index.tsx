@@ -27,21 +27,10 @@ function HeroBanner({ products }: { products: Product[] }) {
       (Boolean(item.flashSale) || Number(item.discountPercent || 0) > 0 || Boolean(item.showInBanner))
   )
 
-  if (offerProducts.length === 0) {
-    return (
-      <div className="hero-banner-single">
-        <span className="hero-label">
-          PERFORMANCE<br /><b>EM CADA DETALHE</b>
-        </span>
-      </div>
-    )
-  }
-
   type Slide = { type: 'default'; product: null } | { type: 'product'; product: Product }
-  const slides: Slide[] = [
-    { type: 'default', product: null },
-    ...offerProducts.map((p) => ({ type: 'product' as const, product: p })),
-  ]
+  const slides: Slide[] = offerProducts.length
+    ? [{ type: 'default', product: null }, ...offerProducts.map((p) => ({ type: 'product' as const, product: p }))]
+    : []
 
   const totalSlides = slides.length
 
@@ -53,10 +42,10 @@ function HeroBanner({ products }: { products: Product[] }) {
     return () => clearInterval(timer)
   }, [totalSlides, paused])
 
-  const safeIndex = ((index % totalSlides) + totalSlides) % totalSlides
-  const currentSlide = slides[safeIndex] || slides[0]
+  const safeIndex = totalSlides > 0 ? ((index % totalSlides) + totalSlides) % totalSlides : 0
+  const currentSlide = totalSlides > 0 ? (slides[safeIndex] || slides[0]) : null
 
-  if (!currentSlide || currentSlide.type === 'default' || !currentSlide.product) {
+  if (offerProducts.length === 0 || !currentSlide || currentSlide.type === 'default' || !currentSlide.product) {
     return (
       <div className="hero-banner-single">
         <span className="hero-label">

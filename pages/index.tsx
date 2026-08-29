@@ -24,7 +24,7 @@ function HeroBanner({ products }: { products: Product[] }) {
     (item) =>
       item &&
       item.active !== false &&
-      (Boolean(item.flashSale) || (Number(item.discountPercent || 0) > 0) || Boolean(item.showInBanner))
+      (Boolean(item.flashSale) || Number(item.discountPercent || 0) > 0 || Boolean(item.showInBanner))
   )
 
   if (offerProducts.length === 0) {

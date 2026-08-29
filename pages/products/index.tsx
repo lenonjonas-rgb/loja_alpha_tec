@@ -26,24 +26,31 @@ export default function Products() {
         const fallbackItems = Array.isArray(products) ? products : []
         const allProducts = [
           ...dbItems,
-          ...fallbackItems.filter((fallback) => !dbItems.some((item: any) => item && item.id === fallback.id)),
-        ].filter((product) => product && product.active !== false)
+          ...fallbackItems.filter((fallback) => fallback && !dbItems.some((item: any) => item && item.id === fallback.id)),
+        ].filter((p) => p && typeof p === 'object' && p.active !== false)
 
         const category = String(router.query.category || '')
         const query = String(router.query.q || '')
-        const normalize = (value: string) =>
-          value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        const normalize = (value: any) =>
+          String(value || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
 
-        const filtered =
-          category && category !== 'ofertas'
-            ? allProducts.filter((p) => normalize(p.category || '') === normalize(category))
-            : allProducts
+        let filtered = allProducts
+        if (category === 'ofertas') {
+          filtered = allProducts.filter(
+            (p) => Boolean(p.flashSale) || Number(p.discountPercent || 0) > 0
+          )
+        } else if (category) {
+          filtered = allProducts.filter((p) => normalize(p.category) === normalize(category))
+        }
 
         setCatalog(
           query
             ? filtered.filter((p) =>
                 normalize(
-                  [p.name || '', p.brand || '', p.category || '', p.compatibleEquipment || '', p.description || ''].join(' ')
+                  [p.name, p.brand, p.category, p.compatibleEquipment, p.description].filter(Boolean).join(' ')
                 ).includes(normalize(query))
               )
             : filtered
@@ -52,6 +59,8 @@ export default function Products() {
       .catch(() => setCatalog((Array.isArray(products) ? products : []).filter((p) => p && p.active !== false)))
   }, [router.query.category, router.query.q])
 
+  const safeCatalog = Array.isArray(catalog) ? catalog.filter(Boolean) : []
+
   return (
     <section className="catalog-page container">
       <div className="catalog-heading">
@@ -59,21 +68,21 @@ export default function Products() {
         <h1>Peças e acessórios</h1>
         <p>Encontre componentes para manter seus equipamentos em movimento.</p>
       </div>
-      {catalog.length ? (
+      {safeCatalog.length ? (
         <div className="catalog-grid">
-          {catalog.map((product) => {
+          {safeCatalog.map((product) => {
             const isOutOfStock = product.stock === 0
             const hasDiscount = Number(product.discountPercent || 0) > 0
             return (
-              <article className="catalog-card" key={product.id}>
-                <Link href={`/products/${product.id}`} className="catalog-card-image">
+              <article className="catalog-card" key={product.id || Math.random()}>
+                <Link href={`/products/${product.id || ''}`} className="catalog-card-image">
                   <img src={product.image || '/logo-header-uniform.jpg'} alt={product.name || 'Produto'} />
                   {product.flashSale && <b>OFERTA RELÂMPAGO</b>}
                 </Link>
                 <div className="catalog-card-body">
                   <small>{product.brand || 'Alpha Tec'} · {product.category || 'Geral'}</small>
-                  <h2>{product.name}</h2>
-                  <p>{product.description}</p>
+                  <h2>{product.name || 'Produto'}</h2>
+                  <p>{product.description || ''}</p>
                   {isOutOfStock ? (
                     <strong className="out-of-stock">Indisponível</strong>
                   ) : (
@@ -83,7 +92,7 @@ export default function Products() {
                       {typeof product.stock === 'number' && <small>{product.stock} em estoque</small>}
                     </>
                   )}
-                  <Link href={`/products/${product.id}`} className="product-button">
+                  <Link href={`/products/${product.id || ''}`} className="product-button">
                     Ver detalhes
                   </Link>
                 </div>

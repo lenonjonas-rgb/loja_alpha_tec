@@ -62,29 +62,45 @@ function HeroBanner({ products }: { products: Product[] }) {
 
   return (
     <div
-      className="hero-banner-carousel"
+      className="hero-banner-carousel relative overflow-hidden rounded-2xl bg-gradient-to-br from-neutral-900 via-neutral-950 to-black p-6 sm:p-8 border border-neutral-800 shadow-2xl"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <div className="hero-slide hero-slide-product">
-        <div className="hero-product-content">
-          <span className="hero-product-badge">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-6 min-h-[360px]">
+        
+        {/* Lado Esquerdo: Informações do Produto */}
+        <div className="flex-1 flex flex-col items-start gap-3 z-10 w-full">
+          {/* Tag / Badge Promocional Chamativa */}
+          <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500 via-red-600 to-red-700 text-white font-black text-xs sm:text-sm uppercase tracking-wider px-4 py-1.5 rounded-full shadow-lg shadow-red-600/40 animate-pulse border border-red-400/30">
             {prod.flashSale
-              ? 'OFERTA RELÂMPAGO'
+              ? '⚡ OFERTA RELÂMPAGO'
               : discountNum > 0
-              ? `OFERTA -${discountNum}%`
-              : 'DESTAQUE DA SEMANA'}
+              ? `🔥 IMPERDÍVEL -${discountNum}%`
+              : '⭐ DESTAQUE DA SEMANA'}
           </span>
-          <h2 className="hero-product-title">{prod.name || 'Produto'}</h2>
-          <div className="hero-product-prices">
-            {discountNum > 0 && <del>{formatPrice(priceNum)}</del>}
-            <strong>{formatPrice(finalPrice)}</strong>
+
+          <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight mt-1">
+            {prod.name || 'Produto'}
+          </h2>
+
+          <div className="flex items-baseline gap-3 my-1">
+            {discountNum > 0 && (
+              <del className="text-neutral-400 text-sm sm:text-base font-semibold">
+                {formatPrice(priceNum)}
+              </del>
+            )}
+            <strong className="text-3xl sm:text-4xl font-black text-red-500 tracking-tight">
+              {formatPrice(finalPrice)}
+            </strong>
           </div>
-          <Link href={`/products/${prod.id}`} className="primary-button hero-product-btn">
+
+          <Link href={`/products/${prod.id}`} className="primary-button hero-product-btn mt-2 inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl transition-all shadow-lg hover:shadow-red-600/30">
             Ver oferta <span>→</span>
           </Link>
         </div>
-        <div className="hero-product-image-wrap">
+
+        {/* Lado Direito: Imagem do Produto Expandida */}
+        <div className="w-full md:w-[50%] h-[260px] sm:h-[340px] flex items-center justify-center p-3 bg-neutral-900/60 rounded-xl border border-white/10 shadow-inner group relative">
           <img
             src={
               imgError[prod.id] || !prod.image
@@ -93,26 +109,28 @@ function HeroBanner({ products }: { products: Product[] }) {
             }
             alt={prod.name || 'Produto'}
             onError={() => setImgError((prev) => ({ ...prev, [prod.id]: true }))}
+            className="w-full h-full object-contain p-1 transform group-hover:scale-105 transition-transform duration-300 drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]"
           />
         </div>
+
       </div>
 
       {totalSlides > 1 && (
-        <div className="hero-carousel-nav">
+        <div className="hero-carousel-nav mt-4 flex items-center justify-between w-full pt-2 border-t border-neutral-800/60">
           <button
             type="button"
-            className="hero-nav-btn"
+            className="hero-nav-btn text-white text-2xl px-3 py-1 bg-neutral-800/80 hover:bg-neutral-700 rounded-lg transition"
             onClick={() => setIndex((prev) => ((prev - 1) % totalSlides + totalSlides) % totalSlides)}
             aria-label="Anterior"
           >
             ‹
           </button>
-          <div className="hero-nav-dots">
+          <div className="hero-nav-dots flex gap-2">
             {slides.map((_, i) => (
               <button
                 key={i}
                 type="button"
-                className={`hero-nav-dot ${i === safeIndex ? 'active' : ''}`}
+                className={`w-3 h-3 rounded-full transition-all ${i === safeIndex ? 'bg-red-600 w-6' : 'bg-neutral-600 hover:bg-neutral-400'}`}
                 onClick={() => setIndex(i)}
                 aria-label={`Slide ${i + 1}`}
               />
@@ -120,7 +138,7 @@ function HeroBanner({ products }: { products: Product[] }) {
           </div>
           <button
             type="button"
-            className="hero-nav-btn"
+            className="hero-nav-btn text-white text-2xl px-3 py-1 bg-neutral-800/80 hover:bg-neutral-700 rounded-lg transition"
             onClick={() => setIndex((prev) => (prev + 1) % totalSlides)}
             aria-label="Próximo"
           >

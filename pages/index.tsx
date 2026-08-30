@@ -20,11 +20,10 @@ function HeroBanner({ products }: { products: Product[] }) {
   const [imgError, setImgError] = useState<Record<string, boolean>>({})
 
   const safeProducts = Array.isArray(products) ? products : []
+  
+  // REGRA ATUALIZADA: Puxa para o carrossel estritamente produtos com BANNER (showInBanner) marcado no Admin
   const offerProducts = safeProducts.filter(
-    (item) =>
-      item &&
-      item.active !== false &&
-      (Boolean(item.flashSale) || Number(item.discountPercent || 0) > 0 || Boolean(item.showInBanner))
+    (item) => item && item.active !== false && Boolean(item.showInBanner)
   )
 
   type Slide = { type: 'default'; product: null } | { type: 'product'; product: Product }
@@ -68,7 +67,7 @@ function HeroBanner({ products }: { products: Product[] }) {
     >
       <div className="flex flex-col md:flex-row items-center justify-between gap-6 min-h-[360px]">
         
-        {/* Lado Esquerdo: Informações do Produto (Visual Suave) */}
+        {/* Lado Esquerdo: Informações do Produto */}
         <div className="flex-1 flex flex-col items-start gap-3 z-10 w-full">
           <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold text-xs sm:text-sm uppercase tracking-wider px-4 py-1.5 rounded-full shadow-md">
             {prod.flashSale
@@ -98,7 +97,7 @@ function HeroBanner({ products }: { products: Product[] }) {
           </Link>
         </div>
 
-        {/* Lado Direito: Imagem Preenchendo 100% da Área */}
+        {/* Lado Direito: Imagem do Produto */}
         <div className="w-full md:w-[50%] h-[280px] sm:h-[360px] rounded-2xl overflow-hidden border border-neutral-800 shadow-lg relative group">
           <img
             src={

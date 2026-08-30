@@ -20,3 +20,19 @@ alter table public.coupons add column if not exists category text;
 create index if not exists coupons_code_active_idx on public.coupons (code, active);
 create index if not exists coupons_product_id_idx on public.coupons (product_id);
 create index if not exists coupons_category_idx on public.coupons (category);
+
+create table if not exists public.store_profiles (
+  id smallint primary key default 1 check (id = 1),
+  cnpj text not null,
+  legal_name text not null,
+  trade_name text,
+  email text,
+  phone text,
+  cep text not null,
+  street text not null,
+  number text not null,
+  neighborhood text,
+  city text not null,
+  state text not null,
+  updated_at timestamptz not null default now()
+);

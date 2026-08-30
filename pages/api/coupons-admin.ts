@@ -29,12 +29,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'POST' || req.method === 'PUT') {
-      const { code, discountPercent, expiresAt, usageLimit, productId, category, id, active } = req.body || {}
+      const { code, discountPercent, expiresAt, usageLimit, productId, category, id, active, freeShipping } = req.body || {}
       const couponCode = String(code || '').trim().toUpperCase()
-      const discount = Number(discountPercent)
+      const discount = Number(discountPercent || 0)
       const normalizedCategory = String(category || '').trim()
       const hasProductRule = Boolean(productId)
       const hasCategoryRule = Boolean(normalizedCategory)
+      const freeShippingEnabled = Boolean(freeShipping)
 
       const supportsRuleColumns = async () => {
         const check = await supabase.from('coupons').select('id').limit(1)
@@ -65,8 +66,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json({ message: 'Cupom removido.', category: normalizedCategory })
       }
 
-      if (!couponCode || discount <= 0 || discount > 100) {
-        return res.status(400).json({ error: 'Informe um código de cupom válido e porcentagem entre 1% e 100%.' })
+      if (!couponCode || (!freeShippingEnabled && (discount <= 0 || discount > 100))) {
+        return res.status(400).json({ error: freeShippingEnabled ? 'Informe um código de cupom válido para frete grátis.' : 'Informe um código de cupom válido e porcentagem entre 1% e 100%.' })
       }
 
       const duplicateQuery = await supabase
@@ -94,10 +95,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             .from('coupons')
             .update({
               code: couponCode,
-              discount_percent: discount,
+              discount_percent: freeShippingEnabled ? 0 : discount,
               expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
               usage_limit: usageLimit ? Number(usageLimit) : null,
               category: null,
+              free_shipping: freeShippingEnabled,
               active: active !== undefined ? Boolean(active) : true
             })
             .eq('id', existingForProduct.id)
@@ -119,11 +121,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             .from('coupons')
             .update({
               code: couponCode,
-              discount_percent: discount,
+              discount_percent: freeShippingEnabled ? 0 : discount,
               expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
               usage_limit: usageLimit ? Number(usageLimit) : null,
               product_id: null,
               category: normalizedCategory,
+              free_shipping: freeShippingEnabled,
               active: active !== undefined ? Boolean(active) : true
             })
             .eq('id', existingForCategory.id)
@@ -144,11 +147,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .from('coupons')
           .update({
             code: couponCode,
-            discount_percent: discount,
+            discount_percent: freeShippingEnabled ? 0 : discount,
             expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
             usage_limit: usageLimit ? Number(usageLimit) : null,
             product_id: productId ? String(productId) : null,
             category: hasCategoryRule ? normalizedCategory : null,
+            free_shipping: freeShippingEnabled,
             active: active !== undefined ? Boolean(active) : true
           })
           .eq('id', id)
@@ -161,9 +165,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const baseInsert = {
         code: couponCode,
-        discount_percent: discount,
+        discount_percent: freeShippingEnabled ? 0 : discount,
         expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
         usage_limit: usageLimit ? Number(usageLimit) : null,
+        free_shipping: freeShippingEnabled,
         active: true
       }
 

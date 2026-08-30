@@ -34,10 +34,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }, 0)
 
     let discount = 0
+    const shippingTotal = Number(shipping || 0)
     if (couponCode) {
       const { data: coupon, error: couponError } = await supabase
         .from('coupons')
-        .select('discount_percent,expires_at,usage_limit,used_count')
+        .select('discount_percent,expires_at,usage_limit,used_count,free_shipping')
         .eq('code', String(couponCode).toUpperCase())
         .eq('active', true)
         .maybeSingle()
@@ -47,10 +48,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'Cupom inválido, expirado ou esgotado.' })
       }
 
-      discount = subtotal * Number(coupon.discount_percent) / 100
+      discount = subtotal * Number(coupon.discount_percent || 0) / 100
+      if (coupon.free_shipping) {
+        return res.status(200).json({ sessionId: '', url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/checkout?payment=success` })
+      }
     }
 
-    const total = Math.max(0, subtotal + Number(shipping || 0) - discount)
+    const total = Math.max(0, subtotal + shippingTotal - discount)
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',

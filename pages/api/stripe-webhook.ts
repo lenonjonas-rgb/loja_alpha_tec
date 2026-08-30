@@ -75,16 +75,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const shippingTotal = Number(session.metadata?.shipping || 0)
       let discount = 0
       const couponCode = String(session.metadata?.couponCode || '')
+      let effectiveShippingTotal = shippingTotal
       if (couponCode) {
         const { data: coupon } = await supabase
           .from('coupons')
-          .select('id,discount_percent,expires_at,usage_limit,used_count')
+          .select('id,discount_percent,expires_at,usage_limit,used_count,free_shipping')
           .eq('code', couponCode.toUpperCase())
           .eq('active', true)
           .maybeSingle()
 
         if (coupon && !(coupon.expires_at && new Date(coupon.expires_at) < new Date()) && !(coupon.usage_limit !== null && coupon.used_count >= coupon.usage_limit)) {
-          discount = subtotal * Number(coupon.discount_percent) / 100
+          discount = subtotal * Number(coupon.discount_percent || 0) / 100
+          effectiveShippingTotal = coupon.free_shipping ? 0 : shippingTotal
         }
       }
 
@@ -95,8 +97,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           status: 'confirmed',
           payment_status: 'paid',
           subtotal,
-          shipping: shippingTotal,
-          total: subtotal + shippingTotal - discount,
+          shipping: effectiveShippingTotal,
+          total: subtotal + effectiveShippingTotal - discount,
         })
         .select('id')
         .single()

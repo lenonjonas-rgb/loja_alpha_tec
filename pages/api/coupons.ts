@@ -9,7 +9,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { data, error } = await getSupabaseServer()
       .from('coupons')
-      .select('id,code,discount_percent,expires_at,usage_limit,used_count,product_id,category')
+      .select('id,code,discount_percent,expires_at,usage_limit,used_count,product_id,category,free_shipping')
       .eq('code', code)
       .eq('active', true)
       .maybeSingle()
@@ -17,7 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (error && /product_id|category/i.test(error.message)) {
       const fallback = await getSupabaseServer()
         .from('coupons')
-        .select('id,code,discount_percent,expires_at,usage_limit,used_count,product_id,category')
+        .select('id,code,discount_percent,expires_at,usage_limit,used_count,product_id,category,free_shipping')
         .eq('code', code)
         .eq('active', true)
         .maybeSingle()
@@ -41,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
       }
-      return res.status(200).json({ code: fallback.data.code, discountPercent: Number(fallback.data.discount_percent), productId: fallback.data.product_id || undefined, category: fallback.data.category || undefined })
+      return res.status(200).json({ code: fallback.data.code, discountPercent: Number(fallback.data.discount_percent || 0), freeShipping: Boolean(fallback.data.free_shipping), productId: fallback.data.product_id || undefined, category: fallback.data.category || undefined })
     }
 
     if (error) throw error
@@ -58,7 +58,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
       return res.status(200).json({
         code: data.code,
-        discountPercent: Number(data.discount_percent),
+        discountPercent: Number(data.discount_percent || 0),
+        freeShipping: Boolean(data.free_shipping),
         productId: data.product_id
       })
     }
@@ -72,12 +73,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
       return res.status(200).json({
         code: data.code,
-        discountPercent: Number(data.discount_percent),
+        discountPercent: Number(data.discount_percent || 0),
+        freeShipping: Boolean(data.free_shipping),
         category: data.category
       })
     }
 
-    return res.status(200).json({ code: data.code, discountPercent: Number(data.discount_percent) })
+    return res.status(200).json({ code: data.code, discountPercent: Number(data.discount_percent || 0), freeShipping: Boolean(data.free_shipping) })
   } catch (error) {
     return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível validar o cupom.' })
   }

@@ -20,6 +20,7 @@ type CouponForm = {
   discountPercent: string
   expiresAt: string
   usageLimit: string
+  freeShipping: boolean
   scope: 'all' | 'product' | 'category'
   productId: string
   category: string
@@ -36,6 +37,7 @@ export default function AdminCouponsPage() {
     discountPercent: '10',
     expiresAt: '',
     usageLimit: '',
+    freeShipping: false,
     scope: 'all',
     productId: '',
     category: ''
@@ -69,6 +71,7 @@ export default function AdminCouponsPage() {
       discountPercent: form.discountPercent,
       expiresAt: form.expiresAt,
       usageLimit: form.usageLimit,
+      freeShipping: form.freeShipping,
       productId: form.scope === 'product' ? form.productId : undefined,
       category: form.scope === 'category' ? form.category : undefined
     }
@@ -88,6 +91,7 @@ export default function AdminCouponsPage() {
       discountPercent: '10',
       expiresAt: '',
       usageLimit: '',
+      freeShipping: false,
       scope: 'all',
       productId: '',
       category: ''

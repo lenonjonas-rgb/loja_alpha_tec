@@ -42,3 +42,6 @@ create table if not exists public.store_profiles (
   state text not null,
   updated_at timestamptz not null default now()
 );
+
+alter table public.orders add column if not exists payment_reference text;
+create unique index if not exists orders_payment_reference_idx on public.orders (payment_reference) where payment_reference is not null;

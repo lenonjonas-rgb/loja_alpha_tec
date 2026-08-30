@@ -8,12 +8,14 @@ import { supabase } from '../lib/supabase'
 const money = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`
 export default function Checkout() {
   const router = useRouter()
-  const { items, subtotal } = useCart()
+  const { items, subtotal, clearCart } = useCart()
   const { customer } = useCustomer()
   const [shipping] = useState(Number(router.query.shipping || 41.09))
   const [carrier] = useState(String(router.query.carrier || 'Correios'))
   const [shippingDeadline] = useState(String(router.query.deadline || 'A calcular'))
   const [error, setError] = useState('')
+  const [confirming, setConfirming] = useState(false)
+  const [confirmedOrderId, setConfirmedOrderId] = useState('')
   const [couponCode, setCouponCode] = useState(String(router.query.coupon || ''))
   const [coupon, setCoupon] = useState<{ code: string; discountPercent: number; freeShipping: boolean } | null>(null)
   useEffect(() => { if (!customer && router.isReady) router.replace('/account?returnTo=checkout') }, [customer, router])
@@ -23,6 +25,29 @@ export default function Checkout() {
     setCouponCode(couponFromQuery)
     void applyCoupon(couponFromQuery)
   }, [router.query.coupon])
+  useEffect(() => {
+    if (!router.isReady) return
+    const paymentStatus = String(router.query.payment || '')
+    if (paymentStatus === 'success') {
+      const paymentId = String(router.query.payment_id || router.query.collection_id || '')
+      if (!paymentId) return
+      setConfirming(true)
+      fetch('/api/mercadopago-confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentId }) })
+        .then((response) => response.json())
+        .then((result) => {
+          if (result.confirmed) {
+            setConfirmedOrderId(result.orderId)
+            clearCart()
+          } else {
+            setError('Pagamento recebido, mas ainda em processamento. Assim que for aprovado, o pedido aparecerá automaticamente.')
+          }
+        })
+        .catch(() => setError('Não foi possível confirmar automaticamente o pagamento. Se o pedido não aparecer em instantes, entre em contato.'))
+        .finally(() => setConfirming(false))
+    } else if (paymentStatus === 'cancelled') {
+      setError('Pagamento cancelado ou não concluído. Você pode tentar novamente.')
+    }
+  }, [router.isReady, router.query.payment])
   async function applyCoupon(codeToApply = couponCode) { const response = await fetch('/api/coupons', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: codeToApply, items }) }); const result = await response.json(); if (!response.ok) return setError(result.error); setCoupon({ code: result.code, discountPercent: Number(result.discountPercent) || 0, freeShipping: Boolean(result.freeShipping) }); setError(result.freeShipping ? 'Cupom aplicado: frete grátis.' : 'Cupom aplicado.') }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -61,6 +86,8 @@ export default function Checkout() {
       setError('Não foi possível registrar o pedido no momento.')
     }
   }
+  if (confirming) return <section className="container checkout-page success-page"><p className="eyebrow">PAGAMENTO</p><h1>Confirmando seu pagamento...</h1><p className="cart-muted">Aguarde um instante enquanto validamos o pagamento com o Mercado Pago.</p></section>
+  if (confirmedOrderId) return <section className="container checkout-page success-page"><p className="eyebrow">PEDIDO CONFIRMADO</p><h1>Pagamento aprovado, obrigado pela sua compra!</h1><p>Pedido <strong>#{confirmedOrderId}</strong> registrado com sucesso. Você pode acompanhar o status na sua conta.</p><Link href="/products" className="primary-button">Continuar comprando <span>→</span></Link></section>
   if (!customer) return <section className="container checkout-page"><h1>Entrando na sua conta...</h1><p className="cart-muted">Você precisa estar cadastrado para finalizar o pedido.</p><Link href="/account" className="primary-button">Criar ou acessar conta <span>→</span></Link></section>
   if (!items.length) return <section className="container checkout-page"><h1>Seu carrinho está vazio</h1><Link href="/products" className="primary-button">Ver catálogo <span>→</span></Link></section>
   const effectiveShipping = coupon?.freeShipping ? 0 : shipping

@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import type { Product } from '../lib/products'
 
 export type CartItem = Product & { quantity: number }
-type CartContextValue = { items: CartItem[]; count: number; subtotal: number; addItem: (product: Product) => void; updateQuantity: (id: string, quantity: number) => void; removeItem: (id: string) => void }
+type CartContextValue = { items: CartItem[]; count: number; subtotal: number; addItem: (product: Product) => void; updateQuantity: (id: string, quantity: number) => void; removeItem: (id: string) => void; clearCart: () => void }
 const CartContext = createContext<CartContextValue | null>(null)
 const storageKey = 'alpha-tec-cart'
 
@@ -54,6 +54,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setItems((current) => current.filter((item) => item.id !== id))
   }
 
+  function clearCart() {
+    setItems([])
+  }
+
   const safeItems = Array.isArray(items) ? items : []
   const count = safeItems.reduce((total, item) => total + (Number(item?.quantity) || 0), 0)
   const subtotal = safeItems.reduce(
@@ -63,7 +67,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={{ items: safeItems, count, subtotal, addItem, updateQuantity, removeItem }}
+      value={{ items: safeItems, count, subtotal, addItem, updateQuantity, removeItem, clearCart }}
     >
       {children}
     </CartContext.Provider>

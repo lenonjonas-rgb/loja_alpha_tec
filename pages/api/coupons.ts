@@ -90,6 +90,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ code: data.code, discountPercent: Number(data.discount_percent || 0), freeShipping: Boolean(data.free_shipping) })
   } catch (error) {
-    return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível validar o cupom.' })
+    const message = error instanceof Error ? error.message : 'Não foi possível validar o cupom.'
+    if (/product_id|category|free_shipping/i.test(message)) {
+      return res.status(400).json({ error: 'A tabela de cupons ainda não está com as colunas necessárias. Execute scripts/commerce.sql no Supabase para criar product_id, category e free_shipping.' })
+    }
+    return res.status(500).json({ error: message })
   }
 }

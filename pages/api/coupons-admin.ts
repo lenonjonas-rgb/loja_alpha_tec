@@ -3,7 +3,11 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
 
 function isCouponRuleColumnError(message: string) {
-  return /product_id|category/i.test(message)
+  return /product_id|category|free_shipping/i.test(message)
+}
+
+function getCouponSchemaError() {
+  return 'A tabela de cupons ainda não está com as colunas necessárias. Execute scripts/commerce.sql no Supabase para criar product_id, category e free_shipping.'
 }
 
 function isAdmin(req: NextApiRequest) {
@@ -229,6 +233,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (duplicate) {
       return res.status(409).json({ error: 'Esse código de cupom já existe. Escolha outro código para continuar.' })
+    }
+
+    if (isCouponRuleColumnError(message)) {
+      return res.status(400).json({ error: getCouponSchemaError() })
     }
 
     return res.status(500).json({ error: message || 'Não foi possível gerenciar os cupons.' })

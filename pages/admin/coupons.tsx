@@ -58,6 +58,10 @@ export default function AdminCouponsPage() {
   async function createCoupon(event: FormEvent) {
     event.preventDefault()
 
+    if (form.freeShipping && form.scope !== 'category') {
+      return setMessage('Cupons de frete grátis só podem ser criados por categoria.')
+    }
+
     if (form.scope === 'product' && !form.productId) {
       return setMessage('Selecione uma peça para o cupom individual.')
     }
@@ -68,7 +72,7 @@ export default function AdminCouponsPage() {
 
     const payload = {
       code: form.code,
-      discountPercent: form.discountPercent,
+      discountPercent: form.freeShipping ? '0' : form.discountPercent,
       expiresAt: form.expiresAt,
       usageLimit: form.usageLimit,
       freeShipping: form.freeShipping,

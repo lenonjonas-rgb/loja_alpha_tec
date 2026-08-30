@@ -12,8 +12,11 @@ create table if not exists public.coupons (
   usage_limit integer,
   used_count integer not null default 0,
   product_id text,
+  category text,
   created_at timestamptz not null default now()
 );
 alter table public.coupons add column if not exists product_id text;
+alter table public.coupons add column if not exists category text;
 create index if not exists coupons_code_active_idx on public.coupons (code, active);
 create index if not exists coupons_product_id_idx on public.coupons (product_id);
+create index if not exists coupons_category_idx on public.coupons (category);

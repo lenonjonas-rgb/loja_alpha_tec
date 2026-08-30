@@ -7,16 +7,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const customer = req.body || {}
   const email = String(customer.email || '').trim().toLowerCase()
+  const password = String(customer.password || '')
 
-  if (!customer.name || !email || !customer.phone || !customer.cep || !customer.address || !customer.number || !customer.city) {
+  if (!customer.name || !email || !password || !customer.phone || !customer.cep || !customer.address || !customer.number || !customer.city) {
     return res.status(400).json({ error: 'Preencha todos os campos obrigatórios para criar seu cadastro.' })
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'A senha deve ter pelo menos 6 caracteres.' })
   }
 
   try {
     const supabase = getSupabaseServer()
     const { data: createdUser, error: userError } = await supabase.auth.admin.createUser({
       email,
-      password: crypto.randomBytes(32).toString('hex'),
+      password,
       email_confirm: true,
       user_metadata: { profile: customer }
     })

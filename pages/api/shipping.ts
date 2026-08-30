@@ -13,8 +13,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     const southeastStates = ['ES', 'MG', 'RJ', 'SP']
     const isSouth = southStates.includes(state)
     const isSoutheast = southeastStates.includes(state)
-    const shippingIncreaseFactor = 1.4
-    const applyShippingIncrease = (value: number) => Number((value * shippingIncreaseFactor).toFixed(2))
+    const shippingIncreaseFactor = 1.65
+    const applyShippingIncrease = (value: number) => Math.round(value * shippingIncreaseFactor * 100) / 100
     const correiosPrice = applyShippingIncrease(isSouth ? 24.9 : isSoutheast ? 29.9 : 39.9)
     const correiosDeadline = isSouth ? '3 a 5 dias úteis' : isSoutheast ? '4 a 7 dias úteis' : '5 a 10 dias úteis'
     const regionalOptions = isSouth

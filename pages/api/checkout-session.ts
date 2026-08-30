@@ -92,6 +92,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
           auto_return: 'approved',
           notification_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/mercadopago-webhook`,
+          // sem excluded_payment_methods/types: mantém PIX, boleto e cartão disponíveis no Checkout Pro
+          payment_methods: {
+            excluded_payment_methods: [],
+            excluded_payment_types: [],
+            installments: 12,
+          },
         }),
       })
 

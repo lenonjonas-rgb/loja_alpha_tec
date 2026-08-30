@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const supabase = getSupabaseServer()
       const { data: products, error: productsError } = await supabase
         .from('products')
-        .select('id,name,price,active,discount_percent')
+        .select('id,name,price,active,discount_percent,image_url')
         .in('id', items.map((item: { id: string }) => item.id))
 
       if (productsError) throw productsError
@@ -33,15 +33,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'Um ou mais produtos não estão disponíveis.' })
       }
 
-      const priceById = new Map(products.map((product) => {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      const toAbsoluteUrl = (path: string) => (path && /^https?:\/\//i.test(path) ? path : path ? `${appUrl}${path.startsWith('/') ? '' : '/'}${path}` : `${appUrl}/logo-header-uniform.jpg`)
+      const productById = new Map(products.map((product) => {
         const basePrice = Number(product.price)
         const discountPercent = Number(product.discount_percent || 0)
         const finalPrice = discountPercent > 0 ? basePrice * (1 - discountPercent / 100) : basePrice
-        return [product.id, finalPrice]
+        return [product.id, { name: product.name, price: finalPrice, pictureUrl: toAbsoluteUrl(product.image_url) }]
       }))
       let subtotal = 0
       for (const item of items as Array<{ id: string; quantity: number }>) {
-        subtotal += (priceById.get(item.id) || 0) * Number(item.quantity)
+        subtotal += (productById.get(item.id)?.price || 0) * Number(item.quantity)
       }
 
       let discount = 0
@@ -65,7 +67,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
-      const total = Math.max(0, subtotal + shippingTotal - discount)
+      // aplica o desconto do cupom proporcionalmente ao preço de cada item, preservando a imagem/nome real do produto
+      const discountFactor = subtotal > 0 ? Math.max(0, (subtotal - discount) / subtotal) : 1
+      const preferenceItems = (items as Array<{ id: string; quantity: number }>).map((item) => {
+        const product = productById.get(item.id)!
+        return {
+          id: item.id,
+          title: product.name,
+          picture_url: product.pictureUrl,
+          quantity: Number(item.quantity),
+          unit_price: Number((product.price * discountFactor).toFixed(2)),
+          currency_id: 'BRL',
+        }
+      })
+      if (shippingTotal > 0) {
+        preferenceItems.push({
+          id: 'frete',
+          title: `Frete - ${carrier || 'Correios'}`,
+          picture_url: `${appUrl}/logo-header-uniform.jpg`,
+          quantity: 1,
+          unit_price: Number(shippingTotal.toFixed(2)),
+          currency_id: 'BRL',
+        })
+      }
+
       const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
         method: 'POST',
         headers: {
@@ -73,13 +98,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
-          items: [{
-            id: String(items[0]?.id || 'alpha-tec-order'),
-            title: `Compra Alpha Tec - ${carrier || 'Frete'}`,
-            quantity: 1,
-            unit_price: Number(total.toFixed(2)),
-            currency_id: 'BRL',
-          }],
+          items: preferenceItems,
           payer: {
             email: 'cliente@exemplo.com',
           },

@@ -54,7 +54,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const productIds = items.map((item: { id: string }) => item.id)
     const { data: products, error: productsError } = await supabase
       .from('products')
-      .select('id,name,price,active')
+      .select('id,name,price,active,discount_percent')
       .in('id', productIds)
 
     if (productsError) throw productsError
@@ -62,7 +62,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ received: true, ignored: true })
     }
 
-    const priceById = new Map(products.map((product) => [product.id, { name: product.name, price: Number(product.price) }]))
+    const priceById = new Map(products.map((product) => {
+      const basePrice = Number(product.price)
+      const discountPercent = Number(product.discount_percent || 0)
+      const finalPrice = discountPercent > 0 ? basePrice * (1 - discountPercent / 100) : basePrice
+      return [product.id, { name: product.name, price: finalPrice }]
+    }))
     const subtotal = items.reduce((total: number, item: { id: string; quantity: number }) => {
       const product = priceById.get(item.id)
       return total + (product ? product.price * Number(item.quantity) : 0)

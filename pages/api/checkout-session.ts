@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const supabase = getSupabaseServer()
       const { data: products, error: productsError } = await supabase
         .from('products')
-        .select('id,name,price,active')
+        .select('id,name,price,active,discount_percent')
         .in('id', items.map((item: { id: string }) => item.id))
 
       if (productsError) throw productsError
@@ -33,7 +33,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'Um ou mais produtos não estão disponíveis.' })
       }
 
-      const priceById = new Map(products.map((product) => [product.id, Number(product.price)]))
+      const priceById = new Map(products.map((product) => {
+        const basePrice = Number(product.price)
+        const discountPercent = Number(product.discount_percent || 0)
+        const finalPrice = discountPercent > 0 ? basePrice * (1 - discountPercent / 100) : basePrice
+        return [product.id, finalPrice]
+      }))
       let subtotal = 0
       for (const item of items as Array<{ id: string; quantity: number }>) {
         subtotal += (priceById.get(item.id) || 0) * Number(item.quantity)
@@ -118,7 +123,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const supabase = getSupabaseServer()
     const { data: products, error: productsError } = await supabase
       .from('products')
-      .select('id,name,price,active')
+      .select('id,name,price,active,discount_percent')
       .in('id', items.map((item: { id: string }) => item.id))
 
     if (productsError) throw productsError
@@ -126,7 +131,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Um ou mais produtos não estão disponíveis.' })
     }
 
-    const priceById = new Map(products.map((product) => [product.id, Number(product.price)]))
+    const priceById = new Map(products.map((product) => {
+      const basePrice = Number(product.price)
+      const discountPercent = Number(product.discount_percent || 0)
+      const finalPrice = discountPercent > 0 ? basePrice * (1 - discountPercent / 100) : basePrice
+      return [product.id, finalPrice]
+    }))
     const subtotal = items.reduce((total: number, item: { id: string; quantity: number }) => {
       const unitPrice = priceById.get(item.id) || 0
       return total + unitPrice * Number(item.quantity)

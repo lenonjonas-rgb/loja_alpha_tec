@@ -10,8 +10,6 @@ export default function Checkout() {
   const router = useRouter()
   const { items, subtotal } = useCart()
   const { customer } = useCustomer()
-  const [submitted, setSubmitted] = useState(false)
-  const [payment, setPayment] = useState<'pix' | 'card' | 'mercadopago'>('mercadopago')
   const [shipping] = useState(Number(router.query.shipping || 41.09))
   const [carrier] = useState(String(router.query.carrier || 'Correios'))
   const [shippingDeadline] = useState(String(router.query.deadline || 'A calcular'))
@@ -37,58 +35,35 @@ export default function Checkout() {
       if (!session) return setError('Sua sessão expirou. Entre novamente na conta.')
 
       const effectiveShipping = coupon?.freeShipping ? 0 : shipping
-      const total = subtotal + effectiveShipping - (coupon ? (coupon.freeShipping ? 0 : subtotal * coupon.discountPercent / 100) : 0)
 
-      if (payment === 'mercadopago') {
-        const response = await fetch('/api/checkout-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-          body: JSON.stringify({
-            customerId: customer.id,
-            items,
-            shipping: effectiveShipping,
-            carrier,
-            couponCode: coupon?.code,
-            paymentMethod: 'mercadopago',
-            successUrl: `${window.location.origin}/checkout?payment=success`,
-            cancelUrl: `${window.location.origin}/checkout?payment=cancelled`
-          })
-        })
-        const result = await response.json()
-        if (!response.ok) return setError(result.error || 'Não foi possível iniciar o pagamento.')
-        if (result.url) {
-          window.location.href = result.url
-          return
-        }
-        return setError('Sessão de pagamento iniciada, mas sem redirecionamento disponível.')
-      }
-
-      const response = await fetch('/api/orders', {
+      const response = await fetch('/api/checkout-session', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({
           customerId: customer.id,
           items,
           shipping: effectiveShipping,
           carrier,
-          paymentMethod: payment,
-          couponCode: coupon?.code
+          couponCode: coupon?.code,
+          paymentMethod: 'mercadopago',
+          successUrl: `${window.location.origin}/checkout?payment=success`,
+          cancelUrl: `${window.location.origin}/checkout?payment=cancelled`
         })
       })
       const result = await response.json()
-      if (!response.ok) return setError(result.error || 'Não foi possível registrar o pedido.')
-      setSubmitted(true)
+      if (!response.ok) return setError(result.error || 'Não foi possível iniciar o pagamento.')
+      if (result.url) {
+        window.location.href = result.url
+        return
+      }
+      return setError('Sessão de pagamento iniciada, mas sem redirecionamento disponível.')
     } catch {
       setError('Não foi possível registrar o pedido no momento.')
     }
   }
-  if (submitted) return <section className="container checkout-page success-page"><p className="eyebrow">PEDIDO RECEBIDO</p><h1>Obrigado pela sua compra.</h1><p>Pedido registrado. A confirmação real do pagamento será ativada quando o gateway for configurado.</p><Link href="/products" className="primary-button">Continuar comprando <span>→</span></Link></section>
   if (!customer) return <section className="container checkout-page"><h1>Entrando na sua conta...</h1><p className="cart-muted">Você precisa estar cadastrado para finalizar o pedido.</p><Link href="/account" className="primary-button">Criar ou acessar conta <span>→</span></Link></section>
   if (!items.length) return <section className="container checkout-page"><h1>Seu carrinho está vazio</h1><Link href="/products" className="primary-button">Ver catálogo <span>→</span></Link></section>
   const effectiveShipping = coupon?.freeShipping ? 0 : shipping
   const discount = coupon ? (coupon.freeShipping ? 0 : subtotal * coupon.discountPercent / 100) : 0
-  return <section className="container checkout-page"><p className="eyebrow">FINALIZAÇÃO</p><h1>Checkout</h1><div className="checkout-layout"><form className="checkout-form" onSubmit={submit}><fieldset><legend>Dados para entrega</legend><div className="form-grid"><label>Nome completo<input required defaultValue={customer.name} /></label><label>CPF ou CNPJ<input required defaultValue={customer.document} /></label><label>E-mail<input required type="email" defaultValue={customer.email} /></label><label>Telefone<input required defaultValue={customer.phone} /></label><label>CEP<input required defaultValue={customer.cep} /></label><label>Endereço<input required defaultValue={customer.address} /></label><label>Número<input required defaultValue={customer.number} /></label><label>Cidade / UF<input required defaultValue={customer.city} /></label></div></fieldset><fieldset><legend>Forma de pagamento</legend><div className="coupon-box"><input value={couponCode} onChange={(event) => setCouponCode(event.target.value.toUpperCase())} placeholder="Cupom de desconto" /><button type="button" onClick={() => void applyCoupon()}>Aplicar cupom</button>{coupon && <small>{coupon.freeShipping ? 'Frete grátis aplicado' : `${coupon.discountPercent}% de desconto aplicado`}</small>}</div><label className="payment-option"><input type="radio" checked={payment === 'pix'} onChange={() => setPayment('pix')} /> PIX (teste)</label><label className="payment-option"><input type="radio" checked={payment === 'card'} onChange={() => setPayment('card')} /> Cartão de crédito (teste)</label><label className="payment-option"><input type="radio" checked={payment === 'mercadopago'} onChange={() => setPayment('mercadopago')} /> Mercado Pago</label><p className="form-hint">PIX e cartão em teste são registrados localmente no pedido. O Mercado Pago é o gateway real e exige MP_ACCESS_TOKEN e webhook configurados na Vercel.</p></fieldset>{error && <p className="form-status">{error}</p>}<button className="primary-button" type="submit">Confirmar pedido <span>→</span></button></form><aside className="cart-summary"><h2>Resumo</h2>{items.map((item) => <div key={item.id}><span>{item.name} × {item.quantity}</span><strong>{money(item.price * item.quantity)}</strong></div>)}<div><span>{carrier} ({shippingDeadline})</span><strong>{money(effectiveShipping)}</strong></div>{coupon && (coupon.freeShipping ? <div><span>Frete grátis ({coupon.code})</span><strong>- {money(shipping)}</strong></div> : <div><span>Desconto ({coupon.discountPercent}%)</span><strong>- {money(discount)}</strong></div>)}<div className="summary-total"><span>Total</span><strong>{money(subtotal + effectiveShipping - discount)}</strong></div></aside></div></section>
+  return <section className="container checkout-page"><p className="eyebrow">FINALIZAÇÃO</p><h1>Checkout</h1><div className="checkout-layout"><form className="checkout-form" onSubmit={submit}><fieldset><legend>Dados para entrega</legend><div className="form-grid"><label>Nome completo<input required defaultValue={customer.name} /></label><label>CPF ou CNPJ<input required defaultValue={customer.document} /></label><label>E-mail<input required type="email" defaultValue={customer.email} /></label><label>Telefone<input required defaultValue={customer.phone} /></label><label>CEP<input required defaultValue={customer.cep} /></label><label>Endereço<input required defaultValue={customer.address} /></label><label>Número<input required defaultValue={customer.number} /></label><label>Cidade / UF<input required defaultValue={customer.city} /></label></div></fieldset><fieldset><legend>Escolha método de pagamento</legend><div className="coupon-box"><input value={couponCode} onChange={(event) => setCouponCode(event.target.value.toUpperCase())} placeholder="Cupom de desconto" /><button type="button" onClick={() => void applyCoupon()}>Aplicar cupom</button>{coupon && <small>{coupon.freeShipping ? 'Frete grátis aplicado' : `${coupon.discountPercent}% de desconto aplicado`}</small>}</div><div className="payment-method-card"><strong>Mercado Pago</strong><p>Pague com Pix, cartão de crédito em até 12x ou boleto. Você será redirecionado para o ambiente seguro do Mercado Pago para concluir o pagamento.</p></div></fieldset>{error && <p className="form-status">{error}</p>}<button className="primary-button" type="submit">Ir para método de pagamento <span>→</span></button></form><aside className="cart-summary"><h2>Resumo</h2>{items.map((item) => <div key={item.id}><span>{item.name} × {item.quantity}</span><strong>{money(item.price * item.quantity)}</strong></div>)}<div><span>{carrier} ({shippingDeadline})</span><strong>{money(effectiveShipping)}</strong></div>{coupon && (coupon.freeShipping ? <div><span>Frete grátis ({coupon.code})</span><strong>- {money(shipping)}</strong></div> : <div><span>Desconto ({coupon.discountPercent}%)</span><strong>- {money(discount)}</strong></div>)}<div className="summary-total"><span>Total</span><strong>{money(subtotal + effectiveShipping - discount)}</strong></div></aside></div></section>
 }

@@ -11,6 +11,9 @@ create table if not exists public.coupons (
   expires_at timestamptz,
   usage_limit integer,
   used_count integer not null default 0,
+  product_id text,
   created_at timestamptz not null default now()
 );
+alter table public.coupons add column if not exists product_id text;
 create index if not exists coupons_code_active_idx on public.coupons (code, active);
+create index if not exists coupons_product_id_idx on public.coupons (product_id);

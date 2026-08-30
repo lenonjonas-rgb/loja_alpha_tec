@@ -12,10 +12,114 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
   const supabase = getSupabaseServer()
   try {
-    if (req.method === 'GET') { const { data, error } = await supabase.from('coupons').select('*').order('created_at', { ascending: false }); if (error) throw error; return res.status(200).json(data) }
-    if (req.method === 'POST') { const { code, discountPercent, expiresAt, usageLimit } = req.body || {}; if (!code || Number(discountPercent) <= 0 || Number(discountPercent) > 100) return res.status(400).json({ error: 'Informe código e desconto entre 1 e 100%.' }); const { data, error } = await supabase.from('coupons').insert({ code: String(code).trim().toUpperCase(), discount_percent: Number(discountPercent), expires_at: expiresAt || null, usage_limit: usageLimit ? Number(usageLimit) : null }).select('*').single(); if (error) throw error; return res.status(201).json(data) }
-    if (req.method === 'PATCH') { const { id, active } = req.body || {}; const { data, error } = await supabase.from('coupons').update({ active: Boolean(active) }).eq('id', id).select('*').single(); if (error) throw error; return res.status(200).json(data) }
-    if (req.method === 'DELETE') { const { error } = await supabase.from('coupons').delete().eq('id', req.query.id); if (error) throw error; return res.status(204).end() }
+    if (req.method === 'GET') {
+      const { data, error } = await supabase.from('coupons').select('*').order('created_at', { ascending: false })
+      if (error && /product_id/i.test(error.message)) {
+        // Fallback se a coluna product_id ainda não existir na tabela
+        const fallback = await supabase.from('coupons').select('*').order('created_at', { ascending: false })
+        if (fallback.error) throw fallback.error
+        return res.status(200).json(fallback.data)
+      }
+      if (error) throw error
+      return res.status(200).json(data)
+    }
+
+    if (req.method === 'POST' || req.method === 'PUT') {
+      const { code, discountPercent, expiresAt, usageLimit, productId, id, active } = req.body || {}
+
+      // Se for remoção ou inativação de cupom por produto com código vazio
+      if (productId && !code) {
+        const { data: existing } = await supabase.from('coupons').select('id').eq('product_id', String(productId)).maybeSingle()
+        if (existing) {
+          await supabase.from('coupons').delete().eq('id', existing.id)
+        }
+        return res.status(200).json({ message: 'Cupom removido.', productId })
+      }
+
+      const couponCode = String(code || '').trim().toUpperCase()
+      const discount = Number(discountPercent)
+
+      if (!couponCode || discount <= 0 || discount > 100) {
+        return res.status(400).json({ error: 'Informe um código de cupom válido e porcentagem entre 1% e 100%.' })
+      }
+
+      // Se for cupom de um produto específico
+      if (productId) {
+        // Verifica se já existe um cupom para este produto
+        const { data: existingForProduct } = await supabase.from('coupons').select('*').eq('product_id', String(productId)).maybeSingle()
+
+        if (existingForProduct) {
+          const { data, error } = await supabase
+            .from('coupons')
+            .update({
+              code: couponCode,
+              discount_percent: discount,
+              expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+              usage_limit: usageLimit ? Number(usageLimit) : null,
+              active: active !== undefined ? Boolean(active) : true
+            })
+            .eq('id', existingForProduct.id)
+            .select('*')
+            .single()
+
+          if (error) throw error
+          return res.status(200).json(data)
+        }
+      }
+
+      // Se um ID de cupom direto foi informado para atualização
+      if (id) {
+        const { data, error } = await supabase
+          .from('coupons')
+          .update({
+            code: couponCode,
+            discount_percent: discount,
+            expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+            usage_limit: usageLimit ? Number(usageLimit) : null,
+            product_id: productId ? String(productId) : null,
+            active: active !== undefined ? Boolean(active) : true
+          })
+          .eq('id', id)
+          .select('*')
+          .single()
+
+        if (error) throw error
+        return res.status(200).json(data)
+      }
+
+      // Senão, insere um novo cupom
+      const { data, error } = await supabase
+        .from('coupons')
+        .insert({
+          code: couponCode,
+          discount_percent: discount,
+          expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+          usage_limit: usageLimit ? Number(usageLimit) : null,
+          product_id: productId ? String(productId) : null,
+          active: true
+        })
+        .select('*')
+        .single()
+
+      if (error) throw error
+      return res.status(201).json(data)
+    }
+
+    if (req.method === 'PATCH') {
+      const { id, active } = req.body || {}
+      const { data, error } = await supabase.from('coupons').update({ active: Boolean(active) }).eq('id', id).select('*').single()
+      if (error) throw error
+      return res.status(200).json(data)
+    }
+
+    if (req.method === 'DELETE') {
+      const { error } = await supabase.from('coupons').delete().eq('id', req.query.id)
+      if (error) throw error
+      return res.status(204).end()
+    }
+
     return res.status(405).json({ error: 'Método não permitido.' })
-  } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível gerenciar os cupons.' }) }
+  } catch (error) {
+    return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível gerenciar os cupons.' })
+  }
 }

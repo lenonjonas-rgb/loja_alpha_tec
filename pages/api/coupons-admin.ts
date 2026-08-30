@@ -66,6 +66,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json({ message: 'Cupom removido.', category: normalizedCategory })
       }
 
+      if (freeShippingEnabled && normalizedCategory !== 'Frete') {
+        return res.status(400).json({ error: 'Cupons de frete grátis devem usar a categoria "Frete".' })
+      }
+
+      if (!freeShippingEnabled && normalizedCategory === 'Frete') {
+        return res.status(400).json({ error: 'A categoria "Frete" é exclusiva para cupons de frete grátis.' })
+      }
+
       if (!couponCode || (!freeShippingEnabled && (discount <= 0 || discount > 100))) {
         return res.status(400).json({ error: freeShippingEnabled ? 'Informe um código de cupom válido para frete grátis.' : 'Informe um código de cupom válido e porcentagem entre 1% e 100%.' })
       }

@@ -49,6 +49,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Cupom inválido, expirado ou esgotado.' })
     }
 
+    if (data.free_shipping) {
+      return res.status(200).json({
+        code: data.code,
+        discountPercent: 0,
+        freeShipping: true,
+        category: data.category || 'Frete'
+      })
+    }
+
     if (data.product_id) {
       if (items.length > 0) {
         const hasProduct = items.some((item: any) => String(item.id) === String(data.product_id))

@@ -26,7 +26,8 @@ type CouponForm = {
   category: string
 }
 
-const categories = ['Esteiras', 'Musculação', 'Bicicletas', 'Acessórios', 'Peças diversas']
+const shippingCategory = 'Frete'
+const categories = [shippingCategory, 'Esteiras', 'Musculação', 'Bicicletas', 'Acessórios', 'Peças diversas']
 
 export default function AdminCouponsPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([])
@@ -58,8 +59,16 @@ export default function AdminCouponsPage() {
   async function createCoupon(event: FormEvent) {
     event.preventDefault()
 
-    if (form.freeShipping && form.scope !== 'category') {
-      return setMessage('Cupons de frete grátis só podem ser criados por categoria.')
+    const isFreeShippingCoupon = form.freeShipping
+
+    if (isFreeShippingCoupon) {
+      if (form.scope !== 'category') {
+        return setMessage('Cupons de frete grátis só podem ser criados por categoria.')
+      }
+
+      if (form.category !== shippingCategory) {
+        return setMessage('Para cupom de frete grátis, selecione a categoria "Frete".')
+      }
     }
 
     if (form.scope === 'product' && !form.productId) {
@@ -70,12 +79,16 @@ export default function AdminCouponsPage() {
       return setMessage('Selecione uma categoria para o cupom por categoria.')
     }
 
+    if (!isFreeShippingCoupon && form.scope === 'category' && form.category === shippingCategory) {
+      return setMessage('A categoria "Frete" é exclusiva para cupons de frete grátis.')
+    }
+
     const payload = {
       code: form.code,
-      discountPercent: form.freeShipping ? '0' : form.discountPercent,
+      discountPercent: isFreeShippingCoupon ? '0' : form.discountPercent,
       expiresAt: form.expiresAt,
       usageLimit: form.usageLimit,
-      freeShipping: form.freeShipping,
+      freeShipping: isFreeShippingCoupon,
       productId: form.scope === 'product' ? form.productId : undefined,
       category: form.scope === 'category' ? form.category : undefined
     }

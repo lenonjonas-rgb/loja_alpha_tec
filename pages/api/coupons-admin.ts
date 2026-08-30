@@ -26,18 +26,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'POST' || req.method === 'PUT') {
       const { code, discountPercent, expiresAt, usageLimit, productId, id, active } = req.body || {}
+      const couponCode = String(code || '').trim().toUpperCase()
+      const discount = Number(discountPercent)
 
       // Se for remoção ou inativação de cupom por produto com código vazio
-      if (productId && !code) {
+      if (productId && !couponCode && discount <= 0) {
         const { data: existing } = await supabase.from('coupons').select('id').eq('product_id', String(productId)).maybeSingle()
         if (existing) {
           await supabase.from('coupons').delete().eq('id', existing.id)
         }
         return res.status(200).json({ message: 'Cupom removido.', productId })
       }
-
-      const couponCode = String(code || '').trim().toUpperCase()
-      const discount = Number(discountPercent)
 
       if (!couponCode || discount <= 0 || discount > 100) {
         return res.status(400).json({ error: 'Informe um código de cupom válido e porcentagem entre 1% e 100%.' })

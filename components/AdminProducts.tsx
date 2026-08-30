@@ -103,21 +103,41 @@ export default function AdminProducts({ products, onSaved, onMessage }: Props) {
       const couponChanged = normalizedCode !== previousCode || discountValue !== previousDiscount
 
       if (couponChanged) {
-        tasks.push(
-          fetch('/api/coupons-admin', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              productId: product.id,
-              code: normalizedCode,
-              discountPercent: discountValue
+        if (!normalizedCode && discountValue <= 0) {
+          tasks.push(
+            fetch('/api/coupons-admin', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                productId: product.id,
+                code: '',
+                discountPercent: 0
+              })
+            }).then(async (response) => {
+              const result = await response.json().catch(() => ({}))
+              if (!response.ok) throw new Error(result.error || 'Não foi possível remover o cupom da peça.')
+              return result
             })
-          }).then(async (response) => {
-            const result = await response.json().catch(() => ({}))
-            if (!response.ok) throw new Error(result.error || 'Não foi possível salvar o cupom da peça.')
-            return result
-          })
-        )
+          )
+        } else if (normalizedCode && discountValue > 0 && discountValue <= 100) {
+          tasks.push(
+            fetch('/api/coupons-admin', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                productId: product.id,
+                code: normalizedCode,
+                discountPercent: discountValue
+              })
+            }).then(async (response) => {
+              const result = await response.json().catch(() => ({}))
+              if (!response.ok) throw new Error(result.error || 'Não foi possível salvar o cupom da peça.')
+              return result
+            })
+          )
+        } else {
+          throw new Error('Cupom inválido: informe um código e uma porcentagem entre 1% e 100%.')
+        }
       }
     }
 

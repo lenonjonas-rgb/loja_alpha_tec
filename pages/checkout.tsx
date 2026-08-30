@@ -12,7 +12,7 @@ export default function Checkout() {
   const { customer } = useCustomer()
   const [submitted, setSubmitted] = useState(false)
   const [payment, setPayment] = useState('pix')
-  const [shipping] = useState(Number(router.query.shipping || 24.9))
+  const [shipping] = useState(Number(router.query.shipping || 34.86))
   const [carrier] = useState(String(router.query.carrier || 'Correios'))
   const [shippingDeadline] = useState(String(router.query.deadline || 'A calcular'))
   const [error, setError] = useState('')

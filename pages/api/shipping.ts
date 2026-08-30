@@ -13,15 +13,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     const southeastStates = ['ES', 'MG', 'RJ', 'SP']
     const isSouth = southStates.includes(state)
     const isSoutheast = southeastStates.includes(state)
-    const correiosPrice = isSouth ? 24.9 : isSoutheast ? 29.9 : 39.9
+    const shippingIncreaseFactor = 1.4
+    const applyShippingIncrease = (value: number) => Number((value * shippingIncreaseFactor).toFixed(2))
+    const correiosPrice = applyShippingIncrease(isSouth ? 24.9 : isSoutheast ? 29.9 : 39.9)
     const correiosDeadline = isSouth ? '3 a 5 dias úteis' : isSoutheast ? '4 a 7 dias úteis' : '5 a 10 dias úteis'
     const regionalOptions = isSouth
-      ? [{ carrier: 'Expresso São Miguel', price: 21.9, deadline: '2 a 4 dias úteis' }, { carrier: 'Rodonaves', price: 26.9, deadline: '3 a 6 dias úteis' }]
+      ? [{ carrier: 'Expresso São Miguel', price: applyShippingIncrease(21.9), deadline: '2 a 4 dias úteis' }, { carrier: 'Rodonaves', price: applyShippingIncrease(26.9), deadline: '3 a 6 dias úteis' }]
       : isSoutheast
-        ? [{ carrier: 'Rodonaves', price: 26.9, deadline: '3 a 6 dias úteis' }, { carrier: 'Jamef', price: 31.9, deadline: '4 a 7 dias úteis' }]
+        ? [{ carrier: 'Rodonaves', price: applyShippingIncrease(26.9), deadline: '3 a 6 dias úteis' }, { carrier: 'Jamef', price: applyShippingIncrease(31.9), deadline: '4 a 7 dias úteis' }]
         : state === 'DF' || ['GO', 'MT', 'MS'].includes(state)
-          ? [{ carrier: 'Rodonaves', price: 34.9, deadline: '4 a 8 dias úteis' }, { carrier: 'Jamef', price: 38.9, deadline: '5 a 9 dias úteis' }]
-          : [{ carrier: 'Total Express', price: 42.9, deadline: '6 a 11 dias úteis' }, { carrier: 'Jamef', price: 47.9, deadline: '6 a 12 dias úteis' }]
+          ? [{ carrier: 'Rodonaves', price: applyShippingIncrease(34.9), deadline: '4 a 8 dias úteis' }, { carrier: 'Jamef', price: applyShippingIncrease(38.9), deadline: '5 a 9 dias úteis' }]
+          : [{ carrier: 'Total Express', price: applyShippingIncrease(42.9), deadline: '6 a 11 dias úteis' }, { carrier: 'Jamef', price: applyShippingIncrease(47.9), deadline: '6 a 12 dias úteis' }]
 
     return res.status(200).json({ options: [{ carrier: 'Correios', price: correiosPrice, deadline: correiosDeadline }, ...regionalOptions] })
   } catch { return res.status(502).json({ error: 'Não foi possível calcular o frete agora.' }) }

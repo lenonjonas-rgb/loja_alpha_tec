@@ -42,6 +42,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'Informe um código de cupom válido e porcentagem entre 1% e 100%.' })
       }
 
+      // Impede códigos duplicados para peças diferentes, porque a coluna code é única no banco.
+      const { data: duplicateCoupon } = await supabase
+        .from('coupons')
+        .select('id, product_id')
+        .eq('code', couponCode)
+        .maybeSingle()
+
+      if (duplicateCoupon && duplicateCoupon.id !== id && duplicateCoupon.product_id !== String(productId)) {
+        return res.status(409).json({ error: `O código "${couponCode}" já está em uso por outra peça. Escolha outro código.` })
+      }
+
       // Se for cupom de um produto específico
       if (productId) {
         // Verifica se já existe um cupom para este produto
@@ -119,6 +130,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(405).json({ error: 'Método não permitido.' })
   } catch (error) {
-    return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível gerenciar os cupons.' })
+    const message = error instanceof Error ? error.message : typeof error === 'string' ? error : 'Não foi possível gerenciar os cupons.'
+    const duplicate = /duplicate|23505|unique/i.test(message)
+
+    if (duplicate) {
+      return res.status(409).json({ error: 'Esse código de cupom já existe. Escolha outro código para continuar.' })
+    }
+
+    return res.status(500).json({ error: message || 'Não foi possível gerenciar os cupons.' })
   }
 }

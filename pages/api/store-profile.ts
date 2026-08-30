@@ -8,6 +8,15 @@ function isAdmin(req: NextApiRequest) {
   return Boolean(username === process.env.ALPHA_MASTER_USER && provided && provided.length === expected.length && crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected)))
 }
 
+async function readJson(response: Response) {
+  const text = await response.text()
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
 
@@ -15,10 +24,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method === 'GET' && req.query.cnpj) {
       const cnpj = String(req.query.cnpj).replace(/\D/g, '')
       if (cnpj.length !== 14) return res.status(400).json({ error: 'Informe um CNPJ com 14 números.' })
-      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`)
-      const company = await response.json()
-      if (!response.ok) return res.status(response.status).json({ error: company.message || 'CNPJ não encontrado.' })
-      return res.status(200).json({ cnpj, legalName: company.razao_social || '', tradeName: company.nome_fantasia || '', email: company.email || '', phone: company.ddd_telefone_1 || '', cep: company.cep || '', street: company.logradouro || '', number: company.numero || '', neighborhood: company.bairro || '', city: company.municipio || '', state: company.uf || '' })
+      const brasilApiResponse = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, { headers: { Accept: 'application/json' } })
+      const brasilApiCompany = await readJson(brasilApiResponse)
+
+      if (brasilApiResponse.ok && brasilApiCompany) {
+        return res.status(200).json({ cnpj, legalName: brasilApiCompany.razao_social || '', tradeName: brasilApiCompany.nome_fantasia || '', email: brasilApiCompany.email || '', phone: brasilApiCompany.ddd_telefone_1 || '', cep: brasilApiCompany.cep || '', street: brasilApiCompany.logradouro || '', number: brasilApiCompany.numero || '', neighborhood: brasilApiCompany.bairro || '', city: brasilApiCompany.municipio || '', state: brasilApiCompany.uf || '' })
+      }
+
+      const fallbackResponse = await fetch(`https://publica.cnpj.ws/cnpj/${cnpj}`, { headers: { Accept: 'application/json' } })
+      const fallbackCompany = await readJson(fallbackResponse)
+      if (!fallbackResponse.ok || !fallbackCompany?.estabelecimento) {
+        return res.status(502).json({ error: 'Não foi possível consultar este CNPJ agora. Tente novamente em alguns minutos.' })
+      }
+
+      const establishment = fallbackCompany.estabelecimento
+      return res.status(200).json({ cnpj, legalName: fallbackCompany.razao_social || '', tradeName: establishment.nome_fantasia || '', email: establishment.email || '', phone: [establishment.ddd1, establishment.telefone1].filter(Boolean).join(' '), cep: establishment.cep || '', street: establishment.logradouro || '', number: establishment.numero || '', neighborhood: establishment.bairro || '', city: establishment.cidade?.nome || '', state: establishment.estado?.sigla || '' })
     }
 
     const supabase = getSupabaseServer()

@@ -40,7 +40,13 @@ export default function AdminStoreProfile() {
     setMessage('Consultando CNPJ...')
     try {
       const response = await fetch(`/api/store-profile?cnpj=${cnpj}`)
-      const result = await response.json()
+      const text = await response.text()
+      let result: Record<string, string>
+      try {
+        result = JSON.parse(text)
+      } catch {
+        throw new Error('A consulta de CNPJ foi bloqueada temporariamente. Tente novamente em alguns minutos.')
+      }
       if (!response.ok) throw new Error(result.error)
       setProfile((current) => ({ ...current, ...result, cnpj }))
       setMessage('Dados preenchidos pela consulta do CNPJ. Confira e complete o número do endereço, se necessário.')

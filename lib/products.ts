@@ -12,6 +12,10 @@ export type Product = {
   discountPercent?: number
   flashSale?: boolean
   showInBanner?: boolean
+  weightKg?: number
+  heightCm?: number
+  widthCm?: number
+  lengthCm?: number
 }
 
 import generatedProducts from './catalog.generated.json'

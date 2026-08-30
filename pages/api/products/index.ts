@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../../lib/supabase-server'
 
-type ProductInput = { id?: string; name: string; brand?: string; category: string; compatibleEquipment?: string; description: string; image: string; price: number; active: boolean; stock?: number; discountPercent?: number; flashSale?: boolean; showInBanner?: boolean }
+type ProductInput = { id?: string; name: string; brand?: string; category: string; compatibleEquipment?: string; description: string; image: string; price: number; active: boolean; stock?: number; discountPercent?: number; flashSale?: boolean; showInBanner?: boolean; weightKg?: number; heightCm?: number; widthCm?: number; lengthCm?: number }
 export const config = { api: { bodyParser: { sizeLimit: '8mb' } } }
 function isAdmin(req: NextApiRequest) { const [username, provided] = (req.cookies.alpha_admin_session || '.').split('.'); const expected = crypto.createHmac('sha256', process.env.ADMIN_SESSION_SECRET || '').update(username || '').digest('hex'); return Boolean(username === process.env.ALPHA_MASTER_USER && provided && provided.length === expected.length && crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected))) }
 function fromRow(row: any) {
@@ -19,11 +19,15 @@ function fromRow(row: any) {
     stock: Number(row.stock || 0),
     discountPercent: Number(row.discount_percent || 0),
     flashSale: Boolean(row.flash_sale),
-    showInBanner: Boolean(row.show_in_banner)
+    showInBanner: Boolean(row.show_in_banner),
+    weightKg: Number(row.weight_kg || 0),
+    heightCm: Number(row.height_cm || 0),
+    widthCm: Number(row.width_cm || 0),
+    lengthCm: Number(row.length_cm || 0)
   }
 }
 
-function toRow(product: ProductInput) { return { name: product.name, brand: product.brand || null, category: product.category, compatible_equipment: product.compatibleEquipment || null, description: product.description, image_url: product.image, price: product.price, active: product.active, stock: Math.max(0, Number(product.stock) || 0), discount_percent: Math.min(100, Math.max(0, Number(product.discountPercent) || 0)), flash_sale: Boolean(product.flashSale), show_in_banner: Boolean(product.showInBanner) } }
+function toRow(product: ProductInput) { return { name: product.name, brand: product.brand || null, category: product.category, compatible_equipment: product.compatibleEquipment || null, description: product.description, image_url: product.image, price: product.price, active: product.active, stock: Math.max(0, Number(product.stock) || 0), discount_percent: Math.min(100, Math.max(0, Number(product.discountPercent) || 0)), flash_sale: Boolean(product.flashSale), show_in_banner: Boolean(product.showInBanner), weight_kg: Math.max(0, Number(product.weightKg) || 0), height_cm: Math.max(0, Number(product.heightCm) || 0), width_cm: Math.max(0, Number(product.widthCm) || 0), length_cm: Math.max(0, Number(product.lengthCm) || 0) } }
 async function persistImage(image: string | undefined, id?: string) {
   if (!image || !image.startsWith('data:image/')) return image || ''
   const match = image.match(/^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i)
@@ -40,7 +44,7 @@ async function persistImage(image: string | undefined, id?: string) {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const supabase = getSupabaseServer()
-    if (req.method === 'GET') { const commercialResult = await supabase.from('products').select('id,name,brand,category,compatible_equipment,description,image_url,price,active,stock,discount_percent,flash_sale,show_in_banner').order('created_at', { ascending: false }); const result = commercialResult.error && /discount_percent|flash_sale|show_in_banner|stock/i.test(commercialResult.error.message) ? await supabase.from('products').select('id,name,brand,category,compatible_equipment,description,image_url,price,active').order('created_at', { ascending: false }) : commercialResult; if (result.error) throw result.error; const migrated = await Promise.all((result.data || []).map(async (row: any) => { let image = row.image_url || ''; if (image.startsWith('data:image/')) { try { image = await persistImage(image, row.id); await supabase.from('products').update({ image_url: image }).eq('id', row.id) } catch (migrationError) { console.error('Falha ao migrar imagem do produto:', row.id, migrationError); image = '' } } return fromRow({ ...row, image_url: image }) })); return res.status(200).json(migrated) }
+    if (req.method === 'GET') { const commercialResult = await supabase.from('products').select('id,name,brand,category,compatible_equipment,description,image_url,price,active,stock,discount_percent,flash_sale,show_in_banner,weight_kg,height_cm,width_cm,length_cm').order('created_at', { ascending: false }); const result = commercialResult.error && /discount_percent|flash_sale|show_in_banner|stock|weight_kg|height_cm|width_cm|length_cm/i.test(commercialResult.error.message) ? await supabase.from('products').select('id,name,brand,category,compatible_equipment,description,image_url,price,active').order('created_at', { ascending: false }) : commercialResult; if (result.error) throw result.error; const migrated = await Promise.all((result.data || []).map(async (row: any) => { let image = row.image_url || ''; if (image.startsWith('data:image/')) { try { image = await persistImage(image, row.id); await supabase.from('products').update({ image_url: image }).eq('id', row.id) } catch (migrationError) { console.error('Falha ao migrar imagem do produto:', row.id, migrationError); image = '' } } return fromRow({ ...row, image_url: image }) })); return res.status(200).json(migrated) }
     if (!isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
     if (req.method === 'POST') { const product = req.body as ProductInput; if (!product.image) return res.status(400).json({ error: 'A imagem do produto é obrigatória.' }); const image = await persistImage(product.image); const { data, error } = await supabase.from('products').insert(toRow({ ...product, image })).select().single(); if (error) throw error; return res.status(201).json(fromRow(data)) }
     if (req.method === 'PUT') { const product = req.body as ProductInput; if (!product.id) return res.status(400).json({ error: 'ID do produto obrigatório.' }); const image = await persistImage(product.image, product.id); const { data, error } = await supabase.from('products').update(toRow({ ...product, image })).eq('id', product.id).select().single(); if (error) throw error; return res.status(200).json(fromRow(data)) }

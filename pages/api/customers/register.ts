@@ -1,4 +1,3 @@
-import crypto from 'crypto'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../../lib/supabase-server'
 

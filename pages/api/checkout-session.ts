@@ -6,7 +6,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido.' })
 
   try {
-    const { customerId, items, shipping, carrier, couponCode, successUrl, cancelUrl, paymentMethod } = req.body || {}
+    const { customerId, items, shipping, carrier, couponCode, successUrl, cancelUrl, paymentMethod, externalReference } = req.body || {}
     if (!customerId || !Array.isArray(items) || !items.length) {
       return res.status(400).json({ error: 'Cliente e itens são obrigatórios.' })
     }
@@ -109,6 +109,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             couponCode: String(couponCode || ''),
             items: JSON.stringify(items),
           },
+          external_reference: externalReference ? String(externalReference) : undefined,
           back_urls: {
             success: successUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/checkout?payment=success`,
             failure: cancelUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/checkout?payment=cancelled`,
@@ -138,7 +139,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const url = mpData.init_point || mpData.sandbox_init_point || null
-      return res.status(200).json({ sessionId: mpData.id || '', url })
+      return res.status(200).json({ sessionId: mpData.id || '', url, externalReference: externalReference || '' })
     }
 
     const stripe = getStripe()

@@ -7,23 +7,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const accessToken = process.env.MP_ACCESS_TOKEN
   if (!accessToken) return res.status(503).json({ error: 'Mercado Pago não configurado.' })
 
-  const { paymentId } = req.body || {}
-  if (!paymentId) return res.status(400).json({ error: 'paymentId é obrigatório.' })
+  const { paymentId, externalReference } = req.body || {}
+  if (!paymentId && !externalReference) return res.status(400).json({ error: 'paymentId ou externalReference é obrigatório.' })
 
   try {
-    const paymentResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    })
+    let payment: any = null
 
-    if (!paymentResponse.ok) {
-      return res.status(502).json({ error: 'Não foi possível confirmar o pagamento com o Mercado Pago.' })
+    if (paymentId) {
+      const paymentResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      })
+      if (!paymentResponse.ok) {
+        return res.status(502).json({ error: 'Não foi possível confirmar o pagamento com o Mercado Pago.' })
+      }
+      payment = await paymentResponse.json()
+    } else {
+      // sem payment_id na URL (ex: usuário fechou a aba antes do redirect): busca pelo external_reference gerado no checkout
+      const searchResponse = await fetch(`https://api.mercadopago.com/v1/payments/search?external_reference=${encodeURIComponent(externalReference)}&sort=date_created&criteria=desc`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      })
+      if (!searchResponse.ok) {
+        return res.status(502).json({ error: 'Não foi possível consultar o pagamento com o Mercado Pago.' })
+      }
+      const searchData = await searchResponse.json()
+      payment = searchData?.results?.[0] || null
+      if (!payment) {
+        return res.status(200).json({ confirmed: false, status: 'pending' })
+      }
     }
 
-    const payment = await paymentResponse.json()
     const result = await createOrderFromPayment(payment)
 
     if ('ignored' in result) {

@@ -6,6 +6,24 @@ import { useCustomer } from '../components/CustomerContext'
 import { supabase } from '../lib/supabase'
 
 const money = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`
+const PENDING_KEY = 'alpha-tec-pending-payment'
+type PendingPayment = { sessionId?: string; externalReference?: string }
+
+function readPendingPayment(): PendingPayment | null {
+  try {
+    const stored = localStorage.getItem(PENDING_KEY)
+    return stored ? JSON.parse(stored) : null
+  } catch {
+    return null
+  }
+}
+function savePendingPayment(pending: PendingPayment) {
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(pending)) } catch { /* ignora falha de storage */ }
+}
+function clearPendingPayment() {
+  try { localStorage.removeItem(PENDING_KEY) } catch { /* ignora falha de storage */ }
+}
+
 export default function Checkout() {
   const router = useRouter()
   const { items, subtotal, clearCart } = useCart()
@@ -16,6 +34,7 @@ export default function Checkout() {
   const [error, setError] = useState('')
   const [confirming, setConfirming] = useState(false)
   const [confirmedOrderId, setConfirmedOrderId] = useState('')
+  const [awaitingPayment, setAwaitingPayment] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card' | 'boleto'>('pix')
   const [couponCode, setCouponCode] = useState(String(router.query.coupon || ''))
   const [coupon, setCoupon] = useState<{ code: string; discountPercent: number; freeShipping: boolean } | null>(null)
@@ -26,42 +45,56 @@ export default function Checkout() {
     setCouponCode(couponFromQuery)
     void applyCoupon(couponFromQuery)
   }, [router.query.coupon])
+
+  function checkPendingPayment(silent = false) {
+    if (!router.isReady) return
+    const sessionId = String(router.query.session_id || '') || readPendingPayment()?.sessionId || ''
+    const externalReference = readPendingPayment()?.externalReference || ''
+    const paymentId = String(router.query.payment_id || router.query.collection_id || '')
+    if (!sessionId && !paymentId && !externalReference) return
+
+    const endpoint = sessionId ? '/api/stripe-confirm' : '/api/mercadopago-confirm'
+    const body = sessionId ? { sessionId } : paymentId ? { paymentId } : { externalReference }
+    const maxAttempts = silent ? 1 : 5
+
+    setConfirming(true)
+    setAwaitingPayment(false)
+    const tryConfirm = (attempt: number) => {
+      fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .then((response) => response.json())
+        .then((result) => {
+          if (result.confirmed) {
+            setConfirmedOrderId(result.orderId)
+            clearCart()
+            clearPendingPayment()
+            setConfirming(false)
+          } else if (attempt < maxAttempts) {
+            setTimeout(() => tryConfirm(attempt + 1), 3000)
+          } else {
+            setError('Pagamento ainda n\u00e3o foi aprovado. Assim que for confirmado, clique em "Verificar pagamento" novamente.')
+            setAwaitingPayment(true)
+            setConfirming(false)
+          }
+        })
+        .catch(() => {
+          setError('N\u00e3o foi poss\u00edvel confirmar automaticamente o pagamento. Clique em "Verificar pagamento" para tentar de novo.')
+          setAwaitingPayment(true)
+          setConfirming(false)
+        })
+    }
+    tryConfirm(1)
+  }
+
   useEffect(() => {
     if (!router.isReady) return
     const paymentStatus = String(router.query.payment || '')
     if (paymentStatus === 'success') {
-      const sessionId = String(router.query.session_id || '')
-      const paymentId = String(router.query.payment_id || router.query.collection_id || '')
-      if (!sessionId && !paymentId) return
-
-      const endpoint = sessionId ? '/api/stripe-confirm' : '/api/mercadopago-confirm'
-      const body = sessionId ? { sessionId } : { paymentId }
-      const maxAttempts = 5
-
-      setConfirming(true)
-      const tryConfirm = (attempt: number) => {
-        fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-          .then((response) => response.json())
-          .then((result) => {
-            if (result.confirmed) {
-              setConfirmedOrderId(result.orderId)
-              clearCart()
-              setConfirming(false)
-            } else if (attempt < maxAttempts) {
-              setTimeout(() => tryConfirm(attempt + 1), 3000)
-            } else {
-              setError('Pagamento recebido, mas ainda em processamento. Assim que for aprovado, o pedido aparecerá automaticamente.')
-              setConfirming(false)
-            }
-          })
-          .catch(() => {
-            setError('Não foi possível confirmar automaticamente o pagamento. Se o pedido não aparecer em instantes, entre em contato.')
-            setConfirming(false)
-          })
-      }
-      tryConfirm(1)
+      checkPendingPayment()
     } else if (paymentStatus === 'cancelled') {
-      setError('Pagamento cancelado ou não concluído. Você pode tentar novamente.')
+      setError('Pagamento cancelado ou n\u00e3o conclu\u00eddo. Voc\u00ea pode tentar novamente.')
+    } else if (readPendingPayment()) {
+      // usu\u00e1rio voltou para a loja sem passar pela URL de retorno (ex: fechou a aba do Mercado Pago): verifica mesmo assim
+      checkPendingPayment()
     }
   }, [router.isReady, router.query.payment])
   async function applyCoupon(codeToApply = couponCode) { const response = await fetch('/api/coupons', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: codeToApply, items }) }); const result = await response.json(); if (!response.ok) return setError(result.error); setCoupon({ code: result.code, discountPercent: Number(result.discountPercent) || 0, freeShipping: Boolean(result.freeShipping) }); setError(result.freeShipping ? 'Cupom aplicado: frete grátis.' : 'Cupom aplicado.') }
@@ -76,6 +109,7 @@ export default function Checkout() {
       if (!session) return setError('Sua sessão expirou. Entre novamente na conta.')
 
       const effectiveShipping = coupon?.freeShipping ? 0 : shipping
+      const externalReference = paymentMethod === 'pix' ? `${customer.id}-${Date.now()}` : undefined
 
       const response = await fetch('/api/checkout-session', {
         method: 'POST',
@@ -87,6 +121,7 @@ export default function Checkout() {
           carrier,
           couponCode: coupon?.code,
           paymentMethod,
+          externalReference,
           successUrl: `${window.location.origin}/checkout?payment=success`,
           cancelUrl: `${window.location.origin}/checkout?payment=cancelled`
         })
@@ -94,6 +129,7 @@ export default function Checkout() {
       const result = await response.json()
       if (!response.ok) return setError(result.error || 'Não foi possível iniciar o pagamento.')
       if (result.url) {
+        savePendingPayment(paymentMethod === 'pix' ? { externalReference } : { sessionId: result.sessionId })
         window.location.href = result.url
         return
       }
@@ -102,8 +138,9 @@ export default function Checkout() {
       setError('Não foi possível registrar o pedido no momento.')
     }
   }
-  if (confirming) return <section className="container checkout-page success-page"><p className="eyebrow">PAGAMENTO</p><h1>Confirmando seu pagamento...</h1><p className="cart-muted">Aguarde um instante enquanto validamos o pagamento com o Mercado Pago.</p></section>
+  if (confirming) return <section className="container checkout-page success-page"><p className="eyebrow">PAGAMENTO</p><h1>Confirmando seu pagamento...</h1><p className="cart-muted">Aguarde um instante enquanto validamos o pagamento.</p></section>
   if (confirmedOrderId) return <section className="container checkout-page success-page"><p className="eyebrow">PEDIDO CONFIRMADO</p><h1>Pagamento aprovado, obrigado pela sua compra!</h1><p>Pedido <strong>#{confirmedOrderId}</strong> registrado com sucesso. Você pode acompanhar o status na sua conta.</p><Link href="/products" className="primary-button">Continuar comprando <span>→</span></Link></section>
+  if (awaitingPayment) return <section className="container checkout-page success-page"><p className="eyebrow">PAGAMENTO</p><h1>Aguardando confirmação do pagamento</h1><p className="cart-muted">{error || 'Assim que o pagamento for aprovado pelo banco, seu pedido será confirmado automaticamente.'}</p><button className="primary-button" type="button" onClick={() => checkPendingPayment()}>Verificar pagamento <span>→</span></button></section>
   if (!customer) return <section className="container checkout-page"><h1>Entrando na sua conta...</h1><p className="cart-muted">Você precisa estar cadastrado para finalizar o pedido.</p><Link href="/account" className="primary-button">Criar ou acessar conta <span>→</span></Link></section>
   if (!items.length) return <section className="container checkout-page"><h1>Seu carrinho está vazio</h1><Link href="/products" className="primary-button">Ver catálogo <span>→</span></Link></section>
   const effectiveShipping = coupon?.freeShipping ? 0 : shipping

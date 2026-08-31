@@ -16,6 +16,7 @@ export default function Checkout() {
   const [error, setError] = useState('')
   const [confirming, setConfirming] = useState(false)
   const [confirmedOrderId, setConfirmedOrderId] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card' | 'boleto'>('pix')
   const [couponCode, setCouponCode] = useState(String(router.query.coupon || ''))
   const [coupon, setCoupon] = useState<{ code: string; discountPercent: number; freeShipping: boolean } | null>(null)
   useEffect(() => { if (!customer && router.isReady) router.replace('/account?returnTo=checkout') }, [customer, router])
@@ -30,20 +31,36 @@ export default function Checkout() {
     const paymentStatus = String(router.query.payment || '')
     if (paymentStatus === 'success') {
       const sessionId = String(router.query.session_id || '')
-      if (!sessionId) return
-      setConfirming(true)
-      fetch('/api/stripe-confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId }) })
-        .then((response) => response.json())
-        .then((result) => {
-          if (result.confirmed) {
-            setConfirmedOrderId(result.orderId)
-            clearCart()
-          } else {
-            setError('Pagamento recebido, mas ainda em processamento. Assim que for aprovado, o pedido aparecerá automaticamente.')
-          }
-        })
-        .catch(() => setError('Não foi possível confirmar automaticamente o pagamento. Se o pedido não aparecer em instantes, entre em contato.'))
-        .finally(() => setConfirming(false))
+      const paymentId = String(router.query.payment_id || router.query.collection_id || '')
+      if (sessionId) {
+        setConfirming(true)
+        fetch('/api/stripe-confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId }) })
+          .then((response) => response.json())
+          .then((result) => {
+            if (result.confirmed) {
+              setConfirmedOrderId(result.orderId)
+              clearCart()
+            } else {
+              setError('Pagamento recebido, mas ainda em processamento. Assim que for aprovado, o pedido aparecerá automaticamente.')
+            }
+          })
+          .catch(() => setError('Não foi possível confirmar automaticamente o pagamento. Se o pedido não aparecer em instantes, entre em contato.'))
+          .finally(() => setConfirming(false))
+      } else if (paymentId) {
+        setConfirming(true)
+        fetch('/api/mercadopago-confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentId }) })
+          .then((response) => response.json())
+          .then((result) => {
+            if (result.confirmed) {
+              setConfirmedOrderId(result.orderId)
+              clearCart()
+            } else {
+              setError('Pagamento recebido, mas ainda em processamento. Assim que for aprovado, o pedido aparecerá automaticamente.')
+            }
+          })
+          .catch(() => setError('Não foi possível confirmar automaticamente o pagamento. Se o pedido não aparecer em instantes, entre em contato.'))
+          .finally(() => setConfirming(false))
+      }
     } else if (paymentStatus === 'cancelled') {
       setError('Pagamento cancelado ou não concluído. Você pode tentar novamente.')
     }
@@ -70,7 +87,7 @@ export default function Checkout() {
           shipping: effectiveShipping,
           carrier,
           couponCode: coupon?.code,
-          paymentMethod: 'stripe',
+          paymentMethod,
           successUrl: `${window.location.origin}/checkout?payment=success`,
           cancelUrl: `${window.location.origin}/checkout?payment=cancelled`
         })
@@ -92,5 +109,5 @@ export default function Checkout() {
   if (!items.length) return <section className="container checkout-page"><h1>Seu carrinho está vazio</h1><Link href="/products" className="primary-button">Ver catálogo <span>→</span></Link></section>
   const effectiveShipping = coupon?.freeShipping ? 0 : shipping
   const discount = coupon ? (coupon.freeShipping ? 0 : subtotal * coupon.discountPercent / 100) : 0
-  return <section className="container checkout-page"><p className="eyebrow">FINALIZAÇÃO</p><h1>Checkout</h1><div className="checkout-layout"><form className="checkout-form" onSubmit={submit}><fieldset><legend>Dados para entrega</legend><div className="form-grid"><label>Nome completo<input required defaultValue={customer.name} /></label><label>CPF ou CNPJ<input required defaultValue={customer.document} /></label><label>E-mail<input required type="email" defaultValue={customer.email} /></label><label>Telefone<input required defaultValue={customer.phone} /></label><label>CEP<input required defaultValue={customer.cep} /></label><label>Endereço<input required defaultValue={customer.address} /></label><label>Número<input required defaultValue={customer.number} /></label><label>Cidade / UF<input required defaultValue={customer.city} /></label></div></fieldset><fieldset><legend>Escolha método de pagamento</legend><div className="coupon-box"><input value={couponCode} onChange={(event) => setCouponCode(event.target.value.toUpperCase())} placeholder="Cupom de desconto" /><button type="button" onClick={() => void applyCoupon()}>Aplicar cupom</button>{coupon && <small>{coupon.freeShipping ? 'Frete grátis aplicado' : `${coupon.discountPercent}% de desconto aplicado`}</small>}</div><div className="payment-method-card"><strong>Stripe</strong><p>Pague com cartão de crédito de forma segura. Você será redirecionado para o ambiente do Stripe para concluir o pagamento.</p></div></fieldset>{error && <p className="form-status">{error}</p>}<button className="primary-button" type="submit">Ir para método de pagamento <span>→</span></button></form><aside className="cart-summary"><h2>Resumo</h2>{items.map((item) => <div key={item.id}><span>{item.name} × {item.quantity}</span><strong>{money(item.price * item.quantity)}</strong></div>)}<div><span>{carrier} ({shippingDeadline})</span><strong>{money(effectiveShipping)}</strong></div>{coupon && (coupon.freeShipping ? <div><span>Frete grátis ({coupon.code})</span><strong>- {money(shipping)}</strong></div> : <div><span>Desconto ({coupon.discountPercent}%)</span><strong>- {money(discount)}</strong></div>)}<div className="summary-total"><span>Total</span><strong>{money(subtotal + effectiveShipping - discount)}</strong></div></aside></div></section>
+  return <section className="container checkout-page"><p className="eyebrow">FINALIZAÇÃO</p><h1>Checkout</h1><div className="checkout-layout"><form className="checkout-form" onSubmit={submit}><fieldset><legend>Dados para entrega</legend><div className="form-grid"><label>Nome completo<input required defaultValue={customer.name} /></label><label>CPF ou CNPJ<input required defaultValue={customer.document} /></label><label>E-mail<input required type="email" defaultValue={customer.email} /></label><label>Telefone<input required defaultValue={customer.phone} /></label><label>CEP<input required defaultValue={customer.cep} /></label><label>Endereço<input required defaultValue={customer.address} /></label><label>Número<input required defaultValue={customer.number} /></label><label>Cidade / UF<input required defaultValue={customer.city} /></label></div></fieldset><fieldset><legend>Escolha método de pagamento</legend><div className="coupon-box"><input value={couponCode} onChange={(event) => setCouponCode(event.target.value.toUpperCase())} placeholder="Cupom de desconto" /><button type="button" onClick={() => void applyCoupon()}>Aplicar cupom</button>{coupon && <small>{coupon.freeShipping ? 'Frete grátis aplicado' : `${coupon.discountPercent}% de desconto aplicado`}</small>}</div><div className="payment-method-card"><label className="payment-option"><input type="radio" checked={paymentMethod === 'pix'} onChange={() => setPaymentMethod('pix')} /> <strong>Pix</strong> — via Mercado Pago, aprovação na hora</label><label className="payment-option"><input type="radio" checked={paymentMethod === 'card'} onChange={() => setPaymentMethod('card')} /> <strong>Cartão de crédito</strong> — via Stripe</label><label className="payment-option"><input type="radio" checked={paymentMethod === 'boleto'} onChange={() => setPaymentMethod('boleto')} /> <strong>Boleto bancário</strong> — via Stripe</label></div></fieldset>{error && <p className="form-status">{error}</p>}<button className="primary-button" type="submit">Ir para método de pagamento <span>→</span></button></form><aside className="cart-summary"><h2>Resumo</h2>{items.map((item) => <div key={item.id}><span>{item.name} × {item.quantity}</span><strong>{money(item.price * item.quantity)}</strong></div>)}<div><span>{carrier} ({shippingDeadline})</span><strong>{money(effectiveShipping)}</strong></div>{coupon && (coupon.freeShipping ? <div><span>Frete grátis ({coupon.code})</span><strong>- {money(shipping)}</strong></div> : <div><span>Desconto ({coupon.discountPercent}%)</span><strong>- {money(discount)}</strong></div>)}<div className="summary-total"><span>Total</span><strong>{money(subtotal + effectiveShipping - discount)}</strong></div></aside></div></section>
 }

@@ -11,12 +11,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Cliente e itens são obrigatórios.' })
     }
 
-    const selectedMethod = String(paymentMethod || 'stripe').toLowerCase()
-    if (selectedMethod !== 'mercadopago' && selectedMethod !== 'stripe') {
-      return res.status(400).json({ error: 'Método de pagamento inválido. Use mercadopago ou stripe.' })
+    const selectedMethod = String(paymentMethod || 'pix').toLowerCase()
+    if (!['pix', 'card', 'boleto'].includes(selectedMethod)) {
+      return res.status(400).json({ error: 'Método de pagamento inválido. Use pix, card ou boleto.' })
     }
 
-    if (selectedMethod === 'mercadopago') {
+    if (selectedMethod === 'pix') {
       const accessToken = process.env.MP_ACCESS_TOKEN
       if (!accessToken) {
         return res.status(503).json({ error: 'Mercado Pago não configurado. Defina MP_ACCESS_TOKEN na Vercel para ativar o pagamento.' })
@@ -116,6 +116,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
           auto_return: 'approved',
           notification_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/mercadopago-webhook`,
+          // restringe a preferência para exibir apenas Pix (bank_transfer no Brasil)
+          payment_methods: {
+            excluded_payment_types: [
+              { id: 'credit_card' },
+              { id: 'debit_card' },
+              { id: 'prepaid_card' },
+              { id: 'ticket' },
+              { id: 'atm' },
+              { id: 'digital_wallet' },
+              { id: 'digital_currency' },
+            ],
+          },
         }),
       })
 
@@ -211,7 +223,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const baseSuccessUrl = successUrl || `${appUrl}/checkout?payment=success`
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      payment_method_types: ['card'],
+      payment_method_types: [selectedMethod === 'boleto' ? 'boleto' : 'card'],
       line_items: lineItems,
       metadata: {
         customerId: String(customerId),

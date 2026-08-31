@@ -112,7 +112,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           back_urls: {
             success: successUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/checkout?payment=success`,
             failure: cancelUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/checkout?payment=cancelled`,
-            pending: cancelUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/checkout?payment=cancelled`,
+            // pix pode ficar "pending" por alguns segundos após o pagamento: trata como sucesso para o cliente ver a confirmação assim que aprovar
+            pending: successUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/checkout?payment=success`,
           },
           auto_return: 'approved',
           notification_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/mercadopago-webhook`,

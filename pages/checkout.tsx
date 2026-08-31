@@ -32,35 +32,34 @@ export default function Checkout() {
     if (paymentStatus === 'success') {
       const sessionId = String(router.query.session_id || '')
       const paymentId = String(router.query.payment_id || router.query.collection_id || '')
-      if (sessionId) {
-        setConfirming(true)
-        fetch('/api/stripe-confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId }) })
+      if (!sessionId && !paymentId) return
+
+      const endpoint = sessionId ? '/api/stripe-confirm' : '/api/mercadopago-confirm'
+      const body = sessionId ? { sessionId } : { paymentId }
+      const maxAttempts = 5
+
+      setConfirming(true)
+      const tryConfirm = (attempt: number) => {
+        fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
           .then((response) => response.json())
           .then((result) => {
             if (result.confirmed) {
               setConfirmedOrderId(result.orderId)
               clearCart()
+              setConfirming(false)
+            } else if (attempt < maxAttempts) {
+              setTimeout(() => tryConfirm(attempt + 1), 3000)
             } else {
               setError('Pagamento recebido, mas ainda em processamento. Assim que for aprovado, o pedido aparecerá automaticamente.')
+              setConfirming(false)
             }
           })
-          .catch(() => setError('Não foi possível confirmar automaticamente o pagamento. Se o pedido não aparecer em instantes, entre em contato.'))
-          .finally(() => setConfirming(false))
-      } else if (paymentId) {
-        setConfirming(true)
-        fetch('/api/mercadopago-confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentId }) })
-          .then((response) => response.json())
-          .then((result) => {
-            if (result.confirmed) {
-              setConfirmedOrderId(result.orderId)
-              clearCart()
-            } else {
-              setError('Pagamento recebido, mas ainda em processamento. Assim que for aprovado, o pedido aparecerá automaticamente.')
-            }
+          .catch(() => {
+            setError('Não foi possível confirmar automaticamente o pagamento. Se o pedido não aparecer em instantes, entre em contato.')
+            setConfirming(false)
           })
-          .catch(() => setError('Não foi possível confirmar automaticamente o pagamento. Se o pedido não aparecer em instantes, entre em contato.'))
-          .finally(() => setConfirming(false))
       }
+      tryConfirm(1)
     } else if (paymentStatus === 'cancelled') {
       setError('Pagamento cancelado ou não concluído. Você pode tentar novamente.')
     }

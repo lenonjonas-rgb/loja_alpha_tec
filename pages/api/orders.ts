@@ -10,23 +10,33 @@ function isAdmin(req: NextApiRequest) {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST' && req.method !== 'GET' && req.method !== 'PATCH') return res.status(405).json({ error: 'Método não permitido.' })
-  if ((req.method === 'GET' || req.method === 'PATCH') && !isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
   if (req.method === 'GET') {
     try {
       const supabase = getSupabaseServer()
-      const { data, error } = await supabase.from('orders').select('id,customer_id,status,payment_status,subtotal,shipping,total,created_at,customers(name,email,phone),order_items(product_name,quantity,unit_price,total)').order('created_at', { ascending: false })
+      const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
+      if (token && !isAdmin(req)) {
+        const { data: { user }, error: userError } = await supabase.auth.getUser(token)
+        if (userError || !user) return res.status(401).json({ error: 'Sessão inválida.' })
+        const { data, error } = await supabase.from('orders').select('id,status,payment_status,shipping,total,created_at,tracking_code,order_items(product_name,quantity,unit_price,total)').eq('customer_id', user.id).order('created_at', { ascending: false })
+        if (error) throw error
+        return res.status(200).json(data)
+      }
+      if (!isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
+      const { data, error } = await supabase.from('orders').select('id,customer_id,status,payment_status,subtotal,shipping,total,created_at,tracking_code,customers(name,email,phone),order_items(product_name,quantity,unit_price,total)').order('created_at', { ascending: false })
       if (error) throw error
       return res.status(200).json(data)
     } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível carregar os pedidos.' }) }
   }
+  if (req.method === 'PATCH' && !isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
   if (req.method === 'PATCH') {
-    const { id, status, paymentStatus } = req.body || {}
+    const { id, status, paymentStatus, trackingCode } = req.body || {}
     const allowedStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']
     const allowedPayments = ['pending', 'paid', 'failed', 'refunded']
     if (!id || !allowedStatuses.includes(status) || !allowedPayments.includes(paymentStatus)) return res.status(400).json({ error: 'Pedido e status válidos são obrigatórios.' })
+    if (status === 'shipped' && !String(trackingCode || '').trim()) return res.status(400).json({ error: 'Informe o código de rastreio antes de enviar o pedido.' })
     try {
       const supabase = getSupabaseServer()
-      const { data, error } = await supabase.from('orders').update({ status, payment_status: paymentStatus }).eq('id', id).select('id,customer_id,status,payment_status,subtotal,shipping,total,created_at,customers(name,email,phone),order_items(product_name,quantity,unit_price,total)').single()
+      const { data, error } = await supabase.from('orders').update({ status, payment_status: paymentStatus, tracking_code: String(trackingCode || '').trim() || null }).eq('id', id).select('id,customer_id,status,payment_status,subtotal,shipping,total,created_at,tracking_code,customers(name,email,phone),order_items(product_name,quantity,unit_price,total)').single()
       if (error) throw error
       return res.status(200).json(data)
     } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível atualizar o pedido.' }) }

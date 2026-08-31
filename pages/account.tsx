@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/router'
 import { useCustomer, type Customer } from '../components/CustomerContext'
 import { getProviders, signIn as signInGoogle, useSession } from 'next-auth/react'
 import { supabase } from '../lib/supabase'
@@ -9,6 +10,7 @@ type AccountForm = Customer
 const emptyCustomer: AccountForm = { name: '', document: '', email: '', phone: '', cep: '', address: '', number: '', complement: '', city: '' }
 
 export default function Account() {
+  const router = useRouter()
   const { customer, signOut } = useCustomer()
   const { data: socialSession } = useSession()
   const [mode, setMode] = useState<'login' | 'register'>('login')
@@ -17,6 +19,13 @@ export default function Account() {
   const [passwordConfirmation, setPasswordConfirmation] = useState('')
   const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  useEffect(() => {
+    if (!router.isReady) return
+    setMode(router.query.mode === 'register' ? 'register' : 'login')
+    setPassword('')
+    setPasswordConfirmation('')
+    setMessage('')
+  }, [router.isReady, router.query.mode])
   useEffect(() => { const user = socialSession?.user; if (user && !customer) setForm((current) => ({ ...current, name: user.name || '', email: user.email || '' })) }, [socialSession, customer])
   function update(field: keyof AccountForm, value: string) { setForm((current) => ({ ...current, [field]: value })) }
   async function lookupCep(value: string) { const cep = value.replace(/\D/g, ''); update('cep', value); if (cep.length !== 8) { update('address', ''); update('city', ''); return } setMessage('Consultando endereço...'); try { const response = await fetch(`/api/cep?cep=${cep}`); const result = await response.json(); if (!response.ok) throw new Error(result.error); update('address', result.address.logradouro || ''); update('city', result.address.localidade ? `${result.address.localidade}/${result.address.uf || ''}` : ''); setMessage('Endereço preenchido. Informe o número e o complemento, se houver.') } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível consultar o CEP.') } }

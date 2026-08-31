@@ -18,7 +18,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <button type="submit" aria-label="Buscar">Buscar</button>
           </form>
           <div className="header-actions">
-            <Link href="/account">{customer ? customer.name : 'CRIAR CONTA / LOGIN'}</Link>
+            {customer ? <Link href="/account">{customer.name}</Link> : <><Link href="/account?mode=register">CRIAR CONTA</Link><Link href="/account?mode=login">LOGIN</Link></>}
             <Link href="/cart" className="cart-link">Carrinho <span>{count}</span></Link>
           </div>
         </div>

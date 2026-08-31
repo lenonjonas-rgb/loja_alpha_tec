@@ -23,13 +23,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     if (!isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
     if (req.method === 'GET') {
+      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+      await supabase
+        .from('leads')
+        .update({ status: 'lost', updated_at: new Date().toISOString() })
+        .eq('status', 'new')
+        .lt('updated_at', twoDaysAgo)
+
       const { data, error } = await supabase.from('leads').select('*').order('created_at', { ascending: false })
       if (error) throw error
       return res.status(200).json(data)
     }
     const { id, status, notes } = req.body || {}
     if (!id || !['new', 'contacted', 'proposal', 'won', 'lost'].includes(status)) return res.status(400).json({ error: 'Lead e status são obrigatórios.' })
-    const { data, error } = await supabase.from('leads').update({ status: status as LeadStatus, notes: typeof notes === 'string' ? notes : '' }).eq('id', id).select('*').single()
+    const { data, error } = await supabase.from('leads').update({ status: status as LeadStatus, notes: typeof notes === 'string' ? notes : '', updated_at: new Date().toISOString() }).eq('id', id).select('*').single()
     if (error) throw error
     return res.status(200).json(data)
   } catch (error) {

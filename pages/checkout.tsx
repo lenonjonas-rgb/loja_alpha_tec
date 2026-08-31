@@ -93,7 +93,6 @@ export default function Checkout() {
       if (!session) return setError('Sua sessão expirou. Entre novamente na conta.')
 
       const effectiveShipping = coupon?.freeShipping ? 0 : shipping
-      const externalReference = paymentMethod === 'pix' ? `${customer.id}-${Date.now()}` : undefined
 
       const response = await fetch('/api/checkout-session', {
         method: 'POST',
@@ -105,7 +104,6 @@ export default function Checkout() {
           carrier,
           couponCode: coupon?.code,
           paymentMethod,
-          externalReference,
           successUrl: `${window.location.origin}/checkout?payment=success`,
           cancelUrl: `${window.location.origin}/checkout?payment=cancelled`
         })
@@ -113,7 +111,7 @@ export default function Checkout() {
       const result = await response.json()
       if (!response.ok) return setError(result.error || 'Não foi possível iniciar o pagamento.')
       if (result.url) {
-        savePendingPayment(paymentMethod === 'pix' ? { externalReference } : { sessionId: result.sessionId })
+        savePendingPayment(paymentMethod === 'pix' ? { externalReference: result.externalReference } : { sessionId: result.sessionId })
         window.location.href = result.url
         return
       }

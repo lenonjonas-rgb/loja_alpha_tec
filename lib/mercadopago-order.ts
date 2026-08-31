@@ -64,6 +64,7 @@ export async function createOrderFromPayment(payment: MercadoPagoPayment) {
   const couponCode = String(payment?.metadata?.couponCode || '')
   let discount = 0
   let effectiveShippingTotal = shippingTotal
+  let appliedCoupon: { id: string; used_count: number } | null = null
 
   if (couponCode) {
     const { data: coupon } = await supabase
@@ -76,6 +77,7 @@ export async function createOrderFromPayment(payment: MercadoPagoPayment) {
     if (coupon && !(coupon.expires_at && new Date(coupon.expires_at) < new Date()) && !(coupon.usage_limit !== null && coupon.used_count >= coupon.usage_limit)) {
       discount = subtotal * Number(coupon.discount_percent || 0) / 100
       effectiveShippingTotal = coupon.free_shipping ? 0 : shippingTotal
+      appliedCoupon = { id: coupon.id, used_count: coupon.used_count }
     }
   }
 
@@ -110,11 +112,11 @@ export async function createOrderFromPayment(payment: MercadoPagoPayment) {
   const { error: itemError } = await supabase.from('order_items').insert(orderItems)
   if (itemError) throw itemError
 
-  if (couponCode) {
+  if (appliedCoupon) {
     await supabase
       .from('coupons')
-      .update({ used_count: 0 })
-      .eq('code', couponCode.toUpperCase())
+      .update({ used_count: appliedCoupon.used_count + 1 })
+      .eq('id', appliedCoupon.id)
   }
 
   return { orderId: order.id, alreadyExists: false as const }

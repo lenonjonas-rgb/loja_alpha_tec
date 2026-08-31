@@ -2,11 +2,12 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useCart } from '../components/CartContext'
 import { useCustomer } from '../components/CustomerContext'
+import { readPendingPayment, clearPendingPayment, confirmPendingPayment } from '../lib/pending-payment'
 
 const money = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`
 type ShippingOption = { carrier: string; price: number; deadline: string }
 export default function Cart() {
-  const { items, subtotal, updateQuantity, removeItem } = useCart()
+  const { items, subtotal, updateQuantity, removeItem, clearCart } = useCart()
   const { customer } = useCustomer()
   const [cep, setCep] = useState('')
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([])
@@ -15,6 +16,20 @@ export default function Cart() {
   const [coupon, setCoupon] = useState<{ code: string; discountPercent: number; freeShipping: boolean } | null>(null)
   const [couponMessage, setCouponMessage] = useState('')
   const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    const pending = readPendingPayment()
+    if (!pending) return
+    confirmPendingPayment(pending)
+      .then((result) => {
+        if (result.confirmed) {
+          clearCart()
+          clearPendingPayment()
+          setMessage('Pagamento confirmado! Seu pedido foi registrado com sucesso.')
+        }
+      })
+      .catch(() => undefined)
+  }, [])
 
   useEffect(() => {
     if (!customer?.cep || cep) return

@@ -8,7 +8,7 @@ export const config = {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
+  if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Método não permitido.' })
   }
 
@@ -19,9 +19,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const event = req.body || {}
-    const paymentId = event?.data?.id || event?.id
+    // o Mercado Pago pode notificar via JSON (webhooks novos: data.id) ou via query string (IPN clássico: ?topic=payment&id=123)
+    const topic = String(req.query.topic || req.query.type || event?.type || '')
+    const paymentId = req.query.id || event?.data?.id || event?.id
 
-    if (!paymentId) {
+    if (!paymentId || (topic && topic !== 'payment')) {
       return res.status(200).json({ received: true, ignored: true })
     }
 

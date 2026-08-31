@@ -4,25 +4,9 @@ import Link from 'next/link'
 import { useCart } from '../components/CartContext'
 import { useCustomer } from '../components/CustomerContext'
 import { supabase } from '../lib/supabase'
+import { readPendingPayment, savePendingPayment, clearPendingPayment } from '../lib/pending-payment'
 
 const money = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`
-const PENDING_KEY = 'alpha-tec-pending-payment'
-type PendingPayment = { sessionId?: string; externalReference?: string }
-
-function readPendingPayment(): PendingPayment | null {
-  try {
-    const stored = localStorage.getItem(PENDING_KEY)
-    return stored ? JSON.parse(stored) : null
-  } catch {
-    return null
-  }
-}
-function savePendingPayment(pending: PendingPayment) {
-  try { localStorage.setItem(PENDING_KEY, JSON.stringify(pending)) } catch { /* ignora falha de storage */ }
-}
-function clearPendingPayment() {
-  try { localStorage.removeItem(PENDING_KEY) } catch { /* ignora falha de storage */ }
-}
 
 export default function Checkout() {
   const router = useRouter()

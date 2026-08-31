@@ -47,3 +47,64 @@ alter table public.orders add column if not exists payment_reference text;
 create unique index if not exists orders_payment_reference_idx on public.orders (payment_reference) where payment_reference is not null;
 alter table public.orders add column if not exists coupon_code text;
 alter table public.orders add column if not exists tracking_code text;
+
+create or replace function public.consume_coupon(p_coupon_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.coupons
+  set used_count = used_count + 1
+  where id = p_coupon_id
+    and active = true
+    and (expires_at is null or expires_at >= now())
+    and (usage_limit is null or used_count < usage_limit);
+
+  return found;
+end;
+$$;
+
+create or replace function public.confirm_paid_order(p_order_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  order_coupon_code text;
+  coupon_id uuid;
+begin
+  select coupon_code into order_coupon_code
+  from public.orders
+  where id = p_order_id and payment_status <> 'paid'
+  for update;
+
+  if not found then
+    return false;
+  end if;
+
+  if order_coupon_code is not null then
+    select id into coupon_id
+    from public.coupons
+    where code = order_coupon_code
+      and active = true
+      and (expires_at is null or expires_at >= now())
+      and (usage_limit is null or used_count < usage_limit)
+    for update;
+
+    if not found then
+      raise exception 'Cupom esgotado antes da confirmação do pagamento.';
+    end if;
+
+    update public.coupons set used_count = used_count + 1 where id = coupon_id;
+  end if;
+
+  update public.orders
+  set status = 'confirmed', payment_status = 'paid'
+  where id = p_order_id;
+
+  return true;
+end;
+$$;

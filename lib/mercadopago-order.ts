@@ -30,27 +30,9 @@ export async function createOrderFromPayment(payment: MercadoPagoPayment) {
     return { orderId: order.id, alreadyExists: true as const }
   }
 
-  const { error: updateError } = await supabase
-    .from('orders')
-    .update({ status: 'confirmed', payment_status: 'paid' })
-    .eq('id', order.id)
-
-  if (updateError) throw updateError
-
-  if (order.coupon_code) {
-    const { data: coupon } = await supabase
-      .from('coupons')
-      .select('id,used_count')
-      .eq('code', order.coupon_code)
-      .maybeSingle()
-
-    if (coupon) {
-      await supabase
-        .from('coupons')
-        .update({ used_count: coupon.used_count + 1 })
-        .eq('id', coupon.id)
-    }
-  }
+  const { data: confirmed, error: confirmationError } = await supabase.rpc('confirm_paid_order', { p_order_id: order.id })
+  if (confirmationError) throw confirmationError
+  if (!confirmed) return { orderId: order.id, alreadyExists: true as const }
 
   return { orderId: order.id, alreadyExists: false as const }
 }

@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Cliente e itens são obrigatórios.' })
     }
 
-    const selectedMethod = String(paymentMethod || 'mercadopago').toLowerCase()
+    const selectedMethod = String(paymentMethod || 'stripe').toLowerCase()
     if (selectedMethod !== 'mercadopago' && selectedMethod !== 'stripe') {
       return res.status(400).json({ error: 'Método de pagamento inválido. Use mercadopago ou stripe.' })
     }
@@ -136,7 +136,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const supabase = getSupabaseServer()
     const { data: products, error: productsError } = await supabase
       .from('products')
-      .select('id,name,price,active,discount_percent')
+      .select('id,name,price,active,discount_percent,image_url')
       .in('id', items.map((item: { id: string }) => item.id))
 
     if (productsError) throw productsError
@@ -144,19 +144,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Um ou mais produtos não estão disponíveis.' })
     }
 
-    const priceById = new Map(products.map((product) => {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const toAbsoluteUrl = (path: string) => (path && /^https?:\/\//i.test(path) ? path : path ? `${appUrl}${path.startsWith('/') ? '' : '/'}${path}` : `${appUrl}/logo-header-uniform.jpg`)
+    const productById = new Map(products.map((product) => {
       const basePrice = Number(product.price)
       const discountPercent = Number(product.discount_percent || 0)
       const finalPrice = discountPercent > 0 ? basePrice * (1 - discountPercent / 100) : basePrice
-      return [product.id, finalPrice]
+      return [product.id, { name: product.name, price: finalPrice, pictureUrl: toAbsoluteUrl(product.image_url) }]
     }))
-    const subtotal = items.reduce((total: number, item: { id: string; quantity: number }) => {
-      const unitPrice = priceById.get(item.id) || 0
-      return total + unitPrice * Number(item.quantity)
-    }, 0)
+    let subtotal = 0
+    for (const item of items as Array<{ id: string; quantity: number }>) {
+      subtotal += (productById.get(item.id)?.price || 0) * Number(item.quantity)
+    }
 
     let discount = 0
-    const shippingTotal = Number(shipping || 0)
+    let shippingTotal = Number(shipping || 0)
     if (couponCode) {
       const { data: coupon, error: couponError } = await supabase
         .from('coupons')
@@ -172,36 +174,54 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       discount = subtotal * Number(coupon.discount_percent || 0) / 100
       if (coupon.free_shipping) {
-        return res.status(200).json({ sessionId: '', url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/checkout?payment=success` })
+        shippingTotal = 0
       }
     }
 
-    const total = Math.max(0, subtotal + shippingTotal - discount)
+    // aplica o desconto do cupom proporcionalmente ao preço de cada item, preservando a imagem/nome real do produto
+    const discountFactor = subtotal > 0 ? Math.max(0, (subtotal - discount) / subtotal) : 1
+    const lineItems = (items as Array<{ id: string; quantity: number }>).map((item) => {
+      const product = productById.get(item.id)!
+      return {
+        price_data: {
+          currency: 'brl',
+          product_data: {
+            name: product.name,
+            images: [product.pictureUrl],
+          },
+          unit_amount: Math.round(product.price * discountFactor * 100),
+        },
+        quantity: Number(item.quantity),
+      }
+    })
+    if (shippingTotal > 0) {
+      lineItems.push({
+        price_data: {
+          currency: 'brl',
+          product_data: {
+            name: `Frete - ${carrier || 'Correios'}`,
+            images: [`${appUrl}/logo-header-uniform.jpg`],
+          },
+          unit_amount: Math.round(shippingTotal * 100),
+        },
+        quantity: 1,
+      })
+    }
 
+    const baseSuccessUrl = successUrl || `${appUrl}/checkout?payment=success`
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'brl',
-            product_data: {
-              name: `Compra Alpha Tec - ${carrier || 'Frete'}`,
-            },
-            unit_amount: Math.round(total * 100),
-          },
-          quantity: 1,
-        },
-      ],
+      line_items: lineItems,
       metadata: {
         customerId: String(customerId),
-        shipping: String(shipping || 0),
+        shipping: String(shippingTotal || 0),
         carrier: String(carrier || 'Correios'),
         couponCode: String(couponCode || ''),
         items: JSON.stringify(items),
       },
-      success_url: successUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/checkout?payment=success`,
-      cancel_url: cancelUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/checkout?payment=cancelled`,
+      success_url: `${baseSuccessUrl}${baseSuccessUrl.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: cancelUrl || `${appUrl}/checkout?payment=cancelled`,
     })
 
     return res.status(200).json({ sessionId: session.id, url: session.url })

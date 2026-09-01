@@ -27,7 +27,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const supabase = getSupabaseServer()
       const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
-      if (token && !isAdmin(req)) {
+      // prioridade absoluta ao token do cliente: nunca cair no ramo admin quando um Bearer token for enviado,
+      // mesmo que exista um cookie de sessão admin ativo no mesmo navegador
+      if (token) {
         const { data: { user }, error: userError } = await supabase.auth.getUser(token)
         if (userError || !user) return res.status(401).json({ error: 'Sessão inválida.' })
         const { data, error } = await supabase.from('orders').select('id,status,payment_status,shipping,total,created_at,tracking_code,invoice_url,order_items(product_name,quantity,unit_price,total)').eq('customer_id', user.id).order('created_at', { ascending: false })

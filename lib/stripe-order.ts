@@ -1,4 +1,5 @@
 import { getSupabaseServer } from './supabase-server'
+import { sendOrderConfirmationEmail } from './order-email'
 
 type StripeSessionLike = {
   id: string
@@ -32,6 +33,8 @@ export async function createOrderFromStripeSession(session: StripeSessionLike) {
   const { data: confirmed, error: confirmationError } = await supabase.rpc('confirm_paid_order', { p_order_id: order.id })
   if (confirmationError) throw confirmationError
   if (!confirmed) return { orderId: order.id, alreadyExists: true as const }
+
+  await sendOrderConfirmationEmail(order.id).catch(() => undefined)
 
   return { orderId: order.id, alreadyExists: false as const }
 }

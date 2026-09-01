@@ -5,6 +5,7 @@ import { useCart } from '../components/CartContext'
 import { useCustomer } from '../components/CustomerContext'
 import { supabase } from '../lib/supabase'
 import { readPendingPayment, savePendingPayment, clearPendingPayment } from '../lib/pending-payment'
+import { maxRedeemablePoints, pointsToDiscount, purchasePointsPreview } from '../lib/loyalty'
 
 const money = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`
 
@@ -22,6 +23,8 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card' | 'boleto'>('pix')
   const [couponCode, setCouponCode] = useState(String(router.query.coupon || ''))
   const [coupon, setCoupon] = useState<{ code: string; discountPercent: number; freeShipping: boolean } | null>(null)
+  const [availablePoints, setAvailablePoints] = useState(0)
+  const [pointsToRedeem, setPointsToRedeem] = useState(0)
   useEffect(() => { if (!customer && router.isReady) router.replace('/account?returnTo=checkout') }, [customer, router])
   useEffect(() => {
     const couponFromQuery = typeof router.query.coupon === 'string' ? router.query.coupon : ''
@@ -29,6 +32,18 @@ export default function Checkout() {
     setCouponCode(couponFromQuery)
     void applyCoupon(couponFromQuery)
   }, [router.query.coupon])
+
+  useEffect(() => {
+    async function loadPoints() {
+      if (!supabase || !customer) return
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      if (!token) return
+      const response = await fetch('/api/loyalty-points', { headers: { Authorization: `Bearer ${token}` } })
+      if (response.ok) { const result = await response.json(); setAvailablePoints(Number(result.points) || 0) }
+    }
+    void loadPoints()
+  }, [customer])
 
   function checkPendingPayment(silent = false) {
     if (!router.isReady) return
@@ -104,6 +119,7 @@ export default function Checkout() {
           carrier,
           couponCode: coupon?.code,
           paymentMethod,
+          pointsToRedeem,
           successUrl: `${window.location.origin}/checkout?payment=success`,
           cancelUrl: `${window.location.origin}/checkout?payment=cancelled`
         })
@@ -127,5 +143,7 @@ export default function Checkout() {
   if (!items.length) return <section className="container checkout-page"><h1>Seu carrinho está vazio</h1><Link href="/products" className="primary-button">Ver catálogo <span>→</span></Link></section>
   const effectiveShipping = coupon?.freeShipping ? 0 : shipping
   const discount = coupon ? (coupon.freeShipping ? 0 : subtotal * coupon.discountPercent / 100) : 0
-  return <section className="container checkout-page"><p className="eyebrow">FINALIZAÇÃO</p><h1>Checkout</h1><div className="checkout-layout"><form className="checkout-form" onSubmit={submit}><fieldset><legend>Dados para entrega</legend><div className="form-grid"><label>Nome completo<input required defaultValue={customer.name} /></label><label>CPF ou CNPJ<input required defaultValue={customer.document} /></label><label>E-mail<input required type="email" defaultValue={customer.email} /></label><label>Telefone<input required defaultValue={customer.phone} /></label><label>CEP<input required defaultValue={customer.cep} /></label><label>Endereço<input required defaultValue={customer.address} /></label><label>Número<input required defaultValue={customer.number} /></label><label>Cidade / UF<input required defaultValue={customer.city} /></label></div></fieldset><fieldset><legend>Escolha método de pagamento</legend><div className="coupon-box"><input value={couponCode} onChange={(event) => setCouponCode(event.target.value.toUpperCase())} placeholder="Cupom de desconto" /><button type="button" onClick={() => void applyCoupon()}>Aplicar cupom</button>{coupon && <small>{coupon.freeShipping ? 'Frete grátis aplicado' : `${coupon.discountPercent}% de desconto aplicado`}</small>}</div><div className="payment-method-card"><label className="payment-option"><input type="radio" checked={paymentMethod === 'pix'} onChange={() => setPaymentMethod('pix')} /> <strong>Pix</strong> — via Mercado Pago, aprovação na hora</label><label className="payment-option"><input type="radio" checked={paymentMethod === 'card'} onChange={() => setPaymentMethod('card')} /> <strong>Cartão de crédito</strong> — via Stripe</label><label className="payment-option"><input type="radio" checked={paymentMethod === 'boleto'} onChange={() => setPaymentMethod('boleto')} /> <strong>Boleto bancário</strong> — via Stripe</label></div></fieldset>{error && <p className="form-status">{error}</p>}<button className="primary-button" type="submit">Ir para método de pagamento <span>→</span></button></form><aside className="cart-summary"><h2>Resumo</h2>{items.map((item) => <div key={item.id}><span>{item.name} × {item.quantity}</span><strong>{money(item.price * item.quantity)}</strong></div>)}<div><span>{carrier} ({shippingDeadline})</span><strong>{money(effectiveShipping)}</strong></div>{coupon && (coupon.freeShipping ? <div><span>Frete grátis ({coupon.code})</span><strong>- {money(shipping)}</strong></div> : <div><span>Desconto ({coupon.discountPercent}%)</span><strong>- {money(discount)}</strong></div>)}<div className="summary-total"><span>Total</span><strong>{money(subtotal + effectiveShipping - discount)}</strong></div></aside></div></section>
+  const maxPoints = maxRedeemablePoints(availablePoints, subtotal)
+  const pointsDiscount = pointsToDiscount(pointsToRedeem)
+  return <section className="container checkout-page"><p className="eyebrow">FINALIZAÇÃO</p><h1>Checkout</h1><div className="checkout-layout"><form className="checkout-form" onSubmit={submit}><fieldset><legend>Dados para entrega</legend><div className="form-grid"><label>Nome completo<input required defaultValue={customer.name} /></label><label>CPF ou CNPJ<input required defaultValue={customer.document} /></label><label>E-mail<input required type="email" defaultValue={customer.email} /></label><label>Telefone<input required defaultValue={customer.phone} /></label><label>CEP<input required defaultValue={customer.cep} /></label><label>Endereço<input required defaultValue={customer.address} /></label><label>Número<input required defaultValue={customer.number} /></label><label>Cidade / UF<input required defaultValue={customer.city} /></label></div></fieldset><fieldset><legend>Escolha método de pagamento</legend><div className="coupon-box"><input value={couponCode} onChange={(event) => setCouponCode(event.target.value.toUpperCase())} placeholder="Cupom de desconto" /><button type="button" onClick={() => void applyCoupon()}>Aplicar cupom</button>{coupon && <small>{coupon.freeShipping ? 'Frete grátis aplicado' : `${coupon.discountPercent}% de desconto aplicado`}</small>}</div>{maxPoints >= 100 && <div className="points-box"><label>Usar meus pontos ({availablePoints} pts disponíveis)<input type="range" min={0} max={maxPoints} step={50} value={pointsToRedeem} onChange={(event) => setPointsToRedeem(Number(event.target.value))} /></label><small>{pointsToRedeem} pts = {money(pointsDiscount)} de desconto</small></div>}<div className="payment-method-card"><label className="payment-option"><input type="radio" checked={paymentMethod === 'pix'} onChange={() => setPaymentMethod('pix')} /> <strong>Pix</strong> — via Mercado Pago, aprovação na hora</label><label className="payment-option"><input type="radio" checked={paymentMethod === 'card'} onChange={() => setPaymentMethod('card')} /> <strong>Cartão de crédito</strong> — via Stripe</label><label className="payment-option"><input type="radio" checked={paymentMethod === 'boleto'} onChange={() => setPaymentMethod('boleto')} /> <strong>Boleto bancário</strong> — via Stripe</label></div></fieldset>{error && <p className="form-status">{error}</p>}<button className="primary-button" type="submit">Ir para método de pagamento <span>→</span></button></form><aside className="cart-summary"><h2>Resumo</h2>{items.map((item) => <div key={item.id}><span>{item.name} × {item.quantity}</span><strong>{money(item.price * item.quantity)}</strong></div>)}<div><span>{carrier} ({shippingDeadline})</span><strong>{money(effectiveShipping)}</strong></div>{coupon && (coupon.freeShipping ? <div><span>Frete grátis ({coupon.code})</span><strong>- {money(shipping)}</strong></div> : <div><span>Desconto ({coupon.discountPercent}%)</span><strong>- {money(discount)}</strong></div>)}{pointsToRedeem > 0 && <div><span>Pontos ({pointsToRedeem} pts)</span><strong>- {money(pointsDiscount)}</strong></div>}<div className="summary-total"><span>Total</span><strong>{money(Math.max(0, subtotal + effectiveShipping - discount - pointsDiscount))}</strong></div><p className="points-earn-preview">Você ganha {purchasePointsPreview(subtotal - discount)} pontos nesta compra</p></aside></div></section>
 }

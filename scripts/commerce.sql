@@ -69,6 +69,54 @@ begin
 end;
 $$;
 
+-- Programa de pontos: cliente avalia o pedido entregue (com fotos opcionais) e ganha pontos,
+-- que expiram em 90 dias e podem ser trocados por desconto em compras futuras.
+create table if not exists public.product_reviews (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null unique references public.orders(id) on delete cascade,
+  customer_id uuid not null references public.customers(id) on delete cascade,
+  rating smallint not null check (rating between 1 and 5),
+  comment text,
+  photos jsonb not null default '[]'::jsonb,
+  points_awarded integer not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists product_reviews_customer_idx on public.product_reviews (customer_id);
+
+create table if not exists public.loyalty_points (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid not null references public.customers(id) on delete cascade,
+  order_id uuid references public.orders(id) on delete set null,
+  points integer not null,
+  reason text not null check (reason in ('review', 'redeem', 'purchase')),
+  expires_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists loyalty_points_customer_idx on public.loyalty_points (customer_id);
+alter table public.loyalty_points drop constraint if exists loyalty_points_reason_check;
+alter table public.loyalty_points add constraint loyalty_points_reason_check check (reason in ('review', 'redeem', 'purchase'));
+
+alter table public.orders add column if not exists points_redeemed integer not null default 0;
+alter table public.orders add column if not exists points_discount numeric(10,2) not null default 0;
+
+-- Saldo de pontos disponível: soma dos ganhos ainda não expirados menos tudo que já foi resgatado
+create or replace function public.get_loyalty_balance(p_customer_id uuid)
+returns integer
+language sql
+security definer
+set search_path = public
+as $$
+  select coalesce(sum(
+    case
+      when reason = 'redeem' then points
+      when expires_at is null or expires_at >= now() then points
+      else 0
+    end
+  ), 0)::integer
+  from public.loyalty_points
+  where customer_id = p_customer_id;
+$$;
+
 create or replace function public.confirm_paid_order(p_order_id uuid)
 returns boolean
 language plpgsql
@@ -78,8 +126,13 @@ as $$
 declare
   order_coupon_code text;
   coupon_id uuid;
+  order_customer_id uuid;
+  order_points_redeemed integer;
+  order_subtotal numeric(12,2);
+  available_points integer;
+  purchase_points integer;
 begin
-  select coupon_code into order_coupon_code
+  select coupon_code, customer_id, points_redeemed, subtotal into order_coupon_code, order_customer_id, order_points_redeemed, order_subtotal
   from public.orders
   where id = p_order_id and payment_status <> 'paid'
   for update;
@@ -104,9 +157,32 @@ begin
     update public.coupons set used_count = used_count + 1 where id = coupon_id;
   end if;
 
+  if order_points_redeemed > 0 then
+    select public.get_loyalty_balance(order_customer_id) into available_points;
+    if available_points < order_points_redeemed then
+      raise exception 'Saldo de pontos insuficiente para concluir o resgate.';
+    end if;
+    insert into public.loyalty_points (customer_id, order_id, points, reason)
+    values (order_customer_id, p_order_id, -order_points_redeemed, 'redeem');
+  end if;
+
   update public.orders
   set status = 'confirmed', payment_status = 'paid'
   where id = p_order_id;
+
+  -- pontos por real gasto: taxa conservadora (1 ponto a cada R$ 5 do subtotal), pois o catálogo tem itens caros
+  purchase_points := floor(coalesce(order_subtotal, 0) / 5)::integer;
+  if purchase_points > 0 then
+    insert into public.loyalty_points (customer_id, order_id, points, reason, expires_at)
+    values (order_customer_id, p_order_id, purchase_points, 'purchase', now() + interval '90 days');
+  end if;
+
+  -- baixa o estoque dos itens do pedido assim que o pagamento é confirmado (uma única vez, dentro da mesma transação)
+  update public.products p
+  set stock = greatest(0, p.stock - oi.quantity)
+  from public.order_items oi
+  where oi.order_id = p_order_id
+    and p.id::text = oi.product_id::text;
 
   return true;
 end;

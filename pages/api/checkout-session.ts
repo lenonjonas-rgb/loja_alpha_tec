@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
 import { getStripe } from '../../lib/stripe'
+import { maxRedeemablePoints, pointsToDiscount } from '../../lib/loyalty'
 
 type PricedProduct = { name: string; price: number; pictureUrl: string }
 
@@ -30,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido.' })
 
   try {
-    const { customerId, items, shipping, carrier, couponCode, successUrl, cancelUrl, paymentMethod } = req.body || {}
+    const { customerId, items, shipping, carrier, couponCode, successUrl, cancelUrl, paymentMethod, pointsToRedeem } = req.body || {}
     if (!customerId || !Array.isArray(items) || !items.length) {
       return res.status(400).json({ error: 'Cliente e itens são obrigatórios.' })
     }
@@ -74,7 +75,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    const total = Math.max(0, subtotal + shippingTotal - discount)
+    let pointsRedeemed = 0
+    let pointsDiscount = 0
+    const requestedPoints = Math.max(0, Math.floor(Number(pointsToRedeem) || 0))
+    if (requestedPoints > 0) {
+      const { data: availableBalance, error: balanceError } = await supabase.rpc('get_loyalty_balance', { p_customer_id: customerId })
+      if (balanceError) throw balanceError
+      const maxPoints = maxRedeemablePoints(Number(availableBalance || 0), subtotal)
+      pointsRedeemed = Math.min(requestedPoints, maxPoints)
+      pointsDiscount = pointsToDiscount(pointsRedeemed)
+    }
+
+    const total = Math.max(0, subtotal + shippingTotal - discount - pointsDiscount)
     // referência única gerada por nós: usada para criar o pedido "pending" antes do pagamento e depois confirmá-lo,
     // sem depender do metadata do gateway (que nem sempre é propagado do lado deles)
     const paymentReference = crypto.randomUUID()
@@ -89,6 +101,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         coupon_code: normalizedCouponCode || null,
         payment_method: selectedMethod,
         carrier: carrier || null,
+        points_redeemed: pointsRedeemed,
+        points_discount: pointsDiscount,
         subtotal,
         shipping: shippingTotal,
         total,
@@ -127,7 +141,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // aplica o desconto do cupom proporcionalmente ao preço de cada item, preservando a imagem/nome real do produto
-      const discountFactor = subtotal > 0 ? Math.max(0, (subtotal - discount) / subtotal) : 1
+      const discountFactor = subtotal > 0 ? Math.max(0, (subtotal - discount - pointsDiscount) / subtotal) : 1
       const preferenceItems = (items as Array<{ id: string; quantity: number }>).map((item) => {
         const product = productById.get(item.id)!
         return {
@@ -201,7 +215,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(503).json({ error: 'Stripe não configurado. Defina STRIPE_SECRET_KEY na Vercel para ativar o pagamento.' })
     }
 
-    const discountFactor = subtotal > 0 ? Math.max(0, (subtotal - discount) / subtotal) : 1
+    const discountFactor = subtotal > 0 ? Math.max(0, (subtotal - discount - pointsDiscount) / subtotal) : 1
     const lineItems = (items as Array<{ id: string; quantity: number }>).map((item) => {
       const product = productById.get(item.id)!
       return {

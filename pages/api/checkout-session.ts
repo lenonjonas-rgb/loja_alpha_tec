@@ -88,6 +88,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         payment_reference: paymentReference,
         coupon_code: normalizedCouponCode || null,
         payment_method: selectedMethod,
+        carrier: carrier || null,
         subtotal,
         shipping: shippingTotal,
         total,

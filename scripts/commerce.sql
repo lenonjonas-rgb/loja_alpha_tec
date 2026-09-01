@@ -49,6 +49,7 @@ alter table public.orders add column if not exists coupon_code text;
 alter table public.orders add column if not exists tracking_code text;
 alter table public.orders add column if not exists payment_method text;
 alter table public.orders add column if not exists invoice_url text;
+alter table public.orders add column if not exists carrier text;
 
 create or replace function public.consume_coupon(p_coupon_id uuid)
 returns boolean

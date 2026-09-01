@@ -133,6 +133,8 @@ export default function Maintenance() {
         const response = await fetch('/api/send-quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pdfBase64, customerName: form.name, customerEmail: form.email, cep: form.cep, serviceType: serviceType === 'seasonal' ? 'Visita Técnica' : 'Contrato mensal' }) })
         const result = await response.json()
         if (result.sent) setStatus('Orçamento gerado, aberto em PDF e enviado por e-mail para você e para a loja.')
+        else if (result.configured === false) setStatus('Orçamento gerado e aberto em PDF. O envio automático por e-mail ainda não foi configurado (SMTP) — anexe o PDF manualmente por enquanto.')
+        else setStatus(result.error || 'Orçamento gerado e aberto em PDF, mas não foi possível enviar por e-mail.')
       } catch { setStatus('Orçamento gerado e aberto em PDF. O envio por e-mail ficará pendente.') }
     } catch { setStatus('Não foi possível gerar o PDF. Atualize a página e tente novamente.') }
   }

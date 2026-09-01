@@ -47,6 +47,7 @@ alter table public.orders add column if not exists payment_reference text;
 create unique index if not exists orders_payment_reference_idx on public.orders (payment_reference) where payment_reference is not null;
 alter table public.orders add column if not exists coupon_code text;
 alter table public.orders add column if not exists tracking_code text;
+alter table public.orders add column if not exists payment_method text;
 
 create or replace function public.consume_coupon(p_coupon_id uuid)
 returns boolean

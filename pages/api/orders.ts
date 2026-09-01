@@ -2,10 +2,23 @@ import crypto from 'crypto'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
 
+export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
+
 function isAdmin(req: NextApiRequest) {
   const [username, provided] = (req.cookies.alpha_admin_session || '.').split('.')
   const expected = crypto.createHmac('sha256', process.env.ADMIN_SESSION_SECRET || 'alpha-local-secret').update(username || '').digest('hex')
   return Boolean(username === process.env.ALPHA_MASTER_USER && provided && provided.length === expected.length && crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected)))
+}
+
+async function persistInvoice(supabase: ReturnType<typeof getSupabaseServer>, orderId: string, invoiceBase64: string) {
+  const match = invoiceBase64.match(/^data:application\/pdf;base64,(.+)$/i)
+  if (!match) throw new Error('A nota fiscal deve ser um arquivo PDF.')
+  const bucket = 'order-invoices'
+  await supabase.storage.createBucket(bucket, { public: true }).catch(() => undefined)
+  const filePath = `${orderId}.pdf`
+  const { error } = await supabase.storage.from(bucket).upload(filePath, Buffer.from(match[1], 'base64'), { contentType: 'application/pdf', upsert: true })
+  if (error) throw error
+  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${filePath}`
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -17,26 +30,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (token && !isAdmin(req)) {
         const { data: { user }, error: userError } = await supabase.auth.getUser(token)
         if (userError || !user) return res.status(401).json({ error: 'Sessão inválida.' })
-        const { data, error } = await supabase.from('orders').select('id,status,payment_status,shipping,total,created_at,tracking_code,order_items(product_name,quantity,unit_price,total)').eq('customer_id', user.id).order('created_at', { ascending: false })
+        const { data, error } = await supabase.from('orders').select('id,status,payment_status,shipping,total,created_at,tracking_code,invoice_url,order_items(product_name,quantity,unit_price,total)').eq('customer_id', user.id).order('created_at', { ascending: false })
         if (error) throw error
         return res.status(200).json(data)
       }
       if (!isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
-      const { data, error } = await supabase.from('orders').select('id,customer_id,status,payment_status,payment_method,subtotal,shipping,total,created_at,tracking_code,customers(name,email,phone),order_items(product_name,quantity,unit_price,total)').order('created_at', { ascending: false })
+      const { data, error } = await supabase.from('orders').select('id,customer_id,status,payment_status,payment_method,subtotal,shipping,total,created_at,tracking_code,invoice_url,customers(name,email,phone),order_items(product_name,quantity,unit_price,total)').order('created_at', { ascending: false })
       if (error) throw error
       return res.status(200).json(data)
     } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível carregar os pedidos.' }) }
   }
   if (req.method === 'PATCH' && !isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
   if (req.method === 'PATCH') {
-    const { id, status, paymentStatus, trackingCode } = req.body || {}
+    const { id, status, paymentStatus, trackingCode, invoiceBase64 } = req.body || {}
     const allowedStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']
     const allowedPayments = ['pending', 'paid', 'failed', 'refunded']
     if (!id || !allowedStatuses.includes(status) || !allowedPayments.includes(paymentStatus)) return res.status(400).json({ error: 'Pedido e status válidos são obrigatórios.' })
     if (status === 'shipped' && !String(trackingCode || '').trim()) return res.status(400).json({ error: 'Informe o código de rastreio antes de enviar o pedido.' })
     try {
       const supabase = getSupabaseServer()
-      const { data, error } = await supabase.from('orders').update({ status, payment_status: paymentStatus, tracking_code: String(trackingCode || '').trim() || null }).eq('id', id).select('id,customer_id,status,payment_status,subtotal,shipping,total,created_at,tracking_code,customers(name,email,phone),order_items(product_name,quantity,unit_price,total)').single()
+      const updatePayload: Record<string, unknown> = { status, payment_status: paymentStatus, tracking_code: String(trackingCode || '').trim() || null }
+      if (invoiceBase64) updatePayload.invoice_url = await persistInvoice(supabase, id, invoiceBase64)
+      const { data, error } = await supabase.from('orders').update(updatePayload).eq('id', id).select('id,customer_id,status,payment_status,subtotal,shipping,total,created_at,tracking_code,invoice_url,customers(name,email,phone),order_items(product_name,quantity,unit_price,total)').single()
       if (error) throw error
       return res.status(200).json(data)
     } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível atualizar o pedido.' }) }

@@ -7,6 +7,13 @@ alter table public.products add column if not exists height_cm numeric(10,2) not
 alter table public.products add column if not exists width_cm numeric(10,2) not null default 0;
 alter table public.products add column if not exists length_cm numeric(10,2) not null default 0;
 
+-- carrinho do cliente sincronizado entre dispositivos: 1 linha por cliente logado
+create table if not exists public.carts (
+  customer_id uuid primary key references auth.users (id) on delete cascade,
+  items jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.coupons (
   id uuid primary key default gen_random_uuid(),
   code text unique not null,

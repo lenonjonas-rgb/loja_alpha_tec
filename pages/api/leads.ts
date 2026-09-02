@@ -11,7 +11,7 @@ function isAdmin(req: NextApiRequest) {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST' && req.method !== 'GET' && req.method !== 'PATCH') return res.status(405).json({ error: 'Método não permitido.' })
+  if (req.method !== 'POST' && req.method !== 'GET' && req.method !== 'PATCH' && req.method !== 'DELETE') return res.status(405).json({ error: 'Método não permitido.' })
   try {
     const supabase = getSupabaseServer()
     if (req.method === 'POST') {
@@ -22,6 +22,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(201).json({ leadId: data.id })
     }
     if (!isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
+    if (req.method === 'DELETE') {
+      const { id } = req.body || {}
+      if (!id) return res.status(400).json({ error: 'Lead é obrigatório.' })
+      const { error } = await supabase.from('leads').delete().eq('id', id)
+      if (error) throw error
+      return res.status(200).json({ id })
+    }
     if (req.method === 'GET') {
       const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
       await supabase

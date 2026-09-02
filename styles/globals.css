@@ -116,3 +116,7 @@ a { color: inherit; text-decoration: none; }
 .pix-copy-box { display: flex; gap: 8px; }
 .pix-copy-box input { border: 1px solid #d9dbdd; box-sizing: border-box; flex: 1; font-size: 11px; overflow: hidden; padding: 12px; text-overflow: ellipsis; }
 .pix-copy-box button { background: #202225; border: 0; color: #fff; cursor: pointer; font-size: 10px; font-weight: 800; padding: 0 16px; text-transform: uppercase; white-space: nowrap; }
+
+.lead-actions { align-items: center; display: flex; gap: 8px; }
+.lead-actions input { flex: 1; }
+.lead-delete-button { background: #d5322f; border: 0; color: #fff; cursor: pointer; flex-shrink: 0; font-size: 10px; font-weight: 800; padding: 11px 14px; text-transform: uppercase; }

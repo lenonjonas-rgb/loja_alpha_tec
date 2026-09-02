@@ -26,12 +26,17 @@ export default function Maintenance() {
   const [quoteReady, setQuoteReady] = useState(false)
   const [quotePdfUrl, setQuotePdfUrl] = useState('')
   const [quotePdfName, setQuotePdfName] = useState('')
+  // true depois que o lead foi criado e o orçamento enviado: trava reenvio duplicado até o cliente alterar algo
+  const [quoteSubmitted, setQuoteSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [lastPdfBase64, setLastPdfBase64] = useState('')
 
-  function update(field: keyof FormState, value: string) { setForm((current) => ({ ...current, [field]: value })) }
   function resetQuotePdf() { setQuotePdfUrl((previousUrl) => { if (previousUrl) URL.revokeObjectURL(previousUrl); return '' }); setQuotePdfName('') }
-  function chooseService(type: ServiceType) { setServiceType(type); setStatus(''); setCoverage(null); setQuoteReady(false); resetQuotePdf() }
-  function toggleEquipment(id: string, checked: boolean) { setSelectedEquipment((current) => ({ ...current, [id]: checked ? 1 : 0 })); setQuoteReady(false); resetQuotePdf() }
-  function setEquipmentQuantity(id: string, quantity: string) { setSelectedEquipment((current) => ({ ...current, [id]: Math.max(1, Number(quantity) || 1) })); setQuoteReady(false); resetQuotePdf() }
+  function invalidateQuote() { setQuoteReady(false); setQuoteSubmitted(false); setLastPdfBase64(''); resetQuotePdf() }
+  function update(field: keyof FormState, value: string) { setForm((current) => ({ ...current, [field]: value })); if (quoteSubmitted) invalidateQuote() }
+  function chooseService(type: ServiceType) { setServiceType(type); setStatus(''); setCoverage(null); invalidateQuote() }
+  function toggleEquipment(id: string, checked: boolean) { setSelectedEquipment((current) => ({ ...current, [id]: checked ? 1 : 0 })); invalidateQuote() }
+  function setEquipmentQuantity(id: string, quantity: string) { setSelectedEquipment((current) => ({ ...current, [id]: Math.max(1, Number(quantity) || 1) })); invalidateQuote() }
 
   async function lookupCep() {
     const cep = form.cep.replace(/\D/g, '')
@@ -50,7 +55,7 @@ export default function Maintenance() {
       const travelMessage = validCoverage.distanceKm < 30
         ? 'Deslocamento isento para este endereço.'
         : `Deslocamento ida e volta: R$ ${roundTripDistance.toFixed(2).replace('.', ',')}.`
-      setCoverage(validCoverage); setQuoteReady(false); setStatus(validCoverage.withinRadius ? `Atendimento disponível. ${travelMessage}` : `Este endereço está fora do raio de atendimento de ${storeConfig.serviceRadiusKm} km.`)
+      setCoverage(validCoverage); invalidateQuote(); setStatus(validCoverage.withinRadius ? `Atendimento disponível. ${travelMessage}` : `Este endereço está fora do raio de atendimento de ${storeConfig.serviceRadiusKm} km.`)
     } catch (error) { setStatus(error instanceof Error ? error.message : 'Não foi possível consultar o CEP.') }
     finally { setLoadingCep(false) }
   }
@@ -63,11 +68,29 @@ export default function Maintenance() {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (submitting) return
     if (!coverage?.withinRadius) return setStatus('Consulte um CEP dentro da área de atendimento antes de continuar.')
     if (!Object.values(selectedEquipment).some((quantity) => quantity > 0)) return setStatus('Selecione ao menos um equipamento para gerar o orçamento.')
+    if (quoteSubmitted && lastPdfBase64) {
+      void resendQuote()
+      return
+    }
     setQuoteReady(true)
     setStatus('Gerando orçamento em PDF...')
     void downloadQuote()
+  }
+
+  async function resendQuote() {
+    setSubmitting(true)
+    setStatus('Reenviando orçamento por e-mail...')
+    try {
+      const response = await fetch('/api/send-quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pdfBase64: lastPdfBase64, customerName: form.name, customerEmail: form.email, cep: form.cep, serviceType: serviceType === 'seasonal' ? 'Visita Técnica' : 'Contrato mensal' }) })
+      const result = await response.json()
+      if (result.sent) setStatus('Orçamento reenviado por e-mail para você e para a loja.')
+      else if (result.configured === false) setStatus('Envio automático por e-mail ainda não foi configurado (SMTP).')
+      else setStatus(result.error || 'Não foi possível reenviar o orçamento por e-mail.')
+    } catch { setStatus('Não foi possível reenviar o orçamento agora.') }
+    finally { setSubmitting(false) }
   }
 
   const selectedRows = equipmentList.filter((equipment) => (selectedEquipment[equipment.id] || 0) > 0).map((equipment) => ({ ...equipment, quantity: selectedEquipment[equipment.id] || 0 }))
@@ -85,6 +108,7 @@ export default function Maintenance() {
   const visitTotal = technicalVisitFee + equipmentTotal
 
   async function downloadQuote() {
+    setSubmitting(true)
     try {
       const leadResponse = await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, serviceType: serviceType === 'seasonal' ? 'Visita Técnica' : 'Contrato mensal', details: form.details, equipment: selectedRows.map((equipment) => ({ name: equipment.name, quantity: equipment.quantity, unitPrice: equipment.price })), estimatedTotal: quoteTotal }) })
       if (!leadResponse.ok) {
@@ -129,6 +153,8 @@ export default function Maintenance() {
         reader.onerror = reject
         reader.readAsDataURL(pdfBlob)
       })
+      setLastPdfBase64(pdfBase64)
+      setQuoteSubmitted(true)
       try {
         const response = await fetch('/api/send-quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pdfBase64, customerName: form.name, customerEmail: form.email, cep: form.cep, serviceType: serviceType === 'seasonal' ? 'Visita Técnica' : 'Contrato mensal' }) })
         const result = await response.json()
@@ -137,6 +163,7 @@ export default function Maintenance() {
         else setStatus(result.error || 'Orçamento gerado e aberto em PDF, mas não foi possível enviar por e-mail.')
       } catch { setStatus('Orçamento gerado e aberto em PDF. O envio por e-mail ficará pendente.') }
     } catch { setStatus('Não foi possível gerar o PDF. Atualize a página e tente novamente.') }
+    finally { setSubmitting(false) }
   }
 
   function downloadQuotePdf() {
@@ -165,7 +192,7 @@ export default function Maintenance() {
       {coverage?.withinRadius && <><fieldset><legend>2. Seus dados</legend><div className="form-grid"><label>CPF ou CNPJ<input required value={form.document} onChange={(event) => update('document', event.target.value)} /></label><label>Nome completo ou empresa<input required value={form.name} onChange={(event) => update('name', event.target.value)} /></label><label>E-mail<input required type="email" value={form.email} onChange={(event) => update('email', event.target.value)} /></label><label>Telefone<input required value={form.phone} onChange={(event) => update('phone', event.target.value)} /></label></div></fieldset>
       <fieldset><legend>3. Endereço do atendimento</legend><div className="form-grid"><label>Rua / avenida<input required value={form.street} onChange={(event) => update('street', event.target.value)} /></label><label>Número<input required value={form.number} onChange={(event) => update('number', event.target.value)} /></label><label>Complemento<input value={form.complement} onChange={(event) => update('complement', event.target.value)} /></label><label>Bairro<input required value={form.neighborhood} onChange={(event) => update('neighborhood', event.target.value)} /></label><label>Cidade<input required value={form.city} onChange={(event) => update('city', event.target.value)} /></label><label>Estado<input required maxLength={2} value={form.state} onChange={(event) => update('state', event.target.value)} /></label></div></fieldset>
       <fieldset><legend>4. Equipamentos e detalhes</legend><p className="form-hint">Selecione os equipamentos e informe as quantidades necessárias.</p><div className="equipment-list">{equipmentList.map((equipment) => <label className="equipment-row" key={equipment.id}><input type="checkbox" checked={Boolean(selectedEquipment[equipment.id])} onChange={(event) => toggleEquipment(equipment.id, event.target.checked)} /><span><strong>{equipment.name}</strong><small>{equipment.description}</small></span>{selectedEquipment[equipment.id] && <input className="quantity" type="number" min="1" value={selectedEquipment[equipment.id]} onChange={(event) => setEquipmentQuantity(equipment.id, event.target.value)} aria-label={`Quantidade de ${equipment.name}`} />}</label>)}</div><p className="form-hint">Pedágios aplicáveis serão verificados pela Alpha Tec na análise da rota.</p><label className="wide">Descreva o problema / observações<textarea required rows={4} value={form.details} onChange={(event) => update('details', event.target.value)} /></label></fieldset>
-      <button className="primary-button" type="submit">Gerar orçamento <span>→</span></button>{quoteReady && <div className="quote-result"><strong>Orçamento disponível em PDF</strong><div className="quote-actions"><button className="download-button" type="button" onClick={downloadQuotePdf} disabled={!quotePdfUrl}>Baixar PDF do orçamento</button><button className="email-button" type="button" onClick={openEmailDraft}>Preparar e-mail</button></div></div>}</>}
+      <button className="primary-button" type="submit" disabled={submitting}>{submitting ? 'Enviando...' : quoteSubmitted ? 'Reenviar orçamento' : 'Gerar orçamento'} <span>→</span></button>{quoteReady && <div className="quote-result"><strong>Orçamento disponível em PDF</strong><div className="quote-actions"><button className="download-button" type="button" onClick={downloadQuotePdf} disabled={!quotePdfUrl}>Baixar PDF do orçamento</button><button className="email-button" type="button" onClick={openEmailDraft}>Preparar e-mail</button></div></div>}</>}
     </form>}
   </section>
 }

@@ -6,6 +6,28 @@ import { readPendingPayment, clearPendingPayment, confirmPendingPayment } from '
 
 const money = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`
 type ShippingOption = { carrier: string; price: number; deadline: string }
+
+// mantém um valor de texto local enquanto o cliente digita, para permitir apagar o campo sem remover o item;
+// só aplica (ou remove, se ficar em 0) quando o campo perde o foco
+function QuantityInput({ name, quantity, onCommit }: { name: string; quantity: number; onCommit: (value: number) => void }) {
+  const [text, setText] = useState(String(quantity))
+  useEffect(() => { setText(String(quantity)) }, [quantity])
+  function commit() {
+    const parsed = Math.max(0, Math.floor(Number(text) || 0))
+    if (parsed !== quantity) onCommit(parsed)
+    else setText(String(quantity))
+  }
+  return <input
+    aria-label={`Quantidade de ${name}`}
+    type="number"
+    min="1"
+    value={text}
+    onChange={(event) => setText(event.target.value)}
+    onBlur={commit}
+    onKeyDown={(event) => { if (event.key === 'Enter') (event.target as HTMLInputElement).blur() }}
+  />
+}
+
 export default function Cart() {
   const { items, subtotal, updateQuantity, removeItem, clearCart } = useCart()
   const { customer } = useCustomer()
@@ -72,5 +94,5 @@ export default function Cart() {
     : '#'
 
   if (!items.length) return <section className="container cart-page"><p className="eyebrow">SUA COMPRA</p><h1>Carrinho vazio</h1><p className="cart-muted">Adicione uma peça ao carrinho para continuar.</p><Link href="/products" className="primary-button">Ver catálogo <span>→</span></Link></section>
-  return <section className="container cart-page"><p className="eyebrow">SUA COMPRA</p><h1>Seu carrinho</h1><div className="cart-layout"><div className="cart-items">{items.map((item) => <article className="cart-item" key={item.id}><img src={item.image} alt={item.name} /><div><small>{item.brand || 'Alpha Tec'}</small><h2>{item.name}</h2><p>{money(item.price)} por unidade</p></div><input aria-label={`Quantidade de ${item.name}`} type="number" min="1" value={item.quantity} onChange={(event) => updateQuantity(item.id, Number(event.target.value))} /><strong>{money(item.price * item.quantity)}</strong><button type="button" onClick={() => removeItem(item.id)}>Remover</button></article>)}</div><aside className="cart-summary"><h2>Resumo do pedido</h2><div><span>Subtotal</span><strong>{money(subtotal)}</strong></div><label>Calcule o frete<input value={cep} onChange={(event) => setCep(event.target.value)} placeholder="00000-000" /><button type="button" onClick={() => void calculateShipping()}>Calcular frete</button></label>{message && <p className="form-status">{message}</p>}{shippingOptions.map((option) => <label key={option.carrier} className="payment-option"><input type="radio" name="shipping" checked={shipping?.carrier === option.carrier} onChange={() => setShipping(option)} /> {option.carrier} - {option.deadline} <strong>{money(option.price)}</strong></label>)}<div className="coupon-box"><input value={couponCode} onChange={(event) => setCouponCode(event.target.value.toUpperCase())} placeholder="Digite seu cupom" /><button type="button" onClick={() => void applyCoupon()}>Aplicar</button></div>{couponMessage && <p className="form-status">{couponMessage}</p>}{coupon && (coupon.freeShipping ? <div><span>Frete grátis ({coupon.code})</span><strong>- {money(shipping?.price || 0)}</strong></div> : <div><span>Desconto ({coupon.code})</span><strong>- {money(discountAmount)}</strong></div>)}<div className="summary-total"><span>Total</span><strong>{money(total)}</strong></div><Link href={shipping ? checkoutHref : '#'} className={shipping ? 'primary-button' : 'primary-button disabled-link'}>Ir para pagamento <span>→</span></Link></aside></div></section>
+  return <section className="container cart-page"><p className="eyebrow">SUA COMPRA</p><h1>Seu carrinho</h1><div className="cart-layout"><div className="cart-items">{items.map((item) => <article className="cart-item" key={item.id}><img src={item.image} alt={item.name} /><div><small>{item.brand || 'Alpha Tec'}</small><h2>{item.name}</h2><p>{money(item.price)} por unidade</p></div><QuantityInput name={item.name} quantity={item.quantity} onCommit={(value) => updateQuantity(item.id, value)} /><strong>{money(item.price * item.quantity)}</strong><button type="button" onClick={() => removeItem(item.id)}>Remover</button></article>)}</div><aside className="cart-summary"><h2>Resumo do pedido</h2><div><span>Subtotal</span><strong>{money(subtotal)}</strong></div><label>Calcule o frete<input value={cep} onChange={(event) => setCep(event.target.value)} placeholder="00000-000" /><button type="button" onClick={() => void calculateShipping()}>Calcular frete</button></label>{message && <p className="form-status">{message}</p>}{shippingOptions.map((option) => <label key={option.carrier} className="payment-option"><input type="radio" name="shipping" checked={shipping?.carrier === option.carrier} onChange={() => setShipping(option)} /> {option.carrier} - {option.deadline} <strong>{money(option.price)}</strong></label>)}<div className="coupon-box"><input value={couponCode} onChange={(event) => setCouponCode(event.target.value.toUpperCase())} placeholder="Digite seu cupom" /><button type="button" onClick={() => void applyCoupon()}>Aplicar</button></div>{couponMessage && <p className="form-status">{couponMessage}</p>}{coupon && (coupon.freeShipping ? <div><span>Frete grátis ({coupon.code})</span><strong>- {money(shipping?.price || 0)}</strong></div> : <div><span>Desconto ({coupon.code})</span><strong>- {money(discountAmount)}</strong></div>)}<div className="summary-total"><span>Total</span><strong>{money(total)}</strong></div><Link href={shipping ? checkoutHref : '#'} className={shipping ? 'primary-button' : 'primary-button disabled-link'}>Ir para pagamento <span>→</span></Link></aside></div></section>
 }

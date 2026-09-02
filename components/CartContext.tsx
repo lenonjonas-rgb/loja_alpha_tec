@@ -9,10 +9,12 @@ const CartContext = createContext<CartContextValue | null>(null)
 const storageKey = 'alpha-tec-cart'
 
 function mergeCarts(local: CartItem[], server: CartItem[]): CartItem[] {
+  // usa a maior quantidade entre os dois lados em vez de somar: como o carrinho local já foi
+  // salvo no servidor em syncs anteriores, somar dobraria a quantidade a cada nova sincronização
   const merged = new Map<string, CartItem>(server.map((item) => [item.id, item]))
   for (const item of local) {
     const existing = merged.get(item.id)
-    merged.set(item.id, existing ? { ...existing, quantity: (existing.quantity || 0) + (item.quantity || 0) } : item)
+    merged.set(item.id, existing ? { ...existing, quantity: Math.max(existing.quantity || 0, item.quantity || 0) } : item)
   }
   return Array.from(merged.values())
 }

@@ -9,6 +9,8 @@ import { maxRedeemablePoints, pointsToDiscount, purchasePointsPreview } from '..
 
 const money = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`
 
+type PixData = { paymentId: string; qrCode: string; qrCodeBase64: string; expiresAt: string | null; externalReference: string }
+
 export default function Checkout() {
   const router = useRouter()
   const { items, subtotal, clearCart } = useCart()
@@ -25,6 +27,9 @@ export default function Checkout() {
   const [coupon, setCoupon] = useState<{ code: string; discountPercent: number; freeShipping: boolean } | null>(null)
   const [availablePoints, setAvailablePoints] = useState(0)
   const [pointsToRedeem, setPointsToRedeem] = useState(0)
+  const [pixData, setPixData] = useState<PixData | null>(null)
+  const [pixCopied, setPixCopied] = useState(false)
+  const [pixSecondsLeft, setPixSecondsLeft] = useState(0)
   useEffect(() => { if (!customer && router.isReady) router.replace('/account?returnTo=checkout') }, [customer, router])
   useEffect(() => {
     const couponFromQuery = typeof router.query.coupon === 'string' ? router.query.coupon : ''
@@ -44,6 +49,42 @@ export default function Checkout() {
     }
     void loadPoints()
   }, [customer])
+
+  // enquanto o QR Code do Pix está na tela, verifica a cada poucos segundos se o pagamento já foi aprovado
+  useEffect(() => {
+    if (!pixData) return
+    const interval = setInterval(() => {
+      fetch('/api/mercadopago-confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ externalReference: pixData.externalReference }) })
+        .then((response) => response.json())
+        .then((result) => {
+          if (result.confirmed) {
+            setConfirmedOrderId(result.orderId)
+            setPixData(null)
+            clearCart()
+            clearPendingPayment()
+          }
+        })
+        .catch(() => undefined)
+    }, 4000)
+    return () => clearInterval(interval)
+  }, [pixData])
+
+  useEffect(() => {
+    if (!pixData?.expiresAt) return setPixSecondsLeft(0)
+    const expiresAtMs = new Date(pixData.expiresAt).getTime()
+    const tick = () => setPixSecondsLeft(Math.max(0, Math.round((expiresAtMs - Date.now()) / 1000)))
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [pixData])
+
+  function copyPixCode() {
+    if (!pixData) return
+    navigator.clipboard?.writeText(pixData.qrCode).then(() => {
+      setPixCopied(true)
+      setTimeout(() => setPixCopied(false), 2500)
+    }).catch(() => undefined)
+  }
 
   function checkPendingPayment(silent = false) {
     if (!router.isReady) return
@@ -126,6 +167,11 @@ export default function Checkout() {
       })
       const result = await response.json()
       if (!response.ok) return setError(result.error || 'Não foi possível iniciar o pagamento.')
+      if (result.pix) {
+        savePendingPayment({ externalReference: result.externalReference })
+        setPixData({ ...result.pix, externalReference: result.externalReference })
+        return
+      }
       if (result.url) {
         savePendingPayment(paymentMethod === 'pix' ? { externalReference: result.externalReference } : { sessionId: result.sessionId })
         window.location.href = result.url
@@ -137,7 +183,25 @@ export default function Checkout() {
     }
   }
   if (confirming) return <section className="container checkout-page success-page"><p className="eyebrow">PAGAMENTO</p><h1>Confirmando seu pagamento...</h1><p className="cart-muted">Aguarde um instante enquanto validamos o pagamento.</p></section>
-  if (confirmedOrderId) return <section className="container checkout-page success-page"><p className="eyebrow">PEDIDO CONFIRMADO</p><h1>Pagamento aprovado, obrigado pela sua compra!</h1><p>Pedido <strong>#{confirmedOrderId}</strong> registrado com sucesso. Você pode acompanhar o status na sua conta.</p><Link href="/products" className="primary-button">Continuar comprando <span>→</span></Link></section>
+  if (confirmedOrderId) return <section className="container checkout-page success-page pix-screen"><div className="pix-status-icon pix-status-success">✓</div><p className="eyebrow" style={{ textAlign: 'center' }}>PEDIDO CONFIRMADO</p><h1 style={{ textAlign: 'center' }}>Pagamento aprovado, obrigado pela sua compra!</h1><p style={{ textAlign: 'center' }}>Pedido <strong>#{confirmedOrderId}</strong> registrado com sucesso. Você pode acompanhar o status na sua conta.</p><Link href="/products" className="primary-button">Continuar comprando <span>→</span></Link></section>
+  if (pixData) {
+    const minutes = String(Math.floor(pixSecondsLeft / 60)).padStart(2, '0')
+    const seconds = String(pixSecondsLeft % 60).padStart(2, '0')
+    return <section className="container checkout-page success-page pix-screen">
+      <div className="pix-status-icon pix-status-pending">⏱</div>
+      <h1 style={{ textAlign: 'center' }}>Pix gerado com sucesso!</h1>
+      <p className="cart-muted" style={{ textAlign: 'center' }}>Escaneie o QR Code no app do seu banco ou use o Pix Copia e Cola para concluir o pagamento.</p>
+      <div className="pix-card">
+        {pixData.qrCodeBase64 && <img className="pix-qr-image" src={`data:image/png;base64,${pixData.qrCodeBase64}`} alt="QR Code Pix" />}
+        {pixData.expiresAt && <p className="pix-expiry">Expira em {minutes}:{seconds}</p>}
+        <div className="pix-copy-box"><input readOnly value={pixData.qrCode} onFocus={(event) => event.currentTarget.select()} /><button type="button" onClick={copyPixCode}>{pixCopied ? 'Copiado!' : 'Copiar'}</button></div>
+      </div>
+      <p className="cart-muted" style={{ textAlign: 'center' }}>Assim que o pagamento for aprovado pelo seu banco, a confirmação aparece aqui automaticamente.</p>
+      <div style={{ textAlign: 'center' }}>
+        <button className="outline-button" type="button" onClick={() => { clearPendingPayment(); setPixData(null) }}>Cancelar e escolher outra forma de pagamento</button>
+      </div>
+    </section>
+  }
   if (awaitingPayment) return <section className="container checkout-page success-page"><p className="eyebrow">PAGAMENTO</p><h1>Aguardando confirmação do pagamento</h1><p className="cart-muted">{error || 'Assim que o pagamento for aprovado pelo banco, seu pedido será confirmado automaticamente.'}</p><button className="primary-button" type="button" onClick={() => checkPendingPayment()}>Verificar pagamento <span>→</span></button>{' '}<button className="outline-button" type="button" onClick={() => { clearPendingPayment(); setAwaitingPayment(false); setError('') }}>Ainda não paguei, cancelar e tentar novamente</button></section>
   if (!customer) return <section className="container checkout-page"><h1>Entrando na sua conta...</h1><p className="cart-muted">Você precisa estar cadastrado para finalizar o pedido.</p><Link href="/account" className="primary-button">Criar ou acessar conta <span>→</span></Link></section>
   if (!items.length) return <section className="container checkout-page"><h1>Seu carrinho está vazio</h1><Link href="/products" className="primary-button">Ver catálogo <span>→</span></Link></section>

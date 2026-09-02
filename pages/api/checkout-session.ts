@@ -140,61 +140,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(503).json({ error: 'Mercado Pago não configurado. Defina MP_ACCESS_TOKEN na Vercel para ativar o pagamento.' })
       }
 
-      // aplica o desconto do cupom proporcionalmente ao preço de cada item, preservando a imagem/nome real do produto
-      const discountFactor = subtotal > 0 ? Math.max(0, (subtotal - discount - pointsDiscount) / subtotal) : 1
-      const preferenceItems = (items as Array<{ id: string; quantity: number }>).map((item) => {
-        const product = productById.get(item.id)!
-        return {
-          id: item.id,
-          title: product.name,
-          picture_url: product.pictureUrl,
-          quantity: Number(item.quantity),
-          unit_price: Number((product.price * discountFactor).toFixed(2)),
-          currency_id: 'BRL',
-        }
-      })
-      if (shippingTotal > 0) {
-        preferenceItems.push({
-          id: 'frete',
-          title: `Frete - ${carrier || 'Correios'}`,
-          picture_url: `${appUrl}/logo-header-uniform.jpg`,
-          quantity: 1,
-          unit_price: Number(shippingTotal.toFixed(2)),
-          currency_id: 'BRL',
-        })
-      }
+      // gera o pagamento Pix diretamente pela API de Payments (em vez do Checkout Pro), para exibir o QR Code/copia-e-cola no próprio site
+      const { data: customerRow } = await supabase.from('customers').select('name,email,document').eq('id', customerId).maybeSingle()
+      const [firstName, ...restName] = String(customerRow?.name || 'Cliente').trim().split(' ')
+      const document = String(customerRow?.document || '').replace(/\D/g, '')
 
-      const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
+      const mpResponse = await fetch('https://api.mercadopago.com/v1/payments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${accessToken}`,
+          'X-Idempotency-Key': paymentReference,
         },
         body: JSON.stringify({
-          items: preferenceItems,
-          payer: {
-            email: 'cliente@exemplo.com',
-          },
+          transaction_amount: Number(total.toFixed(2)),
+          description: 'Pedido loja Alpha Tec',
+          payment_method_id: 'pix',
           external_reference: paymentReference,
-          back_urls: {
-            success: successUrl || `${appUrl}/checkout?payment=success`,
-            failure: cancelUrl || `${appUrl}/checkout?payment=cancelled`,
-            // pix pode ficar "pending" por alguns segundos após o pagamento: trata como sucesso para o cliente ver a confirmação assim que aprovar
-            pending: successUrl || `${appUrl}/checkout?payment=success`,
-          },
-          auto_return: 'approved',
           notification_url: `${appUrl}/api/mercadopago-webhook`,
-          // restringe a preferência para exibir apenas Pix (bank_transfer no Brasil)
-          payment_methods: {
-            excluded_payment_types: [
-              { id: 'credit_card' },
-              { id: 'debit_card' },
-              { id: 'prepaid_card' },
-              { id: 'ticket' },
-              { id: 'atm' },
-              { id: 'digital_wallet' },
-              { id: 'digital_currency' },
-            ],
+          payer: {
+            email: customerRow?.email || 'cliente@exemplo.com',
+            first_name: firstName || 'Cliente',
+            last_name: restName.join(' ') || 'Loja',
+            identification: document ? { type: document.length > 11 ? 'CNPJ' : 'CPF', number: document } : undefined,
           },
         }),
       })
@@ -202,11 +170,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const mpData = await mpResponse.json()
       if (!mpResponse.ok) {
         await rollbackOrder()
-        return res.status(502).json({ error: mpData?.message || 'Não foi possível criar a preferência do Mercado Pago.' })
+        return res.status(502).json({ error: mpData?.message || 'Não foi possível gerar o pagamento Pix no Mercado Pago.' })
       }
 
-      const url = mpData.init_point || mpData.sandbox_init_point || null
-      return res.status(200).json({ orderId, externalReference: paymentReference, url })
+      const transactionData = mpData?.point_of_interaction?.transaction_data || {}
+      if (!transactionData.qr_code) {
+        await rollbackOrder()
+        return res.status(502).json({ error: 'Mercado Pago não retornou o QR Code do Pix.' })
+      }
+
+      return res.status(200).json({
+        orderId,
+        externalReference: paymentReference,
+        pix: {
+          paymentId: mpData.id,
+          qrCode: transactionData.qr_code,
+          qrCodeBase64: transactionData.qr_code_base64,
+          expiresAt: mpData.date_of_expiration || null,
+        },
+      })
     }
 
     const stripe = getStripe()

@@ -78,6 +78,7 @@ export default function Products() {
                 <Link href={`/products/${product.id || ''}`} className="catalog-card-image">
                   <img src={product.image || '/logo-header-uniform.jpg'} alt={product.name || 'Produto'} />
                   {product.flashSale && <b>OFERTA RELÂMPAGO</b>}
+                  {!product.flashSale && hasDiscount && <b>OFERTA -{Number(product.discountPercent)}%</b>}
                 </Link>
                 <div className="catalog-card-body">
                   <small>{product.brand || 'Alpha Tec'} · {product.category || 'Geral'}</small>

@@ -226,6 +226,7 @@ export default function Home() {
                   <Link href={`/products/${product.id}`} className="product-image">
                     <img src={product.image || '/logo-header-uniform.jpg'} alt={product.name || 'Produto'} />
                     {product.flashSale && <b>OFERTA RELÂMPAGO</b>}
+                    {!product.flashSale && discountNum > 0 && <b>OFERTA -{discountNum}%</b>}
                   </Link>
                   <div className="product-info">
                     <p>{product.brand || 'ALPHA TEC'}</p>

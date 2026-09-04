@@ -3,10 +3,10 @@ import { useEffect, useState } from 'react'
 import type { Product } from '../lib/products'
 
 const categories = [
-  { title: 'Esteiras', detail: 'Correias, roletes e placas', image: 'https://images.unsplash.com/photo-1599058917212-d750089bc07e?auto=format&fit=crop&w=800&q=80' },
-  { title: 'Musculação', detail: 'Cabos, polias e estruturas', image: 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=800&q=80' },
-  { title: 'Bicicletas', detail: 'Pedais, correias e sensores', image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80' },
-  { title: 'Acessórios', detail: 'Manoplas, parafusos e mais', image: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=800&q=80' },
+  { title: 'Esteiras', detail: 'Correias, roletes e placas', image: 'https://www.movement.com.br/wp-content/uploads/2025/04/iTouch-Cinza-2.png' },
+  { title: 'Musculação', detail: 'Cabos, polias e estruturas', image: 'https://images.unsplash.com/photo-1646656130630-07af3a262a9b?auto=format&fit=crop&w=800&q=80' },
+  { title: 'Bicicletas', detail: 'Pedais, correias e sensores', image: 'https://images.unsplash.com/photo-1707985287164-c84627ad6eba?auto=format&fit=crop&w=800&q=80' },
+  { title: 'Acessórios', detail: 'Manoplas, parafusos e mais', image: 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=800&q=80' },
 ]
 
 const formatPrice = (price: any) => {

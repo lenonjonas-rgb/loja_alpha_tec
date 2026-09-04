@@ -30,17 +30,27 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         setCustomer(await response.json())
       } else if (response.status === 404) {
         const profile = session.user?.user_metadata?.profile as Customer | undefined
-        if (profile) {
-          const profileResponse = await fetch('/api/customers', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${session.access_token}`
-            },
-            body: JSON.stringify(profile)
-          })
-          if (profileResponse.ok) setCustomer(await profileResponse.json())
+        const googleProfile: Customer = profile || {
+          id: session.user.id,
+          name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Cliente',
+          document: '',
+          email: session.user.email || '',
+          phone: '',
+          cep: '',
+          address: '',
+          number: '',
+          complement: '',
+          city: ''
         }
+        const profileResponse = await fetch('/api/customers', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify(googleProfile)
+        })
+        if (profileResponse.ok) setCustomer(await profileResponse.json())
       }
     } catch (e) {
       console.error('Erro ao carregar perfil:', e)

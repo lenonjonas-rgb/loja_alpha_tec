@@ -34,7 +34,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </nav>
       </header>
       <main>{children}</main>
-      <footer className="site-footer"><div className="container"><strong>ALPHA TEC</strong><span>Peças que mantêm seu treino em movimento.</span><Link href="/admin" className="admin-access">Acesso administrativo</Link></div></footer>
+      <footer className="site-footer"><div className="container"><strong>ALPHA TEC</strong><span>Peças que mantêm seu treino em movimento.</span><div><Link href="/privacidade" className="admin-access">Privacidade</Link><Link href="/admin" className="admin-access">Acesso administrativo</Link></div></div></footer>
     </div>
   )
 }

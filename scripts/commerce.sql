@@ -58,6 +58,18 @@ alter table public.orders add column if not exists payment_method text;
 alter table public.orders add column if not exists invoice_url text;
 alter table public.orders add column if not exists carrier text;
 
+create table if not exists public.password_reset_codes (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid not null references public.customers(id) on delete cascade,
+  email text not null,
+  code_hash text not null,
+  expires_at timestamptz not null,
+  attempts integer not null default 0,
+  used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists password_reset_codes_email_idx on public.password_reset_codes (email, created_at desc);
+
 create or replace function public.consume_coupon(p_coupon_id uuid)
 returns boolean
 language plpgsql

@@ -59,7 +59,7 @@ export default function Cart() {
     void calculateShipping(customer.cep)
   }, [customer?.cep, cep])
 
-  async function calculateShipping(cepToCalculate = cep) { const cleanCep = cepToCalculate.replace(/\D/g, ''); if (cleanCep.length !== 8) return setMessage('Informe um CEP válido.'); setMessage('Calculando frete...'); const response = await fetch(`/api/shipping?cep=${cleanCep}`); const result = await response.json(); if (!response.ok || !result.options?.length) return setMessage(result.error || 'Não foi possível encontrar opções de frete.'); setShippingOptions(result.options); setShipping(result.options[0]); setMessage('Escolha a modalidade de frete.') }
+  async function calculateShipping(cepToCalculate = cep) { const cleanCep = cepToCalculate.replace(/\D/g, ''); if (cleanCep.length !== 8) return setMessage('Informe um CEP válido.'); setMessage('Calculando frete...'); const response = await fetch(`/api/shipping?cep=${cleanCep}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) }); const result = await response.json(); if (!response.ok || !result.options?.length) return setMessage(result.error || 'Não foi possível encontrar opções de frete.'); setShippingOptions(result.options); setShipping(result.options[0]); setMessage('Escolha a modalidade de frete.') }
 
   async function applyCoupon() {
     const trimmedCode = couponCode.trim()

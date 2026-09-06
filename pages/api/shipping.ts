@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { getCorreiosLimitViolation } from '../../lib/shipping-limits'
 
 type ShippingOption = { carrier: string; price: number; deadline: string }
-type ResponseData = { options?: ShippingOption[]; error?: string }
+type ResponseData = { options?: ShippingOption[]; error?: string; notice?: string }
 
 async function fetchCep(cep: string) {
   const controller = new AbortController()
@@ -47,7 +48,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
           ? [{ carrier: 'Rodonaves', price: applyShippingIncrease(34.9), deadline: '4 a 8 dias úteis' }, { carrier: 'Jamef', price: applyShippingIncrease(38.9), deadline: '5 a 9 dias úteis' }]
           : [{ carrier: 'Total Express', price: applyShippingIncrease(42.9), deadline: '6 a 11 dias úteis' }, { carrier: 'Jamef', price: applyShippingIncrease(47.9), deadline: '6 a 12 dias úteis' }]
 
-    return res.status(200).json({ options: [{ carrier: 'Correios', price: correiosPrice, deadline: correiosDeadline }, ...regionalOptions] })
+    const items = Array.isArray(req.body?.items) ? req.body.items : []
+    const correiosUnavailable = getCorreiosLimitViolation(items)
+    const options = correiosUnavailable
+      ? regionalOptions
+      : [{ carrier: 'Correios', price: correiosPrice, deadline: correiosDeadline }, ...regionalOptions]
+    return res.status(200).json({ options, notice: correiosUnavailable || undefined })
   } catch { return res.status(502).json({ error: 'Não foi possível calcular o frete agora.' }) }
 }
 

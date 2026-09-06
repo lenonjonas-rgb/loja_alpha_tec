@@ -3,13 +3,14 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
 import { getStripe } from '../../lib/stripe'
 import { maxRedeemablePoints, pointsToDiscount } from '../../lib/loyalty'
+import { getCorreiosLimitViolation } from '../../lib/shipping-limits'
 
-type PricedProduct = { name: string; price: number; pictureUrl: string }
+type PricedProduct = { name: string; price: number; pictureUrl: string; weightKg: number; heightCm: number; widthCm: number; lengthCm: number }
 
 async function loadPricedProducts(supabase: ReturnType<typeof getSupabaseServer>, items: Array<{ id: string; quantity: number }>, appUrl: string) {
   const { data: products, error } = await supabase
     .from('products')
-    .select('id,name,price,active,discount_percent,image_url')
+    .select('id,name,price,active,discount_percent,image_url,weight_kg,height_cm,width_cm,length_cm')
     .in('id', items.map((item) => item.id))
 
   if (error) throw error
@@ -22,7 +23,7 @@ async function loadPricedProducts(supabase: ReturnType<typeof getSupabaseServer>
     const basePrice = Number(product.price)
     const discountPercent = Number(product.discount_percent || 0)
     const finalPrice = discountPercent > 0 ? basePrice * (1 - discountPercent / 100) : basePrice
-    return [product.id, { name: product.name, price: finalPrice, pictureUrl: toAbsoluteUrl(product.image_url) }]
+    return [product.id, { name: product.name, price: finalPrice, pictureUrl: toAbsoluteUrl(product.image_url), weightKg: Number(product.weight_kg || 0), heightCm: Number(product.height_cm || 0), widthCm: Number(product.width_cm || 0), lengthCm: Number(product.length_cm || 0) }]
   }))
   return productById
 }
@@ -31,10 +32,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido.' })
 
   try {
-    const { customerId, items, shipping, carrier, couponCode, successUrl, cancelUrl, paymentMethod, pointsToRedeem } = req.body || {}
+    const { customerId, items, shipping, carrier, couponCode, successUrl, cancelUrl, paymentMethod, pointsToRedeem, shippingAddress } = req.body || {}
     if (!customerId || !Array.isArray(items) || !items.length) {
       return res.status(400).json({ error: 'Cliente e itens são obrigatórios.' })
     }
+
+    const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
+    if (!token) return res.status(401).json({ error: 'Autenticação necessária.' })
 
     const selectedMethod = String(paymentMethod || 'pix').toLowerCase()
     if (!['pix', 'card', 'boleto'].includes(selectedMethod)) {
@@ -43,9 +47,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const supabase = getSupabaseServer()
+    const { data: authData, error: authError } = await supabase.auth.getUser(token)
+    if (authError || !authData.user || authData.user.id !== String(customerId)) {
+      return res.status(401).json({ error: 'Sessão inválida.' })
+    }
     const productById = await loadPricedProducts(supabase, items, appUrl)
     if (!productById) {
       return res.status(400).json({ error: 'Um ou mais produtos não estão disponíveis.' })
+    }
+    if (String(carrier || '').toLowerCase() === 'correios') {
+      const correiosLimitViolation = getCorreiosLimitViolation((items as Array<{ id: string; quantity: number }>).map((item) => ({ ...productById.get(item.id), quantity: item.quantity })))
+      if (correiosLimitViolation) return res.status(400).json({ error: correiosLimitViolation })
     }
 
     let subtotal = 0
@@ -101,6 +113,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         coupon_code: normalizedCouponCode || null,
         payment_method: selectedMethod,
         carrier: carrier || null,
+        shipping_address: shippingAddress || null,
         points_redeemed: pointsRedeemed,
         points_discount: pointsDiscount,
         subtotal,

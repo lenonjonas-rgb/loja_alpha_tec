@@ -9,32 +9,56 @@ const formatPrice = (price: any) => {
   return !isNaN(num) && num > 0 ? `R$ ${num.toFixed(2).replace('.', ',')}` : 'Consulte o preço'
 }
 
+type DetailTab = 'description' | 'specifications' | 'compatibility'
+
 export default function ProductPage() {
   const router = useRouter()
   const productId = router.query.id
   const { addItem } = useCart()
   const [added, setAdded] = useState(false)
-  const [product, setProduct] = useState<any>(
-    Array.isArray(products) ? products.find((item) => item && item.id === productId) || products[0] : null
-  )
+  const [activeTab, setActiveTab] = useState<DetailTab>('description')
+  const [loading, setLoading] = useState(true)
+  const [product, setProduct] = useState<any>(null)
 
   useEffect(() => {
-    if (!productId) return
+    if (!router.isReady || !productId) return
+
+    setLoading(true)
     fetch('/api/products')
       .then((response) => (response.ok ? response.json() : []))
       .then((databaseProducts) => {
         const dbItems = Array.isArray(databaseProducts) ? databaseProducts : []
         const fallbackItems = Array.isArray(products) ? products : []
-        const databaseProduct = dbItems.find((item: any) => item && item.id === productId)
-        if (databaseProduct) {
-          setProduct(databaseProduct)
+        const foundDb = dbItems.find((item: any) => item && String(item.id) === String(productId))
+        if (foundDb) {
+          setProduct(foundDb)
         } else {
-          const catalogProduct = fallbackItems.find((item) => item && item.id === productId)
-          if (catalogProduct) setProduct(catalogProduct)
+          const foundFallback = fallbackItems.find((item: any) => item && String(item.id) === String(productId))
+          if (foundFallback) {
+            setProduct(foundFallback)
+          } else if (dbItems.length > 0) {
+            setProduct(dbItems[0])
+          }
         }
       })
-      .catch(() => undefined)
-  }, [productId])
+      .catch(() => {
+        const fallbackItems = Array.isArray(products) ? products : []
+        const found = fallbackItems.find((item: any) => item && String(item.id) === String(productId))
+        if (found) setProduct(found)
+      })
+      .finally(() => setLoading(false))
+  }, [router.isReady, productId])
+
+  if (loading && !product) {
+    return (
+      <section className="container product-detail">
+        <Link href="/products" className="back-link">
+          ← Voltar para produtos
+        </Link>
+        <div style={{ padding: '40px 0', color: '#686c70' }}>Carregando dados da peça...</div>
+      </section>
+    )
+  }
 
   if (!product) {
     return (
@@ -51,6 +75,10 @@ export default function ProductPage() {
   const discountNum = Number(product.discountPercent || 0)
   const finalPrice = discountNum > 0 ? priceNum * (1 - discountNum / 100) : priceNum
   const stockNum = typeof product.stock === 'number' ? product.stock : 1
+  const specificationLines = (product.specifications || '')
+    .split(/\n|\r\n|\;\s*/)
+    .map((line: string) => line.trim())
+    .filter(Boolean)
 
   return (
     <section className="container product-detail">
@@ -65,12 +93,51 @@ export default function ProductPage() {
           <p className="eyebrow">PEÇA ORIGINAL {product.brand || 'ALPHA TEC'}</p>
           <h1>{product.name}</h1>
           <p className="detail-code">Código do produto: AT-{productId || '001'}</p>
-          <p className="detail-description">{product.description}</p>
-          <p className="compatible-equipment">
-            <strong>Equipamentos compatíveis</strong>
-            <br />
-            {product.compatibleEquipment || 'Consulte a compatibilidade com nossa equipe.'}
-          </p>
+
+          <div className="detail-tabs" aria-label="Detalhes do produto">
+            <button
+              type="button"
+              className={activeTab === 'description' ? 'active' : ''}
+              onClick={() => setActiveTab('description')}
+            >
+              Descrição
+            </button>
+            <button
+              type="button"
+              className={activeTab === 'specifications' ? 'active' : ''}
+              onClick={() => setActiveTab('specifications')}
+            >
+              Especificações
+            </button>
+            <button
+              type="button"
+              className={activeTab === 'compatibility' ? 'active' : ''}
+              onClick={() => setActiveTab('compatibility')}
+            >
+              Compatibilidade
+            </button>
+          </div>
+
+          <div className="detail-tab-panel">
+            {activeTab === 'description' && (
+              <p className="detail-description">{product.description || 'Descrição em breve.'}</p>
+            )}
+            {activeTab === 'specifications' && (
+              <ul className="detail-spec-list">
+                {specificationLines.length > 0 ? (
+                  specificationLines.map((line: string) => <li key={line}>{line}</li>)
+                ) : (
+                  <li>As especificações do produto serão informadas em breve.</li>
+                )}
+              </ul>
+            )}
+            {activeTab === 'compatibility' && (
+              <p className="detail-description">
+                {product.compatibleEquipment || 'Consulte a compatibilidade com nossa equipe.'}
+              </p>
+            )}
+          </div>
+
           {discountNum > 0 && (
             <del className="detail-old-price">{formatPrice(priceNum)}</del>
           )}

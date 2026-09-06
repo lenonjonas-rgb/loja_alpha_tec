@@ -20,7 +20,7 @@ Se `npx`/`create-next-app` não estiver disponível no ambiente, este scaffold j
 
 O envio automático dos orçamentos usa SMTP e envia para os destinatários configurados em `lib/store-config.ts`. Sem as variáveis SMTP, o PDF continua funcionando, mas o e-mail não é enviado.
 
-O login com Google usa OAuth. No Google Cloud Console, crie uma credencial **OAuth Client ID** do tipo aplicação Web e adicione os callbacks `http://localhost:3000/api/auth/callback/google` e `https://SEU-DOMINIO.vercel.app/api/auth/callback/google`. Cadastre `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_URL` e `NEXTAUTH_SECRET` nas variáveis da Vercel.
+O acesso do cliente usa e-mail e senha pelo Supabase. A recuperação de senha envia um código temporário por SMTP; configure as variáveis SMTP na Vercel e execute a tabela `password_reset_codes` do `scripts/commerce.sql` no Supabase.
 
 ## Código de acesso por e-mail
 

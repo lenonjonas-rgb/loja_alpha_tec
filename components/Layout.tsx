@@ -1,3 +1,6 @@
+import CheckoutAddressSelector from './CheckoutAddressSelector'
+import NotificationBell from './NotificationBell'
+import CustomerMenu from './CustomerMenu'
 import Link from 'next/link'
 import { useCart } from './CartContext'
 import { useCustomer } from './CustomerContext'
@@ -18,8 +21,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <button type="submit" aria-label="Buscar">Buscar</button>
           </form>
           <div className="header-actions">
-            {customer ? <Link href="/account">{customer.name}</Link> : <><Link href="/account?mode=register">CRIAR CONTA</Link><span aria-hidden="true">/</span><Link href="/account?mode=login">LOGIN</Link></>}
-            <Link href="/cart" className="cart-link">Carrinho <span>{count}</span></Link>
+            {customer ? <><CustomerMenu /><Link href="/cart" className="cart-link">Carrinho <span>{count}</span></Link><NotificationBell /></> : <><Link href="/account?mode=register">CRIAR CONTA</Link><span aria-hidden="true">/</span><Link href="/account?mode=login">LOGIN</Link><Link href="/cart" className="cart-link">Carrinho <span>{count}</span></Link></>}
           </div>
         </div>
         <nav className="category-nav">
@@ -33,8 +35,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </nav>
       </header>
-      <main>{children}</main>
-      <footer className="site-footer"><div className="container"><strong>ALPHA TEC</strong><span>Peças que mantêm seu treino em movimento.</span><div><Link href="/privacidade" className="admin-access">Privacidade</Link><Link href="/admin" className="admin-access">Acesso administrativo</Link></div></div></footer>
+      <main><CheckoutAddressSelector />{children}</main>
+      <footer className="site-footer"><div className="container"><strong>ALPHA TEC</strong><span>Peças que mantêm seu treino em movimento.</span><nav className="footer-links" aria-label="Links institucionais"><Link href="/privacidade">Privacidade</Link><Link href="/admin">Acesso administrativo</Link></nav></div></footer>
     </div>
   )
 }

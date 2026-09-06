@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react'
+import { formatCep, formatDocument, formatPhone } from '../lib/formatters'
 
 type StoreProfile = {
   cnpj: string
@@ -29,7 +30,7 @@ export default function AdminStoreProfile() {
   }, [])
 
   function update(field: keyof StoreProfile, value: string) {
-    setProfile((current) => ({ ...current, [field]: value }))
+    setProfile((current) => ({ ...current, [field]: field === 'cnpj' ? formatDocument(value) : field === 'phone' ? formatPhone(value) : field === 'cep' ? formatCep(value) : value }))
   }
 
   async function lookupCnpj() {

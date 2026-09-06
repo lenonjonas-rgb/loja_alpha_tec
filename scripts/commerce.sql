@@ -2,6 +2,7 @@ alter table public.products add column if not exists stock integer not null defa
 alter table public.products add column if not exists discount_percent numeric(5,2) not null default 0;
 alter table public.products add column if not exists flash_sale boolean not null default false;
 alter table public.products add column if not exists show_in_banner boolean not null default false;
+alter table public.products add column if not exists specifications text;
 alter table public.products add column if not exists weight_kg numeric(10,3) not null default 0;
 alter table public.products add column if not exists height_cm numeric(10,2) not null default 0;
 alter table public.products add column if not exists width_cm numeric(10,2) not null default 0;
@@ -57,6 +58,20 @@ alter table public.orders add column if not exists tracking_code text;
 alter table public.orders add column if not exists payment_method text;
 alter table public.orders add column if not exists invoice_url text;
 alter table public.orders add column if not exists carrier text;
+alter table public.orders add column if not exists shipping_address jsonb;
+alter table public.orders add column if not exists delivered_at timestamptz;
+
+create table if not exists public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid not null references public.customers(id) on delete cascade,
+  order_id uuid references public.orders(id) on delete cascade,
+  title text not null,
+  message text not null,
+  status text,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists notifications_customer_created_idx on public.notifications (customer_id, created_at desc);
 
 create table if not exists public.password_reset_codes (
   id uuid primary key default gen_random_uuid(),
@@ -188,6 +203,9 @@ begin
   update public.orders
   set status = 'confirmed', payment_status = 'paid'
   where id = p_order_id;
+
+  insert into public.notifications (customer_id, order_id, title, message, status)
+  values (order_customer_id, p_order_id, 'Pagamento confirmado', 'Seu pedido foi confirmado e já entrou em processamento.', 'confirmed');
 
   -- pontos por real gasto: taxa conservadora (1 ponto a cada R$ 5 do subtotal), pois o catálogo tem itens caros
   purchase_points := floor(coalesce(order_subtotal, 0) / 5)::integer;

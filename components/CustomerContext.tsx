@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { formatCep, formatDocument, formatPhone } from '../lib/formatters'
 
 export type Customer = { id?: string; name: string; document: string; email: string; phone: string; cep: string; address: string; number: string; complement: string; city: string }
 type CustomerContextValue = { customer: Customer | null; loading: boolean; requestCode: (email: string, profile?: Customer) => Promise<string | null>; verifyCode: (email: string, token: string, profile?: Customer) => Promise<string | null>; signOut: () => Promise<void> }
@@ -27,10 +28,11 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         headers: { Authorization: `Bearer ${session.access_token}` }
       })
       if (response.ok) {
-        setCustomer(await response.json())
+        const profile = await response.json()
+        setCustomer({ ...profile, document: formatDocument(profile.document || ''), phone: formatPhone(profile.phone || ''), cep: formatCep(profile.cep || '') })
       } else if (response.status === 404) {
         const profile = session.user?.user_metadata?.profile as Customer | undefined
-        const googleProfile: Customer = profile || {
+        const defaultProfile: Customer = profile || {
           id: session.user.id,
           name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Cliente',
           document: '',
@@ -48,7 +50,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${session.access_token}`
           },
-          body: JSON.stringify(googleProfile)
+          body: JSON.stringify(defaultProfile)
         })
         if (profileResponse.ok) setCustomer(await profileResponse.json())
       }

@@ -4,6 +4,7 @@ export type Product = {
   brand?: string
   category: string
   description: string
+  specifications?: string
   price: number
   image: string
   compatibleEquipment?: string

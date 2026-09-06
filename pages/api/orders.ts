@@ -32,7 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (token) {
         const { data: { user }, error: userError } = await supabase.auth.getUser(token)
         if (userError || !user) return res.status(401).json({ error: 'Sessão inválida.' })
-        const { data, error } = await supabase.from('orders').select('id,status,payment_status,shipping,total,created_at,tracking_code,carrier,invoice_url,order_items(product_name,quantity,unit_price,total),product_reviews(id)').eq('customer_id', user.id).order('created_at', { ascending: false })
+        const { data, error } = await supabase.from('orders').select('id,status,payment_status,shipping,total,created_at,delivered_at,tracking_code,carrier,invoice_url,order_items(product_id,product_name,quantity,unit_price,total),product_reviews(id)').eq('customer_id', user.id).order('created_at', { ascending: false })
         if (error) throw error
         return res.status(200).json(data)
       }
@@ -51,10 +51,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (status === 'shipped' && !String(trackingCode || '').trim()) return res.status(400).json({ error: 'Informe o código de rastreio antes de enviar o pedido.' })
     try {
       const supabase = getSupabaseServer()
+      const { data: previousOrder, error: previousOrderError } = await supabase.from('orders').select('status').eq('id', id).single()
+      if (previousOrderError) throw previousOrderError
       const updatePayload: Record<string, unknown> = { status, payment_status: paymentStatus, tracking_code: String(trackingCode || '').trim() || null }
+      if (status === 'delivered' && previousOrder.status !== 'delivered') updatePayload.delivered_at = new Date().toISOString()
       if (invoiceBase64) updatePayload.invoice_url = await persistInvoice(supabase, id, invoiceBase64)
       const { data, error } = await supabase.from('orders').update(updatePayload).eq('id', id).select('id,customer_id,status,payment_status,subtotal,shipping,total,created_at,tracking_code,carrier,invoice_url,customers(name,email,phone),order_items(product_name,quantity,unit_price,total)').single()
       if (error) throw error
+      if (data.customer_id && data.status !== previousOrder.status) {
+        const orderLabel: Record<string, string> = { pending: 'Pendente', confirmed: 'Confirmado', processing: 'Em separação', shipped: 'Enviado', delivered: 'Entregue', cancelled: 'Cancelado' }
+        await supabase.from('notifications').insert({ customer_id: data.customer_id, order_id: data.id, title: 'Atualização do pedido', message: `Seu pedido agora está: ${orderLabel[data.status] || data.status}.`, status: data.status })
+      }
       return res.status(200).json(data)
     } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível atualizar o pedido.' }) }
   }

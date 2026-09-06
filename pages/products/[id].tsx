@@ -7,6 +7,11 @@ import { useCustomer } from '../../components/CustomerContext'
 import { supabase } from '../../lib/supabase'
 
 type ProductQuestion = { id: string; question: string; answer: string | null; answered_at: string | null; created_at: string }
+type ProductReview = { id: string; rating: number; comment: string; photos: string[]; createdAt: string; customerName: string }
+type ReviewSummary = { average: number; total: number; reviews: ProductReview[] }
+
+const stars = (rating: number) => '★'.repeat(Math.max(0, Math.min(5, rating))) + '☆'.repeat(Math.max(0, 5 - rating))
+const formatReviewDate = (value: string) => new Date(value).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
 const formatPrice = (price: any) => {
   const num = Number(price)
@@ -25,6 +30,7 @@ export default function ProductPage() {
   const [loading, setLoading] = useState(true)
   const [product, setProduct] = useState<any>(null)
   const [questions, setQuestions] = useState<ProductQuestion[]>([])
+  const [reviewSummary, setReviewSummary] = useState<ReviewSummary>({ average: 0, total: 0, reviews: [] })
   const [questionText, setQuestionText] = useState('')
   const [questionStatus, setQuestionStatus] = useState('')
   const [sendingQuestion, setSendingQuestion] = useState(false)
@@ -35,6 +41,14 @@ export default function ProductPage() {
       .then((response) => (response.ok ? response.json() : []))
       .then((list) => setQuestions(Array.isArray(list) ? list : []))
       .catch(() => setQuestions([]))
+  }, [router.isReady, productId])
+
+  useEffect(() => {
+    if (!router.isReady || !productId) return
+    fetch(`/api/reviews?productId=${encodeURIComponent(String(productId))}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((result) => setReviewSummary(result && Array.isArray(result.reviews) ? result : { average: 0, total: 0, reviews: [] }))
+      .catch(() => setReviewSummary({ average: 0, total: 0, reviews: [] }))
   }, [router.isReady, productId])
 
   async function submitQuestion(event: FormEvent) {
@@ -207,6 +221,40 @@ export default function ProductPage() {
             </>
           )}
         </div>
+      </div>
+
+      <div className="product-reviews">
+        <h2>Avaliações de quem comprou</h2>
+        {reviewSummary.total > 0 ? (
+          <>
+            <div className="review-summary">
+              <strong className="review-summary-score">{reviewSummary.average.toFixed(1).replace('.', ',')}</strong>
+              <span className="review-stars">{stars(Math.round(reviewSummary.average))}</span>
+              <span className="cart-muted">{reviewSummary.total} {reviewSummary.total === 1 ? 'avaliação' : 'avaliações'}</span>
+            </div>
+            <ul className="review-list">
+              {reviewSummary.reviews.map((review) => (
+                <li key={review.id}>
+                  <div className="review-head">
+                    <span className="review-stars">{stars(review.rating)}</span>
+                    <strong>{review.customerName}</strong>
+                    <small className="cart-muted">{formatReviewDate(review.createdAt)}</small>
+                  </div>
+                  {review.comment && <p className="review-comment">{review.comment}</p>}
+                  {review.photos.length > 0 && (
+                    <div className="review-photos">
+                      {review.photos.map((photo) => (
+                        <img key={photo} src={photo} alt={`Foto enviada por ${review.customerName}`} />
+                      ))}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="cart-muted">Este produto ainda não recebeu avaliações.</p>
+        )}
       </div>
 
       <div className="product-questions">

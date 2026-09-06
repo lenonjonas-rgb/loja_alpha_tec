@@ -17,7 +17,67 @@ async function persistReviewPhoto(supabase: ReturnType<typeof getSupabaseServer>
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${filePath}`
 }
 
+function maskName(name: string) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return 'Cliente'
+  return parts.length === 1 ? parts[0] : `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`
+}
+
+// as avaliações são vinculadas ao pedido, então chega-se ao produto passando pelos itens do pedido
+async function listProductReviews(res: NextApiResponse, productId: string) {
+  const supabase = getSupabaseServer()
+
+  const { data: orderItems, error: itemsError } = await supabase
+    .from('order_items')
+    .select('order_id')
+    .eq('product_id', productId)
+  if (itemsError) throw itemsError
+
+  const orderIds = Array.from(new Set((orderItems || []).map((item) => item.order_id)))
+  if (!orderIds.length) return res.status(200).json({ average: 0, total: 0, reviews: [] })
+
+  const { data: reviews, error: reviewsError } = await supabase
+    .from('product_reviews')
+    .select('id,customer_id,rating,comment,photos,created_at')
+    .in('order_id', orderIds)
+    .order('created_at', { ascending: false })
+    .limit(50)
+  if (reviewsError) throw reviewsError
+
+  const list = reviews || []
+  if (!list.length) return res.status(200).json({ average: 0, total: 0, reviews: [] })
+
+  const customerIds = Array.from(new Set(list.map((review) => review.customer_id)))
+  const { data: customers } = await supabase.from('customers').select('id,name').in('id', customerIds)
+  const nameById = new Map((customers || []).map((customer) => [String(customer.id), customer.name]))
+
+  const average = list.reduce((sum, review) => sum + Number(review.rating || 0), 0) / list.length
+
+  return res.status(200).json({
+    average: Number(average.toFixed(1)),
+    total: list.length,
+    reviews: list.map((review) => ({
+      id: review.id,
+      rating: Number(review.rating || 0),
+      comment: review.comment || '',
+      photos: Array.isArray(review.photos) ? review.photos : [],
+      createdAt: review.created_at,
+      customerName: maskName(nameById.get(String(review.customer_id)) || ''),
+    })),
+  })
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method === 'GET') {
+    const productId = String(req.query.productId || '')
+    if (!productId) return res.status(400).json({ error: 'Produto não informado.' })
+    try {
+      return await listProductReviews(res, productId)
+    } catch (error) {
+      return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível carregar as avaliações.' })
+    }
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido.' })
 
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')

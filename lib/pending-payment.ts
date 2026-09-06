@@ -1,17 +1,24 @@
 const PENDING_KEY = 'alpha-tec-pending-payment'
-export type PendingPayment = { sessionId?: string; externalReference?: string }
+const PENDING_TTL_MS = 2 * 60 * 60 * 1000
+export type PendingPayment = { sessionId?: string; externalReference?: string; createdAt?: number }
 
 export function readPendingPayment(): PendingPayment | null {
   try {
     const stored = localStorage.getItem(PENDING_KEY)
-    return stored ? JSON.parse(stored) : null
+    if (!stored) return null
+    const pending = JSON.parse(stored) as PendingPayment
+    if (pending.createdAt && Date.now() - pending.createdAt > PENDING_TTL_MS) {
+      clearPendingPayment()
+      return null
+    }
+    return pending
   } catch {
     return null
   }
 }
 
 export function savePendingPayment(pending: PendingPayment) {
-  try { localStorage.setItem(PENDING_KEY, JSON.stringify(pending)) } catch { /* ignora falha de storage */ }
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify({ ...pending, createdAt: Date.now() })) } catch { /* ignora falha de storage */ }
 }
 
 export function clearPendingPayment() {

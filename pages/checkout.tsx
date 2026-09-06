@@ -175,8 +175,10 @@ export default function Checkout() {
     const body = sessionId ? { sessionId } : paymentId ? { paymentId } : { externalReference }
     const maxAttempts = silent ? 1 : 5
 
-    setConfirming(true)
-    setAwaitingPayment(false)
+    if (!silent) {
+      setConfirming(true)
+      setAwaitingPayment(false)
+    }
     const tryConfirm = (attempt: number) => {
       fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         .then((response) => response.json())
@@ -188,6 +190,9 @@ export default function Checkout() {
             setConfirming(false)
           } else if (attempt < maxAttempts) {
             setTimeout(() => tryConfirm(attempt + 1), 3000)
+          } else if (silent) {
+            // tentativa abandonada de uma visita anterior: descarta sem interromper o cliente
+            clearPendingPayment()
           } else {
             setError('Pagamento ainda n\u00e3o foi aprovado. Assim que for confirmado, clique em "Verificar pagamento" novamente.')
             setAwaitingPayment(true)
@@ -195,6 +200,7 @@ export default function Checkout() {
           }
         })
         .catch(() => {
+          if (silent) return clearPendingPayment()
           setError('N\u00e3o foi poss\u00edvel confirmar automaticamente o pagamento. Clique em "Verificar pagamento" para tentar de novo.')
           setAwaitingPayment(true)
           setConfirming(false)
@@ -211,8 +217,8 @@ export default function Checkout() {
     } else if (paymentStatus === 'cancelled') {
       setError('Pagamento cancelado ou n\u00e3o conclu\u00eddo. Voc\u00ea pode tentar novamente.')
     } else if (readPendingPayment()) {
-      // usu\u00e1rio voltou para a loja sem passar pela URL de retorno (ex: fechou a aba do Mercado Pago): verifica mesmo assim
-      checkPendingPayment()
+      // usu\u00e1rio voltou para a loja sem passar pela URL de retorno (ex: fechou a aba do Mercado Pago): verifica em segundo plano
+      checkPendingPayment(true)
     }
   }, [router.isReady, router.query.payment])
   async function applyCoupon(codeToApply = couponCode) { const response = await fetch('/api/coupons', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: codeToApply, items }) }); const result = await response.json(); if (!response.ok) return setError(result.error); setCoupon({ code: result.code, discountPercent: Number(result.discountPercent) || 0, freeShipping: Boolean(result.freeShipping) }); setError(result.freeShipping ? 'Cupom aplicado: frete grátis.' : 'Cupom aplicado.') }

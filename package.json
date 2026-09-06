@@ -13,6 +13,7 @@
   "dependencies": {
     "@mercadopago/sdk-react": "^1.0.7",
     "@supabase/supabase-js": "^2.112.4",
+    "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "next": "^14.2.35",
     "nodemailer": "^6.9.16",

@@ -21,6 +21,38 @@ async function persistInvoice(supabase: ReturnType<typeof getSupabaseServer>, or
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${filePath}`
 }
 
+// o endereço do cliente vive na tabela addresses, não em customers: anexa o mais recente de cada cliente
+async function attachCustomerAddresses(supabase: ReturnType<typeof getSupabaseServer>, orders: any[]) {
+  const customerIds = Array.from(new Set(orders.map((order) => order.customer_id).filter(Boolean)))
+  if (!customerIds.length) return orders
+
+  const { data: addresses } = await supabase
+    .from('addresses')
+    .select('customer_id,cep,street,number,complement,city,state')
+    .in('customer_id', customerIds)
+
+  const addressByCustomer = new Map<string, any>()
+  for (const address of addresses || []) {
+    if (!addressByCustomer.has(String(address.customer_id))) addressByCustomer.set(String(address.customer_id), address)
+  }
+
+  return orders.map((order) => {
+    const address = addressByCustomer.get(String(order.customer_id))
+    return {
+      ...order,
+      customer_address: address
+        ? {
+          cep: address.cep || '',
+          address: address.street || '',
+          number: address.number || '',
+          complement: address.complement || '',
+          city: [address.city, address.state].filter(Boolean).join('/'),
+        }
+        : null,
+    }
+  })
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST' && req.method !== 'GET' && req.method !== 'PATCH') return res.status(405).json({ error: 'Método não permitido.' })
   if (req.method === 'GET') {
@@ -37,9 +69,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json(data)
       }
       if (!isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
-      const { data, error } = await supabase.from('orders').select('id,customer_id,status,payment_status,payment_method,subtotal,shipping,total,created_at,tracking_code,carrier,invoice_url,shipping_address,customers(name,email,phone,document,cep,address,number,complement,city),order_items(product_name,quantity,unit_price,total)').order('created_at', { ascending: false })
+      const { data, error } = await supabase.from('orders').select('id,customer_id,status,payment_status,payment_method,subtotal,shipping,total,created_at,tracking_code,carrier,invoice_url,shipping_address,customers(name,email,phone,document),order_items(product_name,quantity,unit_price,total)').order('created_at', { ascending: false })
       if (error) throw error
-      return res.status(200).json(data)
+      return res.status(200).json(await attachCustomerAddresses(supabase, data || []))
     } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível carregar os pedidos.' }) }
   }
   if (req.method === 'PATCH' && !isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
@@ -56,13 +88,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const updatePayload: Record<string, unknown> = { status, payment_status: paymentStatus, tracking_code: String(trackingCode || '').trim() || null }
       if (status === 'delivered' && previousOrder.status !== 'delivered') updatePayload.delivered_at = new Date().toISOString()
       if (invoiceBase64) updatePayload.invoice_url = await persistInvoice(supabase, id, invoiceBase64)
-      const { data, error } = await supabase.from('orders').update(updatePayload).eq('id', id).select('id,customer_id,status,payment_status,payment_method,subtotal,shipping,total,created_at,tracking_code,carrier,invoice_url,shipping_address,customers(name,email,phone,document,cep,address,number,complement,city),order_items(product_name,quantity,unit_price,total)').single()
+      const { data, error } = await supabase.from('orders').update(updatePayload).eq('id', id).select('id,customer_id,status,payment_status,payment_method,subtotal,shipping,total,created_at,tracking_code,carrier,invoice_url,shipping_address,customers(name,email,phone,document),order_items(product_name,quantity,unit_price,total)').single()
       if (error) throw error
       if (data.customer_id && data.status !== previousOrder.status) {
         const orderLabel: Record<string, string> = { pending: 'Pendente', confirmed: 'Confirmado', processing: 'Em separação', shipped: 'Enviado', delivered: 'Entregue', cancelled: 'Cancelado' }
         await supabase.from('notifications').insert({ customer_id: data.customer_id, order_id: data.id, title: 'Atualização do pedido', message: `Seu pedido agora está: ${orderLabel[data.status] || data.status}.`, status: data.status })
       }
-      return res.status(200).json(data)
+      const [enriched] = await attachCustomerAddresses(supabase, [data])
+      return res.status(200).json(enriched)
     } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível atualizar o pedido.' }) }
   }
   const { customerId, items, shipping, paymentMethod, couponCode, carrier } = req.body || {}

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { getCarrierTrackingUrl } from '../lib/carrier-tracking'
 import { generateShippingLabel, resolveLabelAddress, type LabelAddress, type LabelCustomer } from '../lib/shipping-label'
 
-type Order = { id: string; created_at: string; status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'; payment_status: 'pending' | 'paid' | 'failed' | 'refunded'; payment_method: 'pix' | 'card' | 'boleto' | null; total: number; tracking_code: string | null; carrier: string | null; invoice_url: string | null; shipping_address: LabelAddress | null; customers: LabelCustomer | null; order_items: { product_name: string; quantity: number }[] }
+type Order = { id: string; created_at: string; status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'; payment_status: 'pending' | 'paid' | 'failed' | 'refunded'; payment_method: 'pix' | 'card' | 'boleto' | null; total: number; tracking_code: string | null; carrier: string | null; invoice_url: string | null; shipping_address: LabelAddress | null; customer_address?: LabelAddress | null; customers: LabelCustomer | null; order_items: { product_name: string; quantity: number }[] }
 
 type Props = { onMessage: (message: string) => void }
 const orderStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'] as const

@@ -1,7 +1,7 @@
 import { storeConfig } from './store-config'
 
 export type LabelAddress = { name?: string; document?: string; phone?: string; cep?: string; address?: string; number?: string; complement?: string; city?: string }
-export type LabelCustomer = { name: string; email: string; phone: string; document?: string; cep?: string; address?: string; number?: string; complement?: string; city?: string }
+export type LabelCustomer = { name: string; email: string; phone: string; document?: string }
 export type LabelOrder = {
   id: string
   carrier: string | null
@@ -9,23 +9,25 @@ export type LabelOrder = {
   total: number
   created_at: string
   shipping_address: LabelAddress | null
+  customer_address?: LabelAddress | null
   customers: LabelCustomer | null
   order_items: { product_name: string; quantity: number }[]
 }
 
-// pedidos antigos não gravavam shipping_address: completa com o endereço do cadastro
-export function resolveLabelAddress(order: { shipping_address: LabelAddress | null; customers: LabelCustomer | null }): LabelAddress {
+// pedidos antigos não gravavam shipping_address: completa com o endereço cadastrado do cliente
+export function resolveLabelAddress(order: { shipping_address: LabelAddress | null; customer_address?: LabelAddress | null; customers: LabelCustomer | null }): LabelAddress {
   const saved = order.shipping_address || {}
+  const fallback = order.customer_address || {}
   const customer = order.customers
   return {
     name: saved.name || customer?.name,
     document: saved.document || customer?.document,
     phone: saved.phone || customer?.phone,
-    cep: saved.cep || customer?.cep,
-    address: saved.address || customer?.address,
-    number: saved.number || customer?.number,
-    complement: saved.complement || customer?.complement,
-    city: saved.city || customer?.city,
+    cep: saved.cep || fallback.cep,
+    address: saved.address || fallback.address,
+    number: saved.number || fallback.number,
+    complement: saved.complement || fallback.complement,
+    city: saved.city || fallback.city,
   }
 }
 

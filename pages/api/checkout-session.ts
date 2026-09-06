@@ -204,13 +204,92 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
     }
 
+    const discountFactor = subtotal > 0 ? Math.max(0, (subtotal - discount - pointsDiscount) / subtotal) : 1
+    const baseSuccessUrl = successUrl || `${appUrl}/checkout?payment=success`
+    const baseCancelUrl = cancelUrl || `${appUrl}/checkout?payment=cancelled`
+
+    const mpAccessToken = process.env.MP_ACCESS_TOKEN
+    if (mpAccessToken) {
+      const { data: customerRow } = await supabase.from('customers').select('name,email,document,phone').eq('id', customerId).maybeSingle()
+      const [firstName, ...restName] = String(customerRow?.name || 'Cliente').trim().split(' ')
+      const document = String(customerRow?.document || '').replace(/\D/g, '')
+
+      const preferenceItems = (items as Array<{ id: string; quantity: number }>).map((item) => {
+        const product = productById.get(item.id)!
+        return {
+          id: item.id,
+          title: product.name,
+          picture_url: product.pictureUrl,
+          quantity: Number(item.quantity),
+          currency_id: 'BRL',
+          unit_price: Number((product.price * discountFactor).toFixed(2)),
+        }
+      })
+      if (shippingTotal > 0) {
+        preferenceItems.push({
+          id: 'frete',
+          title: `Frete - ${carrier || 'Correios'}`,
+          picture_url: `${appUrl}/logo-header-uniform.jpg`,
+          quantity: 1,
+          currency_id: 'BRL',
+          unit_price: Number(shippingTotal.toFixed(2)),
+        })
+      }
+
+      // o Mercado Pago não aceita "só cartão"/"só boleto" diretamente: restringe excluindo os demais tipos
+      const excludedPaymentTypes = selectedMethod === 'boleto'
+        ? [{ id: 'credit_card' }, { id: 'debit_card' }, { id: 'bank_transfer' }, { id: 'atm' }, { id: 'prepaid_card' }]
+        : [{ id: 'ticket' }, { id: 'bank_transfer' }, { id: 'atm' }]
+
+      const preferenceResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${mpAccessToken}`,
+          'X-Idempotency-Key': paymentReference,
+        },
+        body: JSON.stringify({
+          items: preferenceItems,
+          external_reference: paymentReference,
+          notification_url: `${appUrl}/api/mercadopago-webhook`,
+          statement_descriptor: 'ALPHATEC',
+          back_urls: { success: baseSuccessUrl, pending: baseSuccessUrl, failure: baseCancelUrl },
+          auto_return: 'approved',
+          payer: {
+            email: customerRow?.email || 'cliente@exemplo.com',
+            name: firstName || 'Cliente',
+            surname: restName.join(' ') || 'Loja',
+            identification: document ? { type: document.length > 11 ? 'CNPJ' : 'CPF', number: document } : undefined,
+          },
+          payment_methods: {
+            excluded_payment_types: excludedPaymentTypes,
+            installments: selectedMethod === 'boleto' ? 1 : 12,
+          },
+        }),
+      })
+
+      const preferenceData = await preferenceResponse.json()
+      if (!preferenceResponse.ok) {
+        await rollbackOrder()
+        return res.status(502).json({ error: preferenceData?.message || 'Não foi possível iniciar o pagamento no Mercado Pago.' })
+      }
+
+      const isSandbox = mpAccessToken.startsWith('TEST-')
+      const initPoint = isSandbox ? (preferenceData.sandbox_init_point || preferenceData.init_point) : preferenceData.init_point
+      if (!initPoint) {
+        await rollbackOrder()
+        return res.status(502).json({ error: 'Mercado Pago não retornou o link de pagamento.' })
+      }
+
+      return res.status(200).json({ orderId, externalReference: paymentReference, url: initPoint })
+    }
+
     const stripe = getStripe()
     if (!stripe) {
       await rollbackOrder()
-      return res.status(503).json({ error: 'Stripe não configurado. Defina STRIPE_SECRET_KEY na Vercel para ativar o pagamento.' })
+      return res.status(503).json({ error: 'Pagamento não configurado. Defina MP_ACCESS_TOKEN (ou STRIPE_SECRET_KEY) na Vercel.' })
     }
 
-    const discountFactor = subtotal > 0 ? Math.max(0, (subtotal - discount - pointsDiscount) / subtotal) : 1
     const lineItems = (items as Array<{ id: string; quantity: number }>).map((item) => {
       const product = productById.get(item.id)!
       return {
@@ -239,16 +318,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
     }
 
-    const baseSuccessUrl = successUrl || `${appUrl}/checkout?payment=success`
     let session
     try {
       session = await stripe.checkout.sessions.create({
         mode: 'payment',
         payment_method_types: [selectedMethod === 'boleto' ? 'boleto' : 'card'],
+        // boleto exige nome/endereço/CPF do pagador
+        billing_address_collection: selectedMethod === 'boleto' ? 'required' : 'auto',
         line_items: lineItems,
         client_reference_id: paymentReference,
         success_url: `${baseSuccessUrl}${baseSuccessUrl.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: cancelUrl || `${appUrl}/checkout?payment=cancelled`,
+        cancel_url: baseCancelUrl,
       })
     } catch (stripeError) {
       await rollbackOrder()

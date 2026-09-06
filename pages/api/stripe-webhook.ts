@@ -45,7 +45,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       process.env.STRIPE_WEBHOOK_SECRET || ''
     )
 
-    if (event.type === 'checkout.session.completed') {
+    // boleto é assíncrono: a sessão fecha como "unpaid" e a confirmação chega depois em async_payment_succeeded
+    if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       const session = event.data.object as Stripe.Checkout.Session
       await createOrderFromStripeSession(session)
     }

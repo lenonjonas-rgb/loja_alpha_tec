@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
+import { initMercadoPago } from '@mercadopago/sdk-react'
 import { useCart } from '../components/CartContext'
 import { useCustomer } from '../components/CustomerContext'
 import { supabase } from '../lib/supabase'
@@ -9,7 +11,11 @@ import { maxRedeemablePoints, pointsToDiscount, purchasePointsPreview } from '..
 
 const money = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`
 
+// o brick monta iframes do Mercado Pago e só funciona no navegador
+const CardPayment = dynamic(() => import('@mercadopago/sdk-react').then((mod) => mod.CardPayment), { ssr: false })
+
 type PixData = { paymentId: string; qrCode: string; qrCodeBase64: string; expiresAt: string | null; externalReference: string }
+type CardData = { publicKey: string; amount: number; payerEmail: string; payerDocument: string; externalReference: string }
 type Address = { id: string; label: string; name: string; document: string; phone: string; cep: string; address: string; number: string; complement: string; city: string }
 
 export default function Checkout() {
@@ -31,6 +37,7 @@ export default function Checkout() {
   const [pixData, setPixData] = useState<PixData | null>(null)
   const [pixCopied, setPixCopied] = useState(false)
   const [pixSecondsLeft, setPixSecondsLeft] = useState(0)
+  const [cardData, setCardData] = useState<CardData | null>(null)
   const [addressOptions, setAddressOptions] = useState<Address[]>([])
   const [selectedAddressId, setSelectedAddressId] = useState('')
   const [addressEditing, setAddressEditing] = useState(false)
@@ -111,6 +118,50 @@ export default function Checkout() {
       setPixCopied(true)
       setTimeout(() => setPixCopied(false), 2500)
     }).catch(() => undefined)
+  }
+
+  async function submitCard(formData: any) {
+    if (!cardData || !supabase) return
+    setError('')
+    const { data } = await supabase.auth.getSession()
+    const accessToken = data?.session?.access_token
+    if (!accessToken) return setError('Sua sessão expirou. Entre novamente na conta.')
+
+    setConfirming(true)
+    try {
+      const response = await fetch('/api/mercadopago-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({
+          externalReference: cardData.externalReference,
+          token: formData.token,
+          installments: formData.installments,
+          paymentMethodId: formData.payment_method_id,
+          issuerId: formData.issuer_id,
+          payer: formData.payer,
+        }),
+      })
+      const result = await response.json()
+      setConfirming(false)
+      if (!response.ok) return setError(result.error || 'Não foi possível processar o pagamento.')
+      if (result.confirmed) {
+        setConfirmedOrderId(result.orderId)
+        setCardData(null)
+        clearCart()
+        clearPendingPayment()
+        return
+      }
+      if (result.status === 'in_process' || result.status === 'pending') {
+        setCardData(null)
+        setError(result.message || '')
+        setAwaitingPayment(true)
+        return
+      }
+      setError(result.message || 'Pagamento recusado.')
+    } catch {
+      setConfirming(false)
+      setError('Não foi possível processar o pagamento. Tente novamente.')
+    }
   }
 
   function checkPendingPayment(silent = false) {
@@ -210,6 +261,12 @@ export default function Checkout() {
         setPixData({ ...result.pix, externalReference: result.externalReference })
         return
       }
+      if (result.card) {
+        savePendingPayment({ externalReference: result.externalReference })
+        initMercadoPago(result.card.publicKey, { locale: 'pt-BR' })
+        setCardData({ ...result.card, externalReference: result.externalReference })
+        return
+      }
       if (result.url) {
         savePendingPayment(result.sessionId ? { sessionId: result.sessionId } : { externalReference: result.externalReference })
         window.location.href = result.url
@@ -237,6 +294,24 @@ export default function Checkout() {
       <p className="cart-muted" style={{ textAlign: 'center' }}>Assim que o pagamento for aprovado pelo seu banco, a confirmação aparece aqui automaticamente.</p>
       <div style={{ textAlign: 'center' }}>
         <button className="outline-button" type="button" onClick={() => { clearPendingPayment(); setPixData(null) }}>Cancelar e escolher outra forma de pagamento</button>
+      </div>
+    </section>
+  }
+  if (cardData) {
+    return <section className="container checkout-page success-page pix-screen">
+      <h1 style={{ textAlign: 'center' }}>Pagamento com cartão</h1>
+      <p className="cart-muted" style={{ textAlign: 'center' }}>Total {money(cardData.amount)} — escolha o número de parcelas e preencha os dados do cartão.</p>
+      {error && <p className="form-status" style={{ textAlign: 'center' }}>{error}</p>}
+      <div className="pix-card">
+        <CardPayment
+          initialization={{ amount: cardData.amount, payer: { email: cardData.payerEmail } }}
+          customization={{ paymentMethods: { maxInstallments: 12 } }}
+          onSubmit={submitCard}
+          onError={() => setError('Confira os dados do cartão e tente novamente.')}
+        />
+      </div>
+      <div style={{ textAlign: 'center' }}>
+        <button className="outline-button" type="button" onClick={() => { clearPendingPayment(); setCardData(null); setError('') }}>Cancelar e escolher outra forma de pagamento</button>
       </div>
     </section>
   }

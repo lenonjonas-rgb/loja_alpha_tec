@@ -214,6 +214,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const [firstName, ...restName] = String(customerRow?.name || 'Cliente').trim().split(' ')
       const document = String(customerRow?.document || '').replace(/\D/g, '')
 
+      // cartão usa checkout transparente (brick na própria loja), então só devolvemos o necessário para montar o formulário
+      if (selectedMethod === 'card') {
+        const publicKey = process.env.MP_PUBLIC_KEY
+        if (!publicKey) {
+          await rollbackOrder()
+          return res.status(503).json({ error: 'Defina MP_PUBLIC_KEY na Vercel para aceitar cartão de crédito.' })
+        }
+        return res.status(200).json({
+          orderId,
+          externalReference: paymentReference,
+          card: {
+            publicKey,
+            amount: Number(total.toFixed(2)),
+            payerEmail: customerRow?.email || '',
+            payerDocument: document,
+          },
+        })
+      }
+
       const preferenceItems = (items as Array<{ id: string; quantity: number }>).map((item) => {
         const product = productById.get(item.id)!
         return {
@@ -236,10 +255,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         })
       }
 
-      // o Mercado Pago não aceita "só cartão"/"só boleto" diretamente: restringe excluindo os demais tipos
-      const excludedPaymentTypes = selectedMethod === 'boleto'
-        ? [{ id: 'credit_card' }, { id: 'debit_card' }, { id: 'bank_transfer' }, { id: 'atm' }, { id: 'prepaid_card' }]
-        : [{ id: 'ticket' }, { id: 'bank_transfer' }, { id: 'atm' }]
+      // restam apenas boletos aqui: pix e cartão já retornaram acima
+      const excludedPaymentTypes = [{ id: 'credit_card' }, { id: 'debit_card' }, { id: 'bank_transfer' }, { id: 'atm' }, { id: 'prepaid_card' }]
 
       const preferenceResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
         method: 'POST',
@@ -263,7 +280,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
           payment_methods: {
             excluded_payment_types: excludedPaymentTypes,
-            installments: selectedMethod === 'boleto' ? 1 : 12,
+            installments: 1,
           },
         }),
       })

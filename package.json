@@ -11,6 +11,7 @@
     "images:watch": "node scripts/process-images.js --watch"
   },
   "dependencies": {
+    "@mercadopago/sdk-react": "^1.0.7",
     "@supabase/supabase-js": "^2.112.4",
     "jspdf": "^4.2.1",
     "next": "^14.2.35",

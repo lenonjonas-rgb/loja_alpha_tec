@@ -1,6 +1,7 @@
 import { storeConfig } from './store-config'
 
 export type LabelAddress = { name?: string; document?: string; phone?: string; cep?: string; address?: string; number?: string; complement?: string; city?: string }
+export type LabelCustomer = { name: string; email: string; phone: string; document?: string; cep?: string; address?: string; number?: string; complement?: string; city?: string }
 export type LabelOrder = {
   id: string
   carrier: string | null
@@ -8,8 +9,24 @@ export type LabelOrder = {
   total: number
   created_at: string
   shipping_address: LabelAddress | null
-  customers: { name: string; email: string; phone: string } | null
+  customers: LabelCustomer | null
   order_items: { product_name: string; quantity: number }[]
+}
+
+// pedidos antigos não gravavam shipping_address: completa com o endereço do cadastro
+export function resolveLabelAddress(order: { shipping_address: LabelAddress | null; customers: LabelCustomer | null }): LabelAddress {
+  const saved = order.shipping_address || {}
+  const customer = order.customers
+  return {
+    name: saved.name || customer?.name,
+    document: saved.document || customer?.document,
+    phone: saved.phone || customer?.phone,
+    cep: saved.cep || customer?.cep,
+    address: saved.address || customer?.address,
+    number: saved.number || customer?.number,
+    complement: saved.complement || customer?.complement,
+    city: saved.city || customer?.city,
+  }
 }
 
 const formatCep = (cep: string) => {
@@ -34,7 +51,7 @@ export async function generateShippingLabel(order: LabelOrder) {
   // formato 100x150mm, o padrão das etiquetas térmicas e das encomendas dos Correios
   const pdf = new jsPDF({ unit: 'mm', format: [100, 150] })
   const isCorreios = /correios/i.test(order.carrier || '')
-  const destination = order.shipping_address || {}
+  const destination = resolveLabelAddress(order)
   const { city, state } = splitCityState(destination.city || '')
   const recipientName = destination.name || order.customers?.name || 'Destinatário'
   const trackingCode = order.tracking_code || ''

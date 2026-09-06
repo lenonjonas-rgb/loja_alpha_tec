@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { getCarrierTrackingUrl } from '../lib/carrier-tracking'
-import { generateShippingLabel, type LabelAddress } from '../lib/shipping-label'
+import { generateShippingLabel, resolveLabelAddress, type LabelAddress, type LabelCustomer } from '../lib/shipping-label'
 
-type Order = { id: string; created_at: string; status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'; payment_status: 'pending' | 'paid' | 'failed' | 'refunded'; payment_method: 'pix' | 'card' | 'boleto' | null; total: number; tracking_code: string | null; carrier: string | null; invoice_url: string | null; shipping_address: LabelAddress | null; customers: { name: string; email: string; phone: string } | null; order_items: { product_name: string; quantity: number }[] }
+type Order = { id: string; created_at: string; status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'; payment_status: 'pending' | 'paid' | 'failed' | 'refunded'; payment_method: 'pix' | 'card' | 'boleto' | null; total: number; tracking_code: string | null; carrier: string | null; invoice_url: string | null; shipping_address: LabelAddress | null; customers: LabelCustomer | null; order_items: { product_name: string; quantity: number }[] }
 
 type Props = { onMessage: (message: string) => void }
 const orderStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'] as const
@@ -27,7 +27,7 @@ export default function AdminOrders({ onMessage }: Props) {
     event.target.value = ''
   }
   async function printLabel(order: Order) {
-    if (!order.shipping_address?.cep) return onMessage('Este pedido não tem endereço de entrega salvo. Confirme os dados com o cliente antes de gerar a etiqueta.')
+    if (!resolveLabelAddress(order).cep) return onMessage('Nem o pedido nem o cadastro do cliente têm CEP. Atualize o cadastro antes de gerar a etiqueta.')
     const isCorreios = /correios/i.test(order.carrier || '')
 
     if (isCorreios) {

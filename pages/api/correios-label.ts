@@ -21,16 +21,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const supabase = getSupabaseServer()
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select('id,tracking_code,carrier,shipping_address,customers(name,email,phone),order_items(product_id,product_name,quantity,unit_price)')
+      .select('id,tracking_code,carrier,shipping_address,customers(name,email,phone,document,cep,address,number,complement,city),order_items(product_id,product_name,quantity,unit_price)')
       .eq('id', orderId)
       .maybeSingle()
     if (orderError) throw orderError
     if (!order) return res.status(404).json({ error: 'Pedido não encontrado.' })
 
-    const destination = (order.shipping_address || {}) as Record<string, string>
-    if (!destination.cep) return res.status(400).json({ error: 'Este pedido não tem endereço de entrega salvo.' })
-
     const customer = Array.isArray(order.customers) ? order.customers[0] : order.customers
+    // pedidos antigos não gravavam shipping_address: usa o endereço do cadastro do cliente
+    const saved = (order.shipping_address || {}) as Record<string, string>
+    const destination = {
+      name: saved.name || customer?.name,
+      document: saved.document || customer?.document,
+      phone: saved.phone || customer?.phone,
+      cep: saved.cep || customer?.cep,
+      address: saved.address || customer?.address,
+      number: saved.number || customer?.number,
+      complement: saved.complement || customer?.complement,
+      city: saved.city || customer?.city,
+    }
+    if (!destination.cep) return res.status(400).json({ error: 'Nem o pedido nem o cadastro do cliente têm CEP. Atualize o cadastro antes de gerar a etiqueta.' })
+
     const items = order.order_items || []
 
     // já existe rastreio: apenas rebaixa o rótulo em vez de criar outra pré-postagem
@@ -61,16 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const { codigoObjeto } = await createPrepostagem({
-      destination: {
-        name: destination.name || customer?.name,
-        document: destination.document,
-        phone: destination.phone || customer?.phone,
-        cep: destination.cep,
-        address: destination.address,
-        number: destination.number,
-        complement: destination.complement,
-        city: destination.city,
-      },
+      destination,
       destinationEmail: customer?.email,
       pkg: { weightGrams: weightGrams || 300, heightCm: heightCm || 2, widthCm, lengthCm },
       items: items.map((item) => ({

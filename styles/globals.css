@@ -105,6 +105,13 @@ a { color: inherit; text-decoration: none; }
 .opinion-rating { display: flex; gap: 4px; }
 .opinion-rating button { background: none; border: none; color: #d5d6d7; cursor: pointer; font-size: 28px; line-height: 1; padding: 0; }
 .opinion-rating button.active { color: #f5a623; }
+.history-list { display: grid; gap: 1px; list-style: none; margin: 22px 0 0; padding: 0; }
+.history-list li { align-items: center; background: #f8f8f8; border: 1px solid #e2e3e4; display: flex; gap: 12px; padding: 12px 16px; }
+.history-list li a { color: #202225; flex: 1; font-size: 14px; text-decoration: none; }
+.history-list li a:hover { color: #d32f2f; }
+.history-list li .cart-muted { font-size: 12px; margin-bottom: 0; }
+.history-list li button { background: none; border: none; color: #9a9d9f; cursor: pointer; font-size: 20px; line-height: 1; padding: 0 4px; }
+.history-list li button:hover { color: #d32f2f; }
 .product-questions h2 { font-family: 'Barlow Condensed'; font-size: 32px; margin: 0 0 18px; text-transform: uppercase; }
 .product-question-form { display: grid; gap: 12px; justify-items: start; margin-bottom: 28px; max-width: 620px; }
 .product-question-form label { display: grid; font-size: 11px; font-weight: 800; gap: 6px; letter-spacing: .08em; text-transform: uppercase; width: 100%; }

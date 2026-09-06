@@ -30,7 +30,7 @@ export default function CustomerMenu() {
     </button>
     <nav className="customer-menu-panel" aria-label="Menu da conta">
       <Link href="/account#orders">Compras</Link>
-      <Link href="/account">Histórico</Link>
+      <Link href="/historico">Histórico</Link>
       <Link href="/perguntas">Perguntas</Link>
       <Link href="/opinioes">Opiniões</Link>
     </nav>

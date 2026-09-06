@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { products } from '../../lib/products'
+import { supabase } from '../../lib/supabase'
 
 const formatPrice = (price: any) => {
   const num = Number(price)
@@ -58,6 +59,20 @@ export default function Products() {
       })
       .catch(() => setCatalog((Array.isArray(products) ? products : []).filter((p) => p && p.active !== false)))
   }, [router.query.category, router.query.q])
+
+  useEffect(() => {
+    const term = String(router.query.q || '').trim()
+    if (!term || !supabase) return
+    void supabase.auth.getSession().then(({ data }) => {
+      const token = data?.session?.access_token
+      if (!token) return
+      void fetch('/api/search-history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ term }),
+      }).catch(() => undefined)
+    })
+  }, [router.query.q])
 
   const safeCatalog = Array.isArray(catalog) ? catalog.filter(Boolean) : []
 

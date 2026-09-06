@@ -238,3 +238,12 @@ create table if not exists public.product_questions (
 );
 create index if not exists product_questions_product_idx on public.product_questions (product_id, created_at desc);
 create index if not exists product_questions_customer_idx on public.product_questions (customer_id, created_at desc);
+
+-- Histórico de buscas do cliente, exibido em "Histórico" no menu da conta.
+create table if not exists public.search_history (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid not null references public.customers(id) on delete cascade,
+  term text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists search_history_customer_idx on public.search_history (customer_id, created_at desc);

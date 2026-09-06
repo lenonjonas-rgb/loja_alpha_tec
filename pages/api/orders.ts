@@ -32,7 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (token) {
         const { data: { user }, error: userError } = await supabase.auth.getUser(token)
         if (userError || !user) return res.status(401).json({ error: 'Sessão inválida.' })
-        const { data, error } = await supabase.from('orders').select('id,status,payment_status,shipping,total,created_at,delivered_at,tracking_code,carrier,invoice_url,order_items(product_id,product_name,quantity,unit_price,total),product_reviews(id)').eq('customer_id', user.id).order('created_at', { ascending: false })
+        const { data, error } = await supabase.from('orders').select('id,status,payment_status,shipping,total,created_at,delivered_at,tracking_code,carrier,invoice_url,order_items(product_id,product_name,quantity,unit_price,total),product_reviews(id,rating,comment,photos,points_awarded,created_at)').eq('customer_id', user.id).order('created_at', { ascending: false })
         if (error) throw error
         return res.status(200).json(data)
       }

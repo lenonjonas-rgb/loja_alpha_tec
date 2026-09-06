@@ -32,7 +32,7 @@ export default function CustomerMenu() {
       <Link href="/account#orders">Compras</Link>
       <Link href="/account">Histórico</Link>
       <Link href="/perguntas">Perguntas</Link>
-      <Link href="/account#reviews">Opiniões</Link>
+      <Link href="/opinioes">Opiniões</Link>
     </nav>
   </div>
 }

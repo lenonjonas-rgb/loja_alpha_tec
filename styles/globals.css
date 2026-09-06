@@ -92,6 +92,19 @@ a { color: inherit; text-decoration: none; }
 .review-comment { color: #4d5154; font-size: 14px; line-height: 1.6; margin: 10px 0 0; }
 .review-photos { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
 .review-photos img { border: 1px solid #e2e3e4; height: 84px; object-fit: cover; width: 84px; }
+.opinion-heading { font-family: 'Barlow Condensed'; font-size: 26px; margin: 36px 0 14px; text-transform: uppercase; }
+.opinion-list { display: grid; gap: 18px; list-style: none; margin: 0; padding: 0; }
+.opinion-list li { background: #f8f8f8; border: 1px solid #e2e3e4; padding: 16px 18px; }
+.opinion-list .cart-muted { display: block; margin-bottom: 10px; }
+.opinion-products { display: grid; gap: 10px; margin-bottom: 14px; }
+.opinion-product { align-items: center; color: #202225; display: flex; font-size: 14px; gap: 10px; text-decoration: none; }
+.opinion-product img { border: 1px solid #e2e3e4; height: 48px; object-fit: cover; width: 48px; }
+.opinion-form { display: grid; gap: 12px; justify-items: start; margin-top: 12px; max-width: 620px; }
+.opinion-form label { display: grid; font-size: 11px; font-weight: 800; gap: 6px; letter-spacing: .08em; text-transform: uppercase; width: 100%; }
+.opinion-form textarea { border: 1px solid #e2e3e4; font-family: inherit; font-size: 14px; padding: 12px; resize: vertical; width: 100%; }
+.opinion-rating { display: flex; gap: 4px; }
+.opinion-rating button { background: none; border: none; color: #d5d6d7; cursor: pointer; font-size: 28px; line-height: 1; padding: 0; }
+.opinion-rating button.active { color: #f5a623; }
 .product-questions h2 { font-family: 'Barlow Condensed'; font-size: 32px; margin: 0 0 18px; text-transform: uppercase; }
 .product-question-form { display: grid; gap: 12px; justify-items: start; margin-bottom: 28px; max-width: 620px; }
 .product-question-form label { display: grid; font-size: 11px; font-weight: 800; gap: 6px; letter-spacing: .08em; text-transform: uppercase; width: 100%; }

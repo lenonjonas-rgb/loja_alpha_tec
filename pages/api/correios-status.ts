@@ -17,18 +17,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const config = getCorreiosConfig()!
+  const diagnostics = {
+    ambiente: process.env.CORREIOS_AMBIENTE === 'homologacao' ? 'homologacao' : 'producao',
+    baseUrl: config.baseUrl,
+    usuario: `${config.usuario.slice(0, 2)}***`,
+    codigoAcessoTamanho: config.codigoAcesso.length,
+    cartaoPostagemTamanho: config.cartaoPostagem.replace(/\D/g, '').length,
+    contratoTamanho: config.contrato.replace(/\D/g, '').length,
+    codigoServico: config.codigoServico,
+  }
+
   try {
     await getCorreiosToken(config)
-    return res.status(200).json({
-      authenticated: true,
-      ambiente: process.env.CORREIOS_AMBIENTE === 'homologacao' ? 'homologacao' : 'producao',
-      codigoServico: config.codigoServico,
-      message: 'Autenticação nos Correios funcionando.',
-    })
+    return res.status(200).json({ authenticated: true, ...diagnostics, message: 'Autenticação nos Correios funcionando.' })
   } catch (error) {
     return res.status(200).json({
       authenticated: false,
-      ambiente: process.env.CORREIOS_AMBIENTE === 'homologacao' ? 'homologacao' : 'producao',
+      ...diagnostics,
       message: error instanceof Error ? error.message : 'Falha na autenticação.',
     })
   }

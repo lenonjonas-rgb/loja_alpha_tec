@@ -32,23 +32,47 @@ export function getCorreiosConfig(): CorreiosConfig | null {
 
 let cachedToken: { token: string; expiresAt: number } | null = null
 
+async function readResponse(response: Response) {
+  const text = await response.text().catch(() => '')
+  try {
+    return { data: JSON.parse(text), text }
+  } catch {
+    return { data: null, text }
+  }
+}
+
+// contratos diferentes autenticam por rotas diferentes; tenta na ordem mais comum
+const AUTH_ROUTES = [
+  { path: '/token/v1/autentica/cartaopostagem', body: (config: CorreiosConfig) => ({ numero: config.cartaoPostagem }) },
+  { path: '/token/v1/autentica/contrato', body: (config: CorreiosConfig) => ({ numero: config.contrato }) },
+  { path: '/token/v1/autentica', body: () => undefined },
+]
+
 export async function getCorreiosToken(config: CorreiosConfig) {
   if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) return cachedToken.token
 
   const basic = Buffer.from(`${config.usuario}:${config.codigoAcesso}`).toString('base64')
-  const response = await fetch(`${config.baseUrl}/token/v1/autentica/cartaopostagem`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Basic ${basic}` },
-    body: JSON.stringify({ numero: config.cartaoPostagem }),
-  })
-  const data = await response.json().catch(() => null)
-  if (!response.ok || !data?.token) {
-    throw new Error(describeCorreiosError(data) || 'Não foi possível autenticar nos Correios. Confira usuário, código de acesso e cartão de postagem.')
+  const failures: string[] = []
+
+  for (const route of AUTH_ROUTES) {
+    const body = route.body(config)
+    const response = await fetch(`${config.baseUrl}${route.path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Basic ${basic}` },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    })
+    const { data, text } = await readResponse(response)
+
+    if (response.ok && data?.token) {
+      const expiresAt = data.expiraEm ? new Date(data.expiraEm).getTime() : Date.now() + 20 * 60 * 1000
+      cachedToken = { token: data.token, expiresAt }
+      return data.token as string
+    }
+
+    failures.push(`${route.path} → HTTP ${response.status}${describeCorreiosError(data) ? `: ${describeCorreiosError(data)}` : text ? `: ${text.slice(0, 200)}` : ''}`)
   }
 
-  const expiresAt = data.expiraEm ? new Date(data.expiraEm).getTime() : Date.now() + 20 * 60 * 1000
-  cachedToken = { token: data.token, expiresAt }
-  return data.token as string
+  throw new Error(`Falha ao autenticar nos Correios (ambiente ${config.baseUrl}). ${failures.join(' | ')}`)
 }
 
 function onlyDigits(value: string | undefined) {

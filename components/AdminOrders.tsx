@@ -28,12 +28,38 @@ export default function AdminOrders({ onMessage }: Props) {
   }
   async function printLabel(order: Order) {
     if (!order.shipping_address?.cep) return onMessage('Este pedido não tem endereço de entrega salvo. Confirme os dados com o cliente antes de gerar a etiqueta.')
+    const isCorreios = /correios/i.test(order.carrier || '')
+
+    if (isCorreios) {
+      onMessage('Gerando pré-postagem nos Correios...')
+      try {
+        const response = await fetch('/api/correios-label', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId: order.id }) })
+        const result = await response.json()
+        if (response.ok && result.pdfBase64) {
+          downloadPdf(result.pdfBase64, `etiqueta-correios-${order.id.slice(0, 8)}.pdf`)
+          setOrders((items) => items.map((item) => item.id === order.id ? { ...item, tracking_code: result.trackingCode } : item))
+          return onMessage(`Etiqueta gerada. Rastreio ${result.trackingCode}.`)
+        }
+        // sem contrato configurado ainda: cai na etiqueta interna em vez de travar a expedição
+        if (!result.notConfigured) return onMessage(result.error || 'Não foi possível gerar a etiqueta nos Correios.')
+        onMessage('Correios não configurado. Gerando etiqueta interna.')
+      } catch {
+        onMessage('Correios indisponível. Gerando etiqueta interna.')
+      }
+    }
+
     try {
       await generateShippingLabel(order)
-      onMessage('Etiqueta gerada.')
+      if (!isCorreios) onMessage('Etiqueta gerada.')
     } catch {
       onMessage('Não foi possível gerar a etiqueta.')
     }
+  }
+  function downloadPdf(base64: string, fileName: string) {
+    const link = document.createElement('a')
+    link.href = base64.startsWith('data:') ? base64 : `data:application/pdf;base64,${base64}`
+    link.download = fileName
+    link.click()
   }
   function handleDrop(status: Order['status'], event: React.DragEvent) {    event.preventDefault()
     setDragOverColumn(null)

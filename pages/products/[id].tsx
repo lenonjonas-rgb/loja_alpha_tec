@@ -1,8 +1,12 @@
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { useEffect, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { products } from '../../lib/products'
 import { useCart } from '../../components/CartContext'
+import { useCustomer } from '../../components/CustomerContext'
+import { supabase } from '../../lib/supabase'
+
+type ProductQuestion = { id: string; question: string; answer: string | null; answered_at: string | null; created_at: string }
 
 const formatPrice = (price: any) => {
   const num = Number(price)
@@ -15,10 +19,48 @@ export default function ProductPage() {
   const router = useRouter()
   const productId = router.query.id
   const { addItem } = useCart()
+  const { customer } = useCustomer()
   const [added, setAdded] = useState(false)
   const [activeTab, setActiveTab] = useState<DetailTab>('description')
   const [loading, setLoading] = useState(true)
   const [product, setProduct] = useState<any>(null)
+  const [questions, setQuestions] = useState<ProductQuestion[]>([])
+  const [questionText, setQuestionText] = useState('')
+  const [questionStatus, setQuestionStatus] = useState('')
+  const [sendingQuestion, setSendingQuestion] = useState(false)
+
+  useEffect(() => {
+    if (!router.isReady || !productId) return
+    fetch(`/api/questions?productId=${encodeURIComponent(String(productId))}`)
+      .then((response) => (response.ok ? response.json() : []))
+      .then((list) => setQuestions(Array.isArray(list) ? list : []))
+      .catch(() => setQuestions([]))
+  }, [router.isReady, productId])
+
+  async function submitQuestion(event: FormEvent) {
+    event.preventDefault()
+    if (!supabase) return setQuestionStatus('Serviço indisponível no momento.')
+    const { data } = await supabase.auth.getSession()
+    const token = data?.session?.access_token
+    if (!token) return setQuestionStatus('Entre na sua conta para enviar uma pergunta.')
+
+    setSendingQuestion(true)
+    try {
+      const response = await fetch('/api/questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ productId, question: questionText }),
+      })
+      const result = await response.json()
+      if (!response.ok) return setQuestionStatus(result.error || 'Não foi possível enviar a pergunta.')
+      setQuestionText('')
+      setQuestionStatus('Pergunta enviada! Você recebe a resposta em "Perguntas", no menu da sua conta.')
+    } catch {
+      setQuestionStatus('Não foi possível enviar a pergunta. Tente novamente.')
+    } finally {
+      setSendingQuestion(false)
+    }
+  }
 
   useEffect(() => {
     if (!router.isReady || !productId) return
@@ -165,6 +207,46 @@ export default function ProductPage() {
             </>
           )}
         </div>
+      </div>
+
+      <div className="product-questions">
+        <h2>Perguntas sobre este produto</h2>
+        {customer ? (
+          <form className="product-question-form" onSubmit={submitQuestion}>
+            <label>
+              Sua pergunta
+              <textarea
+                required
+                rows={3}
+                maxLength={500}
+                value={questionText}
+                onChange={(event) => setQuestionText(event.target.value)}
+                placeholder="Ex.: esta peça é compatível com o modelo X?"
+              />
+            </label>
+            <button className="primary-button" type="submit" disabled={sendingQuestion}>
+              {sendingQuestion ? 'Enviando...' : 'Enviar pergunta'} <span>→</span>
+            </button>
+          </form>
+        ) : (
+          <p className="cart-muted">
+            <Link href="/account">Entre na sua conta</Link> para perguntar sobre este produto.
+          </p>
+        )}
+        {questionStatus && <p className="form-status">{questionStatus}</p>}
+
+        {questions.length > 0 ? (
+          <ul className="product-question-list">
+            {questions.map((item) => (
+              <li key={item.id}>
+                <p className="product-question-text">{item.question}</p>
+                <p className="product-question-answer">{item.answer}</p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="cart-muted">Ainda não há perguntas respondidas para este produto.</p>
+        )}
       </div>
     </section>
   )

@@ -31,7 +31,7 @@ export default function CustomerMenu() {
     <nav className="customer-menu-panel" aria-label="Menu da conta">
       <Link href="/account#orders">Compras</Link>
       <Link href="/account">Histórico</Link>
-      <Link href="/maintenance">Perguntas</Link>
+      <Link href="/perguntas">Perguntas</Link>
       <Link href="/account#reviews">Opiniões</Link>
     </nav>
   </div>

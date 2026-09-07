@@ -1,12 +1,6 @@
-import crypto from 'crypto'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
-
-function isAdmin(req: NextApiRequest) {
-  const [username, provided] = (req.cookies.alpha_admin_session || '.').split('.')
-  const expected = crypto.createHmac('sha256', process.env.ADMIN_SESSION_SECRET || 'alpha-local-secret').update(username || '').digest('hex')
-  return Boolean(username === process.env.ALPHA_MASTER_USER && provided && provided.length === expected.length && crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected)))
-}
+import { isAdmin } from '../../lib/admin-auth'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })

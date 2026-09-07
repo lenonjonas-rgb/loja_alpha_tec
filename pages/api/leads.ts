@@ -1,14 +1,8 @@
-import crypto from 'crypto'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
+import { isAdmin } from '../../lib/admin-auth'
 
 type LeadStatus = 'new' | 'contacted' | 'proposal' | 'won' | 'lost'
-
-function isAdmin(req: NextApiRequest) {
-  const [username, provided] = (req.cookies.alpha_admin_session || '.').split('.')
-  const expected = crypto.createHmac('sha256', process.env.ADMIN_SESSION_SECRET || 'alpha-local-secret').update(username || '').digest('hex')
-  return Boolean(username === process.env.ALPHA_MASTER_USER && provided && provided.length === expected.length && crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected)))
-}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST' && req.method !== 'GET' && req.method !== 'PATCH' && req.method !== 'DELETE') return res.status(405).json({ error: 'Método não permitido.' })

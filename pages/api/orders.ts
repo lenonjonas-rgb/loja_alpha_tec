@@ -1,14 +1,8 @@
-import crypto from 'crypto'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
+import { isAdmin } from '../../lib/admin-auth'
 
 export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
-
-function isAdmin(req: NextApiRequest) {
-  const [username, provided] = (req.cookies.alpha_admin_session || '.').split('.')
-  const expected = crypto.createHmac('sha256', process.env.ADMIN_SESSION_SECRET || 'alpha-local-secret').update(username || '').digest('hex')
-  return Boolean(username === process.env.ALPHA_MASTER_USER && provided && provided.length === expected.length && crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected)))
-}
 
 async function persistInvoice(supabase: ReturnType<typeof getSupabaseServer>, orderId: string, invoiceBase64: string) {
   const match = invoiceBase64.match(/^data:application\/pdf;base64,(.+)$/i)

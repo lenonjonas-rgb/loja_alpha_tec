@@ -1,10 +1,9 @@
-import crypto from 'crypto'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../../lib/supabase-server'
+import { isAdmin } from '../../../lib/admin-auth'
 
 type ProductInput = { id?: string; name: string; brand?: string; category: string; compatibleEquipment?: string; description: string; specifications?: string; image: string; price: number; active: boolean; stock?: number; discountPercent?: number; flashSale?: boolean; showInBanner?: boolean; weightKg?: number; heightCm?: number; widthCm?: number; lengthCm?: number }
 export const config = { api: { bodyParser: { sizeLimit: '8mb' } } }
-function isAdmin(req: NextApiRequest) { const [username, provided] = (req.cookies.alpha_admin_session || '.').split('.'); const expected = crypto.createHmac('sha256', process.env.ADMIN_SESSION_SECRET || '').update(username || '').digest('hex'); return Boolean(username === process.env.ALPHA_MASTER_USER && provided && provided.length === expected.length && crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected))) }
 function fromRow(row: any) {
   return {
     id: row.id,

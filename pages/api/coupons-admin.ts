@@ -1,6 +1,6 @@
-import crypto from 'crypto'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
+import { isAdmin } from '../../lib/admin-auth'
 
 function isCouponRuleColumnError(message: string) {
   return /product_id|category|free_shipping/i.test(message)
@@ -8,12 +8,6 @@ function isCouponRuleColumnError(message: string) {
 
 function getCouponSchemaError() {
   return 'A tabela de cupons ainda não está com as colunas necessárias. Execute scripts/commerce.sql no Supabase para criar product_id, category e free_shipping.'
-}
-
-function isAdmin(req: NextApiRequest) {
-  const [username, provided] = (req.cookies.alpha_admin_session || '.').split('.')
-  const expected = crypto.createHmac('sha256', process.env.ADMIN_SESSION_SECRET || 'alpha-local-secret').update(username || '').digest('hex')
-  return Boolean(username === process.env.ALPHA_MASTER_USER && provided && provided.length === expected.length && crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected)))
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

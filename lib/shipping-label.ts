@@ -60,131 +60,116 @@ async function imageDataUrl(path: string) {
   })
 }
 
-export async function generateShippingLabel(order: LabelOrder) {
-  const { jsPDF } = await import('jspdf')
-  // formato único para Correios e demais transportadoras
-  const pdf = new jsPDF({ unit: 'mm', format: [100, 150] })
+async function drawShippingLabel(pdf: any, order: LabelOrder, x: number, y: number, labelWidth: number, labelHeight: number, logo: string | null) {
   const destination = resolveLabelAddress(order)
   const { city, state } = splitCityState(destination.city || '')
   const recipientName = destination.name || order.customers?.name || 'Destinatário'
   const trackingCode = order.tracking_code || ''
-
-  const margin = 6
-  const width = 100 - margin * 2
-  let y = margin
+  const margin = 8
+  const width = labelWidth - margin * 2
+  let cursor = y + margin
 
   pdf.setLineWidth(0.4)
-  pdf.rect(margin - 2, margin - 2, width + 4, 150 - margin * 2 + 4)
-
-  try {
-    const logo = await imageDataUrl('/logo-header-uniform.jpg')
-    pdf.addImage(logo, 'JPEG', margin, y, 29, 12, undefined, 'FAST')
-  } catch {
+  pdf.rect(x + 2, y + 2, labelWidth - 4, labelHeight - 4)
+  if (logo) pdf.addImage(logo, 'JPEG', x + margin, cursor, 38, 16, undefined, 'FAST')
+  else {
     pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(14)
-    pdf.text('ALPHA TEC', margin, y + 7)
+    pdf.setFontSize(16)
+    pdf.text('ALPHA TEC', x + margin, cursor + 10)
   }
   pdf.setFont('helvetica', 'bold')
-  pdf.setFontSize(10)
-  pdf.text('ETIQUETA DE ENVIO', 100 - margin, y + 5, { align: 'right' })
-  pdf.setFontSize(8)
+  pdf.setFontSize(12)
+  pdf.text('ETIQUETA DE ENVIO', x + labelWidth - margin, cursor + 6, { align: 'right' })
   pdf.setFont('helvetica', 'normal')
-  pdf.text(String(order.carrier || 'Transportadora não informada').toUpperCase(), 100 - margin, y + 10, { align: 'right' })
-  pdf.text(`Pedido #${order.id.slice(0, 8)}`, 100 - margin, y + 15, { align: 'right' })
-  pdf.text(new Date(order.created_at).toLocaleDateString('pt-BR'), margin, y + 17)
-  y += 21
-  pdf.line(margin, y, 100 - margin, y)
-  y += 4
+  pdf.setFontSize(9)
+  pdf.text(String(order.carrier || 'Transportadora não informada').toUpperCase(), x + labelWidth - margin, cursor + 12, { align: 'right' })
+  pdf.text(`Pedido #${order.id.slice(0, 8)} · ${new Date(order.created_at).toLocaleDateString('pt-BR')}`, x + labelWidth - margin, cursor + 18, { align: 'right' })
+  cursor += 24
+  pdf.line(x + margin, cursor, x + labelWidth - margin, cursor)
+  cursor += 6
 
   const codeForBarcode = trackingCode || order.id.replace(/-/g, '').slice(0, 20).toUpperCase()
   try {
-    const barcode = await barcodeDataUrl(codeForBarcode, 2)
-    pdf.addImage(barcode, 'PNG', margin, y, width, 16)
-    y += 18
-    pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(10)
-    pdf.text(codeForBarcode, 50, y, { align: 'center' })
-    y += 3
+    const barcode = await barcodeDataUrl(codeForBarcode, 1.5)
+    pdf.addImage(barcode, 'PNG', x + margin, cursor, width, 20)
+    cursor += 23
   } catch {
     pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(11)
-    pdf.text(codeForBarcode, margin, y + 5)
-    y += 8
+    pdf.setFontSize(12)
+    pdf.text(codeForBarcode, x + margin, cursor + 8)
+    cursor += 12
   }
+  pdf.setFont('helvetica', 'bold')
+  pdf.setFontSize(10)
+  pdf.text(codeForBarcode, x + labelWidth / 2, cursor, { align: 'center' })
+  cursor += 4
   if (!trackingCode) {
     pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(7)
-    pdf.text('Código de rastreio ainda não informado — referência interna do pedido.', 50, y + 3.5, { align: 'center' })
-    y += 5
+    pdf.text('Referência interna — rastreio oficial ainda não informado.', x + labelWidth / 2, cursor + 4, { align: 'center' })
+    cursor += 7
   }
 
-  y += 3
-  pdf.line(margin, y, 100 - margin, y)
-  y += 5
-
+  cursor += 3
+  pdf.line(x + margin, cursor, x + labelWidth - margin, cursor)
+  cursor += 7
   pdf.setFont('helvetica', 'bold')
-  pdf.setFontSize(9)
-  pdf.text('DESTINATÁRIO', margin, y)
-  y += 5
-  pdf.setFont('helvetica', 'bold')
-  pdf.setFontSize(11)
-  pdf.text(recipientName.toUpperCase().slice(0, 40), margin, y)
-  y += 5
-  pdf.setFont('helvetica', 'normal')
-  pdf.setFontSize(9)
-  const streetLine = `${destination.address || ''}${destination.number ? `, ${destination.number}` : ''}${destination.complement ? ` - ${destination.complement}` : ''}`
-  for (const line of pdf.splitTextToSize(streetLine || 'Endereço não informado', width)) {
-    pdf.text(line, margin, y)
-    y += 4.5
-  }
-  pdf.text(`${city || 'Cidade'}${state ? ` / ${state}` : ''}`, margin, y)
-  y += 4.5
-  pdf.setFont('helvetica', 'bold')
+  pdf.setFontSize(10)
+  pdf.text('DESTINATÁRIO', x + margin, cursor)
+  cursor += 6
   pdf.setFontSize(13)
-  pdf.text(`CEP: ${formatCep(destination.cep || '')}`, margin, y + 1)
-  y += 7
+  pdf.text(recipientName.toUpperCase().slice(0, 42), x + margin, cursor)
+  cursor += 6
   pdf.setFont('helvetica', 'normal')
-  pdf.setFontSize(8)
-  if (destination.phone) { pdf.text(`Tel.: ${destination.phone}`, margin, y); y += 4 }
-  if (destination.document) { pdf.text(`CPF/CNPJ: ${destination.document}`, margin, y); y += 4 }
-
-  y += 2
-  pdf.line(margin, y, 100 - margin, y)
-  y += 5
-
+  pdf.setFontSize(10)
+  const streetLine = `${destination.address || ''}${destination.number ? `, ${destination.number}` : ''}${destination.complement ? ` - ${destination.complement}` : ''}`
+  for (const line of pdf.splitTextToSize(streetLine || 'Endereço não informado', width)) { pdf.text(line, x + margin, cursor); cursor += 5 }
+  pdf.text(`${city || 'Cidade'}${state ? ` / ${state}` : ''}`, x + margin, cursor)
+  cursor += 5
   pdf.setFont('helvetica', 'bold')
+  pdf.setFontSize(16)
+  pdf.text(`CEP: ${formatCep(destination.cep || '')}`, x + margin, cursor + 1)
+  cursor += 9
+  pdf.setFont('helvetica', 'normal')
   pdf.setFontSize(9)
-  pdf.text('REMETENTE', margin, y)
-  y += 5
-  pdf.setFont('helvetica', 'normal')
-  pdf.setFontSize(8)
-  pdf.text(storeConfig.legalName, margin, y)
-  y += 4
-  pdf.text(`CNPJ: ${storeConfig.document}`, margin, y)
-  y += 4
-  for (const line of pdf.splitTextToSize(`${storeConfig.address.street}, ${storeConfig.address.number} - ${storeConfig.address.neighborhood}`, width)) {
-    pdf.text(line, margin, y)
-    y += 4
-  }
-  pdf.text(`${storeConfig.address.city} / ${storeConfig.address.state} - CEP: ${formatCep(storeConfig.address.cep)}`, margin, y)
-  y += 6
+  if (destination.phone) { pdf.text(`Tel.: ${destination.phone}`, x + margin, cursor); cursor += 5 }
+  if (destination.document) { pdf.text(`CPF/CNPJ: ${destination.document}`, x + margin, cursor); cursor += 5 }
 
-  pdf.line(margin, y, 100 - margin, y)
-  y += 5
+  cursor += 3
+  pdf.line(x + margin, cursor, x + labelWidth - margin, cursor)
+  cursor += 7
   pdf.setFont('helvetica', 'bold')
-  pdf.setFontSize(8)
-  pdf.text('CONTEÚDO', margin, y)
-  y += 4
+  pdf.setFontSize(10)
+  pdf.text('REMETENTE', x + margin, cursor)
+  cursor += 6
   pdf.setFont('helvetica', 'normal')
-  pdf.setFontSize(8)
+  pdf.setFontSize(9)
+  pdf.text(storeConfig.legalName, x + margin, cursor); cursor += 5
+  pdf.text(`CNPJ: ${storeConfig.document}`, x + margin, cursor); cursor += 5
+  for (const line of pdf.splitTextToSize(`${storeConfig.address.street}, ${storeConfig.address.number} - ${storeConfig.address.neighborhood}`, width)) { pdf.text(line, x + margin, cursor); cursor += 5 }
+  pdf.text(`${storeConfig.address.city} / ${storeConfig.address.state} - CEP: ${formatCep(storeConfig.address.cep)}`, x + margin, cursor); cursor += 7
+  pdf.line(x + margin, cursor, x + labelWidth - margin, cursor); cursor += 7
+  pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.text('CONTEÚDO', x + margin, cursor); cursor += 5
+  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9)
   const content = order.order_items.map((item) => `${item.quantity}x ${item.product_name}`).join(' | ')
-  for (const line of pdf.splitTextToSize(content || 'Peças e acessórios', width).slice(0, 4)) {
-    pdf.text(line, margin, y)
-    y += 4
-  }
-
+  for (const line of pdf.splitTextToSize(content || 'Peças e acessórios', width).slice(0, 3)) { pdf.text(line, x + margin, cursor); cursor += 5 }
   pdf.setFontSize(7)
-  pdf.text('Não aceite a encomenda se a embalagem estiver violada.', margin, 150 - margin - 2)
+  pdf.text('Não aceite a encomenda se a embalagem estiver violada.', x + margin, y + labelHeight - margin)
+}
 
-  pdf.save(`etiqueta-alpha-tec-${order.id.slice(0, 8)}.pdf`)
+export async function generateShippingLabels(orders: LabelOrder[]) {
+  const { jsPDF } = await import('jspdf')
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' })
+  const logo = await imageDataUrl('/logo-header-uniform.jpg').catch(() => null)
+  const labelWidth = 148.5
+  const labelHeight = 210
+  for (let index = 0; index < orders.length; index += 1) {
+    if (index > 0 && index % 2 === 0) pdf.addPage('a4', 'landscape')
+    await drawShippingLabel(pdf, orders[index], (index % 2) * labelWidth, 0, labelWidth, labelHeight, logo)
+  }
+  pdf.save(`etiquetas-alpha-tec-${new Date().toISOString().slice(0, 10)}.pdf`)
+}
+
+export async function generateShippingLabel(order: LabelOrder) {
+  return generateShippingLabels([order])
 }

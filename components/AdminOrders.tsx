@@ -41,11 +41,9 @@ export default function AdminOrders({ onMessage }: Props) {
           await generateShippingLabel(updatedOrder)
           return onMessage(`Etiqueta Alpha Tec gerada. Rastreio ${result.trackingCode}.`)
         }
-        // sem contrato configurado ainda: cai na etiqueta interna em vez de travar a expedição
-        if (!result.notConfigured) return onMessage(result.error || 'Não foi possível gerar a etiqueta nos Correios.')
-        onMessage('Correios não configurado. Gerando etiqueta interna.')
+        onMessage(`Correios não disponível (${result.error || 'falha na integração'}). Gerando etiqueta Alpha Tec sem rastreio oficial.`)
       } catch {
-        onMessage('Correios indisponível. Gerando etiqueta interna.')
+        onMessage('Correios indisponível. Gerando etiqueta Alpha Tec sem rastreio oficial.')
       }
     }
 

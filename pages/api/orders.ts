@@ -54,7 +54,7 @@ async function attachCustomerAddresses(supabase: ReturnType<typeof getSupabaseSe
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST' && req.method !== 'GET' && req.method !== 'PATCH') return res.status(405).json({ error: 'Método não permitido.' })
+  if (req.method !== 'POST' && req.method !== 'GET' && req.method !== 'PATCH' && req.method !== 'DELETE') return res.status(405).json({ error: 'Método não permitido.' })
   if (req.method === 'GET') {
     try {
       const supabase = getSupabaseServer()
@@ -97,6 +97,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const [enriched] = await attachCustomerAddresses(supabase, [data])
       return res.status(200).json(enriched)
     } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível atualizar o pedido.' }) }
+  }
+  if (req.method === 'DELETE') {
+    if (!isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
+    const { id } = req.body || {}
+    if (!id) return res.status(400).json({ error: 'Pedido não informado.' })
+    try {
+      const supabase = getSupabaseServer()
+      const { data: order, error: orderError } = await supabase.from('orders').select('id,status').eq('id', id).maybeSingle()
+      if (orderError) throw orderError
+      if (!order) return res.status(404).json({ error: 'Pedido não encontrado.' })
+      if (order.status !== 'cancelled') return res.status(400).json({ error: 'Somente pedidos cancelados podem ser excluídos.' })
+      const { error } = await supabase.from('orders').delete().eq('id', id).eq('status', 'cancelled')
+      if (error) throw error
+      return res.status(200).json({ deleted: true, id })
+    } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível excluir o pedido.' }) }
   }
   const { customerId, items, shipping, paymentMethod, couponCode, carrier } = req.body || {}
   if (!customerId || !Array.isArray(items) || !items.length) return res.status(400).json({ error: 'Cliente e itens são obrigatórios.' })

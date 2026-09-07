@@ -29,6 +29,33 @@ export default function AdminOrders({ onMessage }: Props) {
     onMessage('Pedido atualizado.')
   }
 
+  async function deleteOrder(order: Order) {
+    if (!window.confirm(`Excluir o pedido #${order.id.slice(0, 8)}? Essa ação não pode ser desfeita.`)) return
+    const response = await fetch('/api/orders', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: order.id }) })
+    const result = await response.json()
+    if (!response.ok) return onMessage(result.error || 'Não foi possível excluir o pedido.')
+    setOrders((items) => items.filter((item) => item.id !== order.id))
+    setSelectedIds((items) => items.filter((id) => id !== order.id))
+    onMessage('Pedido cancelado excluído.')
+  }
+
+  async function cancelSelected() {
+    const targets = orders.filter((order) => selectedIds.includes(order.id) && order.status !== 'cancelled')
+    if (!targets.length) return onMessage('Selecione pelo menos um pedido que ainda não esteja cancelado.')
+    if (!window.confirm(`Cancelar ${targets.length} pedido(s) selecionado(s)?`)) return
+
+    const results = await Promise.all(targets.map((order) => fetch('/api/orders', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: order.id, status: 'cancelled', paymentStatus: order.payment_status, trackingCode: order.tracking_code || '' }),
+    }).then(async (response) => ({ response, result: await response.json() }))))
+    const failed = results.filter(({ response }) => !response.ok)
+    const updatedById = new Map(results.filter(({ response }) => response.ok).map(({ result }) => [result.id, result as Order]))
+    setOrders((items) => items.map((item) => updatedById.get(item.id) || item))
+    setSelectedIds([])
+    onMessage(failed.length ? `${targets.length - failed.length} pedido(s) cancelado(s); ${failed.length} falhou(ram).` : `${targets.length} pedido(s) cancelado(s).`)
+  }
+
   function uploadInvoice(order: Order, event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -86,7 +113,7 @@ export default function AdminOrders({ onMessage }: Props) {
   return <div className="orders-dashboard">
     <div className="lead-toolbar">
       <div><h2>Pedidos do site</h2><p className="form-hint">Selecione um status para ver seus pedidos.</p></div>
-      <button className="label-button bulk-label-button" type="button" disabled={!selectedIds.length} onClick={() => void printLabels(orders.filter((order) => selectedIds.includes(order.id)))}>Imprimir etiquetas ({selectedIds.length})</button>
+      <div className="bulk-order-actions"><button className="label-button bulk-label-button" type="button" disabled={!selectedIds.length} onClick={() => void printLabels(orders.filter((order) => selectedIds.includes(order.id)))}>Imprimir etiquetas ({selectedIds.length})</button><button className="bulk-cancel-button" type="button" disabled={!selectedIds.length} onClick={() => void cancelSelected()}>Cancelar selecionados</button></div>
     </div>
     <nav className="order-status-tabs" aria-label="Status dos pedidos">
       {orderStatuses.map((status) => <button key={status} type="button" className={activeStatus === status ? `active ${status}` : ''} onClick={() => { setActiveStatus(status); setSelectedIds([]) }}><span>{orderLabel[status]}</span><strong>{orders.filter((order) => order.status === status).length}</strong></button>)}
@@ -114,6 +141,7 @@ export default function AdminOrders({ onMessage }: Props) {
             <input className="tracking-code-input" defaultValue={order.tracking_code || ''} placeholder="Código de rastreio" onBlur={(event) => { const value = event.target.value.trim(); if (value !== (order.tracking_code || '')) void updateOrder(order, order.status, order.payment_status, value) }} />
             {activeStatus === 'processing' && <button type="button" className="label-button" onClick={() => void printLabels([order])}>Gerar etiqueta Alpha Tec</button>}
             {activeStatus === 'processing' && <label className="invoice-upload">{order.invoice_url ? 'Substituir nota fiscal' : 'Anexar nota fiscal (PDF)'}<input type="file" accept="application/pdf" onChange={(event) => uploadInvoice(order, event)} /></label>}
+            {activeStatus === 'cancelled' && <button type="button" className="lead-delete-button order-delete-button" onClick={() => void deleteOrder(order)}>Excluir pedido</button>}
           </div>}
         </article>
       })}

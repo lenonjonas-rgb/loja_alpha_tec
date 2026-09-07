@@ -253,7 +253,17 @@ a { color: inherit; text-decoration: none; }
 .order-list-toolbar label { align-items: center; display: flex; font-weight: 800; gap: 8px; text-transform: uppercase; }
 .order-select { float: left; margin: 2px 12px 0 0; }
 .order-select input, .order-list-toolbar input { accent-color: #7a4fb5; height: 16px; width: 16px; }
-.order-card { min-height: 170px; overflow: auto; }
+.order-card { min-height: 0; overflow: hidden; padding: 0; }
+.order-summary { align-items: center; cursor: pointer; display: flex; gap: 12px; min-height: 76px; padding: 14px 0; }
+.order-summary-main { flex: 1; min-width: 0; }
+.order-summary-main h3 { margin-bottom: 4px; }
+.order-summary-main p, .order-summary-main small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.order-expand-icon { color: #7a4fb5; font-size: 22px; font-weight: 700; width: 22px; }
+.order-details { border-top: 1px solid #e2e3e4; padding: 16px 0 18px 30px; }
+.order-details .lead-actions { align-items: flex-start; flex-direction: column; }
+.order-details .lead-actions select, .order-details .tracking-code-input { box-sizing: border-box; height: 40px; margin: 0; width: 220px; }
+.order-details .tracking-code-input { padding: 10px; }
+.order-details .order-carrier { margin: 12px 0 6px; }
 .address-radio { color: #d5322f; font-size: 22px; }
 .checkout-address-editor { border-top: 1px solid #e2e3e4; margin-top: 16px; padding-top: 16px; }
 .checkout-address-editor label, .checkout-new-address label { color: #4d5154; display: block; font-size: 11px; font-weight: 800; margin-bottom: 12px; }

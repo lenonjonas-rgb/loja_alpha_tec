@@ -56,6 +56,23 @@ export default function AdminOrders({ onMessage }: Props) {
     onMessage(failed.length ? `${targets.length - failed.length} pedido(s) cancelado(s); ${failed.length} falhou(ram).` : `${targets.length} pedido(s) cancelado(s).`)
   }
 
+  async function deleteSelectedCancelled() {
+    const targets = orders.filter((order) => selectedIds.includes(order.id) && order.status === 'cancelled')
+    if (!targets.length) return onMessage('Selecione pedidos na aba Cancelado para excluir.')
+    if (!window.confirm(`Excluir permanentemente ${targets.length} pedido(s) cancelado(s)? Essa ação não pode ser desfeita.`)) return
+
+    const results = await Promise.all(targets.map((order) => fetch('/api/orders', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: order.id }),
+    }).then(async (response) => ({ response, result: await response.json() }))))
+    const failed = results.filter(({ response }) => !response.ok)
+    const deletedIds = new Set(results.filter(({ response }) => response.ok).map(({ result }) => result.id))
+    setOrders((items) => items.filter((item) => !deletedIds.has(item.id)))
+    setSelectedIds([])
+    onMessage(failed.length ? `${targets.length - failed.length} pedido(s) excluído(s); ${failed.length} falhou(ram).` : `${targets.length} pedido(s) excluído(s).`)
+  }
+
   function uploadInvoice(order: Order, event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -113,7 +130,7 @@ export default function AdminOrders({ onMessage }: Props) {
   return <div className="orders-dashboard">
     <div className="lead-toolbar">
       <div><h2>Pedidos do site</h2><p className="form-hint">Selecione um status para ver seus pedidos.</p></div>
-      <div className="bulk-order-actions"><button className="label-button bulk-label-button" type="button" disabled={!selectedIds.length} onClick={() => void printLabels(orders.filter((order) => selectedIds.includes(order.id)))}>Imprimir etiquetas ({selectedIds.length})</button><button className="bulk-cancel-button" type="button" disabled={!selectedIds.length} onClick={() => void cancelSelected()}>Cancelar selecionados</button></div>
+      <div className="bulk-order-actions"><button className="label-button bulk-label-button" type="button" disabled={!selectedIds.length} onClick={() => void printLabels(orders.filter((order) => selectedIds.includes(order.id)))}>Imprimir etiquetas ({selectedIds.length})</button>{activeStatus === 'cancelled' ? <button className="bulk-cancel-button" type="button" disabled={!selectedIds.length} onClick={() => void deleteSelectedCancelled()}>Excluir selecionados</button> : <button className="bulk-cancel-button" type="button" disabled={!selectedIds.length} onClick={() => void cancelSelected()}>Cancelar selecionados</button>}</div>
     </div>
     <nav className="order-status-tabs" aria-label="Status dos pedidos">
       {orderStatuses.map((status) => <button key={status} type="button" className={activeStatus === status ? `active ${status}` : ''} onClick={() => { setActiveStatus(status); setSelectedIds([]) }}><span>{orderLabel[status]}</span><strong>{orders.filter((order) => order.status === status).length}</strong></button>)}

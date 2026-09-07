@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
-import { createPrepostagem, downloadLabelPdf, getCorreiosConfig } from '../../lib/correios'
+import { createPrepostagem, getCorreiosConfig } from '../../lib/correios'
 
 function isAdmin(req: NextApiRequest) {
   const [username, provided] = (req.cookies.alpha_admin_session || '.').split('.')
@@ -52,8 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // já existe rastreio: apenas rebaixa o rótulo em vez de criar outra pré-postagem
     if (order.tracking_code) {
-      const pdfBase64 = await downloadLabelPdf(order.tracking_code)
-      return res.status(200).json({ trackingCode: order.tracking_code, pdfBase64, reused: true })
+      return res.status(200).json({ trackingCode: order.tracking_code, reused: true })
     }
 
     const productIds = items.map((item) => item.product_id)
@@ -92,8 +91,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { error: updateError } = await supabase.from('orders').update({ tracking_code: codigoObjeto }).eq('id', order.id)
     if (updateError) throw updateError
 
-    const pdfBase64 = await downloadLabelPdf(codigoObjeto)
-    return res.status(200).json({ trackingCode: codigoObjeto, pdfBase64 })
+    return res.status(200).json({ trackingCode: codigoObjeto })
   } catch (error) {
     return res.status(502).json({ error: error instanceof Error ? error.message : 'Não foi possível gerar a etiqueta dos Correios.' })
   }

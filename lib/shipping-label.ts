@@ -48,11 +48,22 @@ async function barcodeDataUrl(value: string, width: number) {
   return canvas.toDataURL('image/png')
 }
 
+async function imageDataUrl(path: string) {
+  const response = await fetch(path)
+  if (!response.ok) throw new Error('Logo da loja não encontrada.')
+  const blob = await response.blob()
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(new Error('Não foi possível carregar a logo da loja.'))
+    reader.readAsDataURL(blob)
+  })
+}
+
 export async function generateShippingLabel(order: LabelOrder) {
   const { jsPDF } = await import('jspdf')
-  // formato 100x150mm, o padrão das etiquetas térmicas e das encomendas dos Correios
+  // formato único para Correios e demais transportadoras
   const pdf = new jsPDF({ unit: 'mm', format: [100, 150] })
-  const isCorreios = /correios/i.test(order.carrier || '')
   const destination = resolveLabelAddress(order)
   const { city, state } = splitCityState(destination.city || '')
   const recipientName = destination.name || order.customers?.name || 'Destinatário'
@@ -65,15 +76,23 @@ export async function generateShippingLabel(order: LabelOrder) {
   pdf.setLineWidth(0.4)
   pdf.rect(margin - 2, margin - 2, width + 4, 150 - margin * 2 + 4)
 
+  try {
+    const logo = await imageDataUrl('/logo-header-uniform.jpg')
+    pdf.addImage(logo, 'JPEG', margin, y, 29, 12, undefined, 'FAST')
+  } catch {
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(14)
+    pdf.text('ALPHA TEC', margin, y + 7)
+  }
   pdf.setFont('helvetica', 'bold')
-  pdf.setFontSize(14)
-  pdf.text(isCorreios ? 'CORREIOS' : String(order.carrier || 'TRANSPORTADORA').toUpperCase(), margin, y + 4)
+  pdf.setFontSize(10)
+  pdf.text('ETIQUETA DE ENVIO', 100 - margin, y + 5, { align: 'right' })
   pdf.setFontSize(8)
   pdf.setFont('helvetica', 'normal')
-  pdf.text(isCorreios ? 'ETIQUETA DE ENCOMENDA' : 'ETIQUETA DE LOGÍSTICA', margin, y + 9)
-  pdf.text(`Pedido #${order.id.slice(0, 8)}`, 100 - margin, y + 4, { align: 'right' })
-  pdf.text(new Date(order.created_at).toLocaleDateString('pt-BR'), 100 - margin, y + 9, { align: 'right' })
-  y += 13
+  pdf.text(String(order.carrier || 'Transportadora não informada').toUpperCase(), 100 - margin, y + 10, { align: 'right' })
+  pdf.text(`Pedido #${order.id.slice(0, 8)}`, 100 - margin, y + 15, { align: 'right' })
+  pdf.text(new Date(order.created_at).toLocaleDateString('pt-BR'), margin, y + 17)
+  y += 21
   pdf.line(margin, y, 100 - margin, y)
   y += 4
 
@@ -167,5 +186,5 @@ export async function generateShippingLabel(order: LabelOrder) {
   pdf.setFontSize(7)
   pdf.text('Não aceite a encomenda se a embalagem estiver violada.', margin, 150 - margin - 2)
 
-  pdf.save(`etiqueta-${isCorreios ? 'correios' : 'transportadora'}-${order.id.slice(0, 8)}.pdf`)
+  pdf.save(`etiqueta-alpha-tec-${order.id.slice(0, 8)}.pdf`)
 }

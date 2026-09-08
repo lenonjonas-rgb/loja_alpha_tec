@@ -1,4 +1,5 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
+import { CORREIOS_PACKAGE_DEFAULTS } from '../lib/shipping-limits'
 
 type Product = {
   id: string
@@ -120,10 +121,10 @@ export default function AdminProducts({ products, onSaved, onMessage }: Props) {
           <label>Preço<input required type="number" min="0" step="0.01" value={selected.price} onChange={(event) => setSelected({ ...selected, price: Number(event.target.value) })} /></label>
           <label>Estoque disponível<input required type="number" min="0" value={selected.stock ?? 0} onChange={(event) => setSelected({ ...selected, stock: Number(event.target.value) })} /></label>
           <label>Desconto (%)<input type="number" min="0" max="100" value={selected.discountPercent ?? 0} onChange={(event) => setSelected({ ...selected, discountPercent: Number(event.target.value) })} /></label>
-          <label>Peso (kg)<input required type="number" min="0.001" step="0.001" value={selected.weightKg ?? ''} onChange={(event) => setSelected({ ...selected, weightKg: Number(event.target.value) })} /></label>
-          <label>Altura (cm)<input required type="number" min="0.1" step="0.1" value={selected.heightCm ?? ''} onChange={(event) => setSelected({ ...selected, heightCm: Number(event.target.value) })} /></label>
-          <label>Largura (cm)<input required type="number" min="0.1" step="0.1" value={selected.widthCm ?? ''} onChange={(event) => setSelected({ ...selected, widthCm: Number(event.target.value) })} /></label>
-          <label>Comprimento (cm)<input required type="number" min="0.1" step="0.1" value={selected.lengthCm ?? ''} onChange={(event) => setSelected({ ...selected, lengthCm: Number(event.target.value) })} /></label>
+          <label>Peso (kg)<input required type="number" min={CORREIOS_PACKAGE_DEFAULTS.weightKg} step="0.001" value={selected.weightKg || CORREIOS_PACKAGE_DEFAULTS.weightKg} onChange={(event) => setSelected({ ...selected, weightKg: Number(event.target.value) })} /></label>
+          <label>Altura (cm)<input required type="number" min={CORREIOS_PACKAGE_DEFAULTS.heightCm} step="0.1" value={selected.heightCm || CORREIOS_PACKAGE_DEFAULTS.heightCm} onChange={(event) => setSelected({ ...selected, heightCm: Number(event.target.value) })} /></label>
+          <label>Largura (cm)<input required type="number" min={CORREIOS_PACKAGE_DEFAULTS.widthCm} step="0.1" value={selected.widthCm || CORREIOS_PACKAGE_DEFAULTS.widthCm} onChange={(event) => setSelected({ ...selected, widthCm: Number(event.target.value) })} /></label>
+          <label>Comprimento (cm)<input required type="number" min={CORREIOS_PACKAGE_DEFAULTS.lengthCm} step="0.1" value={selected.lengthCm || CORREIOS_PACKAGE_DEFAULTS.lengthCm} onChange={(event) => setSelected({ ...selected, lengthCm: Number(event.target.value) })} /></label>
           <label>Compatível com<input value={selected.compatibleEquipment || ''} onChange={(event) => setSelected({ ...selected, compatibleEquipment: event.target.value })} /></label>
           <label>Descrição<textarea required value={selected.description} onChange={(event) => setSelected({ ...selected, description: event.target.value })} /></label>
           <label>Especificações<textarea required value={selected.specifications || ''} onChange={(event) => setSelected({ ...selected, specifications: event.target.value })} placeholder={'Tensão: 220V\nPotência: 2,2HP'} /></label>
@@ -160,7 +161,16 @@ export default function AdminProducts({ products, onSaved, onMessage }: Props) {
             <label>Desconto %<input type="number" min="0" max="100" value={draft.discountPercent ?? 0} onChange={(event) => updateDraft(product, { discountPercent: Number(event.target.value) })} /></label>
             <label className="active-toggle"><input type="checkbox" checked={Boolean(draft.flashSale)} onChange={(event) => updateDraft(product, { flashSale: event.target.checked })} /> Oferta</label>
             <label className="active-toggle"><input type="checkbox" checked={Boolean(draft.showInBanner)} onChange={(event) => updateDraft(product, { showInBanner: event.target.checked })} /> Banner</label>
-            <button type="button" onClick={() => setSelected(draft)}>Editar dados</button>
+            <button
+              type="button"
+              onClick={() => setSelected({
+                ...draft,
+                weightKg: draft.weightKg || CORREIOS_PACKAGE_DEFAULTS.weightKg,
+                heightCm: draft.heightCm || CORREIOS_PACKAGE_DEFAULTS.heightCm,
+                widthCm: draft.widthCm || CORREIOS_PACKAGE_DEFAULTS.widthCm,
+                lengthCm: draft.lengthCm || CORREIOS_PACKAGE_DEFAULTS.lengthCm
+              })}
+            >Editar dados</button>
           </div>
         )
       })}

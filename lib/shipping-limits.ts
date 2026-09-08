@@ -4,6 +4,13 @@ export const CORREIOS_LIMITS = {
   maxDimensionSumCm: 200,
 } as const
 
+export const CORREIOS_PACKAGE_DEFAULTS = {
+  weightKg: 0.3,
+  heightCm: 2,
+  widthCm: 11,
+  lengthCm: 16,
+} as const
+
 type ShippingItem = {
   quantity?: number
   weightKg?: number

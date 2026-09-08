@@ -1,4 +1,5 @@
 import { ChangeEvent, useState } from 'react'
+import { CORREIOS_PACKAGE_DEFAULTS } from '../lib/shipping-limits'
 
 type ProductRow = {
   name: string
@@ -28,10 +29,10 @@ const blank = (): ProductRow => ({
   image: '',
   description: '',
   specifications: '',
-  weightKg: '',
-  heightCm: '',
-  widthCm: '',
-  lengthCm: ''
+  weightKg: String(CORREIOS_PACKAGE_DEFAULTS.weightKg),
+  heightCm: String(CORREIOS_PACKAGE_DEFAULTS.heightCm),
+  widthCm: String(CORREIOS_PACKAGE_DEFAULTS.widthCm),
+  lengthCm: String(CORREIOS_PACKAGE_DEFAULTS.lengthCm)
 })
 
 export default function AdminBulkProducts({ onMessage }: Props) {
@@ -159,10 +160,10 @@ export default function AdminBulkProducts({ onMessage }: Props) {
             </select>
             <input value={row.compatibleEquipment} onChange={(event) => update(index, 'compatibleEquipment', event.target.value)} placeholder="Modelo" />
             <input type="number" min="0.001" step="0.001" value={row.price} onChange={(event) => update(index, 'price', event.target.value)} placeholder="0,00" />
-            <input type="number" min="0.001" step="0.001" value={row.weightKg} onChange={(event) => update(index, 'weightKg', event.target.value)} placeholder="0,500" />
-            <input type="number" min="0.1" step="0.1" value={row.heightCm} onChange={(event) => update(index, 'heightCm', event.target.value)} placeholder="10" />
-            <input type="number" min="0.1" step="0.1" value={row.widthCm} onChange={(event) => update(index, 'widthCm', event.target.value)} placeholder="10" />
-            <input type="number" min="0.1" step="0.1" value={row.lengthCm} onChange={(event) => update(index, 'lengthCm', event.target.value)} placeholder="10" />
+            <input type="number" min={CORREIOS_PACKAGE_DEFAULTS.weightKg} step="0.001" value={row.weightKg} onChange={(event) => update(index, 'weightKg', event.target.value)} />
+            <input type="number" min={CORREIOS_PACKAGE_DEFAULTS.heightCm} step="0.1" value={row.heightCm} onChange={(event) => update(index, 'heightCm', event.target.value)} />
+            <input type="number" min={CORREIOS_PACKAGE_DEFAULTS.widthCm} step="0.1" value={row.widthCm} onChange={(event) => update(index, 'widthCm', event.target.value)} />
+            <input type="number" min={CORREIOS_PACKAGE_DEFAULTS.lengthCm} step="0.1" value={row.lengthCm} onChange={(event) => update(index, 'lengthCm', event.target.value)} />
             <input className="bulk-file-input" type="file" accept="image/*" onChange={(event) => uploadImage(index, event)} />
             <textarea className="bulk-description-input" value={row.description} onChange={(event) => update(index, 'description', event.target.value)} placeholder="Descrição resumida" />
             <textarea className="bulk-description-input" value={row.specifications} onChange={(event) => update(index, 'specifications', event.target.value)} placeholder={'Tensão: 220V\nPotência: 2,2HP'} />

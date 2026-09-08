@@ -241,14 +241,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-      <section className="container service-callout">
-        <div>
-          <p className="eyebrow">PRECISA DE AJUDA?</p>
-          <h2>Manutenção para o seu equipamento?</h2>
-          <p>Escolha entre visita sazonal ou contrato mensal e verifique a cobertura para seu endereço.</p>
-        </div>
-        <Link href="/maintenance" className="outline-button">Quero manutenção <span>→</span></Link>
-      </section>
     </>
   )
 }

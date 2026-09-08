@@ -32,6 +32,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Link href="/products?category=bicicletas">Bicicletas</Link>
             <Link href="/products?category=acessorios">Acessórios</Link>
             <Link href="/products?category=ofertas" className="sale-link">Ofertas</Link>
+            <Link href="/maintenance" className="nav-service-callout">
+              <span>Precisa de ajuda?</span>
+              <strong>Manutenção para o seu equipamento?</strong>
+              <b>Quero manutenção <i>→</i></b>
+            </Link>
           </div>
         </nav>
       </header>

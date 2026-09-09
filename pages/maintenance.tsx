@@ -17,6 +17,18 @@ const equipmentList: Equipment[] = [
 const initialForm: FormState = { document: '', name: '', email: '', phone: '', cep: '', street: '', number: '', complement: '', neighborhood: '', city: '', state: '', equipment: '', quantity: '1', details: '', toll: '0' }
 const technicalVisitFee = 250
 
+async function loadQuoteLogo() {
+  const response = await fetch('/logo-header-uniform.jpg')
+  if (!response.ok) throw new Error('Logo da loja não encontrada.')
+  const blob = await response.blob()
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(new Error('Não foi possível carregar a logo da loja.'))
+    reader.readAsDataURL(blob)
+  })
+}
+
 export default function Maintenance() {
   const [serviceType, setServiceType] = useState<ServiceType | ''>('')
   const [form, setForm] = useState(initialForm)
@@ -119,28 +131,104 @@ export default function Maintenance() {
       const { jsPDF } = await import('jspdf')
       const pdf = new jsPDF()
       const money = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`
-    pdf.setFontSize(18); pdf.text('ALPHA TEC', 20, 22); pdf.setFontSize(10); pdf.text('ORÇAMENTO DE MANUTENÇÃO', 20, 30)
-    pdf.line(20, 35, 190, 35); pdf.text(`Tipo: ${serviceType === 'seasonal' ? 'Visita Técnica' : 'Contrato mensal'}`, 20, 45); pdf.text(`Cliente: ${form.name || 'Não informado'}`, 20, 52); pdf.text(`CPF/CNPJ: ${form.document || 'Não informado'}`, 20, 59); pdf.text(`Endereço: ${form.street}, ${form.number} - ${form.city}/${form.state}`, 20, 66); pdf.text(`CEP: ${form.cep}`, 20, 73)
-    let y = 87; pdf.setFontSize(11); pdf.text('ITEM', 20, y); pdf.text('QTD.', 125, y); pdf.text('UNITÁRIO', 145, y); pdf.text('TOTAL', 177, y); y += 8; pdf.setFontSize(10)
-    if (serviceType === 'seasonal') {
-      pdf.text('Visita Técnica Especializada', 20, y); pdf.text('1', 128, y); pdf.text(money(visitTotal), 145, y); pdf.text(money(visitTotal), 177, y); y += 7
-    } else {
-      selectedRows.forEach((equipment) => { pdf.text(equipment.name, 20, y); pdf.text(String(equipment.quantity), 128, y); pdf.text(money(equipment.price), 145, y); pdf.text(money(equipment.price * equipment.quantity), 177, y); y += 7 })
-    }
-    pdf.text('Deslocamento', 20, y); pdf.text(money(travelTotal), 177, y); y += 7
-    if (tollTotal > 0) { pdf.text('Pedágios', 20, y); pdf.text(money(tollTotal), 177, y); y += 7 }
-    pdf.line(20, y + 2, 190, y + 2); pdf.setFontSize(13); pdf.text(`TOTAL: ${money(quoteTotal)}`, 135, y + 12); pdf.setFontSize(9); pdf.text('Orçamento sujeito à confirmação técnica e validade de 7 dias.', 20, y + 28)
-    if (serviceType === 'seasonal') {
-      pdf.addPage(); pdf.setFontSize(15); pdf.text('INFORMATIVO TÉCNICO & GARANTIA DE SERVIÇO', 20, 22); pdf.setFontSize(11); pdf.text('Nosso Compromisso com o Seu Equipamento', 20, 31)
-      const information = `Para garantir a melhor performance, durabilidade e segurança do seu equipamento, nosso atendimento não é apenas uma checagem rápida. A Visita Técnica Especializada (${money(visitTotal)}) é um serviço preventivo e corretivo completo que inclui:\n\n- Diagnóstico preciso: identificação detalhada da causa raiz do problema.\n- Limpeza técnica: remoção de resíduos, poeira e sujidades nos componentes internos vitais.\n- Lubrificação técnica: aplicação de lubrificantes específicos para reduzir o atrito e estender a vida útil das peças.\n- Ajustes e calibração: regulagem mecânica e alinhamento geral do equipamento.\n\nCOMO FUNCIONA EM CASO DE TROCA DE PEÇAS:\n\n1. Ação imediata: sempre que possível, o problema é solucionado diretamente durante o primeiro atendimento.\n2. Peças específicas: caso seja identificada a necessidade de substituição de componentes danificados ou desgastados, o orçamento da peça necessária será enviado para sua aprovação. O custo do componente fica por conta do cliente.\n3. Retorno sem custo adicional: o valor da segunda visita técnica para a instalação e montagem da nova peça já está incluso no valor inicial da visita. Não há nova taxa de visita para a conclusão do serviço.\n\nTRANSPARÊNCIA E RESPEITO AO SEU INVESTIMENTO:\nNosso objetivo é entregar o equipamento pronto para uso com total segurança, sem surpresas no orçamento.`
-      let infoY = 44; pdf.setFontSize(10)
-      information.split('\n').forEach((paragraph) => { const lines = pdf.splitTextToSize(paragraph, 170); if (infoY + lines.length * 5 > 275) { pdf.addPage(); infoY = 22 } pdf.text(lines, 20, infoY); infoY += lines.length * 5 + (paragraph ? 3 : 1) })
-    } else {
-      pdf.addPage(); pdf.setFontSize(15); pdf.text('INFORMATIVO TÉCNICO - PLANO DE MANUTENÇÃO PREVENTIVA', 20, 22); pdf.setFontSize(11); pdf.text('Proteja seu Investimento e Evite Paradas Inesperadas', 20, 31)
-      const information = `A Manutenção Preventiva Especializada foi desenvolvida para anteceder falhas, prolongar a vida útil dos seus equipamentos e garantir a máxima segurança dos usuários. Em vez de remediar quebras dispendiosas, mantemos sua estrutura rodando com performance máxima.\n\nO QUE ESTÁ INCLUSO NA MANUTENÇÃO PREVENTIVA:\n\n- Higienização e limpeza interna: remoção de poeira, suor e resíduos acumulados em motores, placas e componentes mecânicos.\n- Lubrificação de alta performance: utilização de lubrificantes específicos para diminuir o atrito, aquecimento e desgaste prematuro.\n- Ajustes, tensionamento e alinhamento: regulagem de lonas, correias, cabos de aço e alinhamento mecânico geral.\n- Revisão elétrica e eletrônica: checagem de conexões, cabos, sensores e placas para evitar curtos ou picos de tensão.\n- Relatório técnico de condição: mapeamento visual e técnico do estado do equipamento, apontando peças com desgaste natural antes que venham a quebrar.\n\nPOR QUE INVESTIR NA PREVENTIVA?\n\n- Economia direta: reduz em até 70% o risco de quebras graves que exigem peças caras.\n- Maior durabilidade: aumenta expressivamente a vida útil do seu patrimônio.\n- Segurança garantida: minimiza o risco de acidentes causados por travamentos ou rompimento de cabos e correias.\n- Equipamento sempre disponível: evita que o equipamento fique fora de uso por dias aguardando peças.\n\nCONSISTÊNCIA É PERFORMANCE:\nEquipamentos bem regulados e lubrificados operam de forma mais silenciosa, suave e com menor consumo de energia.`
-      let infoY = 44; pdf.setFontSize(10)
-      information.split('\n').forEach((paragraph) => { const lines = pdf.splitTextToSize(paragraph, 170); if (infoY + lines.length * 5 > 275) { pdf.addPage(); infoY = 22 } pdf.text(lines, 20, infoY); infoY += lines.length * 5 + (paragraph ? 3 : 1) })
-    }
+      const logo = await loadQuoteLogo().catch(() => null)
+      const colors = { ink: [31, 36, 41] as [number, number, number], red: [190, 45, 48] as [number, number, number], pale: [246, 247, 248] as [number, number, number], line: [220, 223, 226] as [number, number, number], muted: [102, 109, 116] as [number, number, number] }
+      const margin = 18
+      const contentWidth = 174
+      const serviceLabel = serviceType === 'seasonal' ? 'Visita Técnica' : 'Contrato Mensal'
+
+      function drawHeader(title = 'ORÇAMENTO DE MANUTENÇÃO', subtitle = serviceLabel) {
+        pdf.setFillColor(...colors.ink); pdf.rect(0, 0, 210, 43, 'F')
+        if (logo) pdf.addImage(logo, 'JPEG', margin, 8, 42, 18, undefined, 'FAST')
+        else { pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(17); pdf.text('ALPHA TEC', margin, 20) }
+        pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(13); pdf.text(title, 205, 17, { align: 'right' })
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.text(subtitle.toUpperCase(), 205, 26, { align: 'right' })
+        pdf.setFillColor(...colors.red); pdf.rect(0, 40, 210, 3, 'F')
+        pdf.setTextColor(...colors.ink)
+      }
+
+      function drawFooter() {
+        const pageNumber = pdf.getNumberOfPages()
+        pdf.setDrawColor(...colors.line); pdf.line(margin, 282, 192, 282)
+        pdf.setTextColor(...colors.muted); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8)
+        pdf.text('ALPHA TEC LTDA  |  Orçamento válido por 7 dias, sujeito à confirmação técnica.', margin, 288)
+        pdf.text(`Página ${pageNumber}`, 192, 288, { align: 'right' })
+      }
+
+      function drawLabelValue(label: string, value: string, x: number, y: number, width: number) {
+        pdf.setTextColor(...colors.muted); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7); pdf.text(label.toUpperCase(), x, y)
+        pdf.setTextColor(...colors.ink); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(10)
+        const lines = pdf.splitTextToSize(value || 'Não informado', width)
+        pdf.text(lines.slice(0, 2), x, y + 5)
+      }
+
+      drawHeader()
+      pdf.setFillColor(...colors.pale); pdf.roundedRect(margin, 54, contentWidth, 37, 2, 2, 'F')
+      pdf.setTextColor(...colors.ink); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(11); pdf.text('DADOS DO CLIENTE', margin + 5, 62)
+      drawLabelValue('Cliente', form.name, margin + 5, 70, 76)
+      drawLabelValue('CPF/CNPJ', form.document, 108, 70, 76)
+      drawLabelValue('Endereço', `${form.street}, ${form.number} - ${form.city}/${form.state}`, margin + 5, 82, 76)
+      drawLabelValue('CEP', form.cep, 108, 82, 76)
+
+      pdf.setTextColor(...colors.ink); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(11); pdf.text('COMPOSIÇÃO DO ORÇAMENTO', margin, 105)
+      const tableTop = 111
+      pdf.setFillColor(...colors.ink); pdf.roundedRect(margin, tableTop, contentWidth, 10, 1, 1, 'F')
+      pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8)
+      pdf.text('DESCRIÇÃO', margin + 5, tableTop + 6.5); pdf.text('QTD.', 126, tableTop + 6.5, { align: 'center' }); pdf.text('UNITÁRIO', 160, tableTop + 6.5, { align: 'right' }); pdf.text('TOTAL', 187, tableTop + 6.5, { align: 'right' })
+
+      const rows: { description: string; quantity: string; unit: string; total: string }[] = serviceType === 'seasonal'
+        ? [{ description: 'Visita Técnica Especializada', quantity: '1', unit: money(visitTotal), total: money(visitTotal) }]
+        : selectedRows.map((equipment) => ({ description: equipment.name, quantity: String(equipment.quantity), unit: money(equipment.price), total: money(equipment.price * equipment.quantity) }))
+      if (travelTotal > 0) rows.push({ description: 'Taxa de deslocamento', quantity: '1', unit: money(travelTotal), total: money(travelTotal) })
+      if (tollTotal > 0) rows.push({ description: 'Pedágios', quantity: '1', unit: money(tollTotal), total: money(tollTotal) })
+
+      let y = tableTop + 10
+      rows.forEach((row, index) => {
+        const descriptionLines = pdf.splitTextToSize(row.description, 91)
+        const rowHeight = Math.max(10, descriptionLines.length * 4.5 + 5)
+        if (index % 2 === 0) { pdf.setFillColor(...colors.pale); pdf.rect(margin, y, contentWidth, rowHeight, 'F') }
+        pdf.setTextColor(...colors.ink); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.text(descriptionLines, margin + 5, y + 6)
+        pdf.text(row.quantity, 126, y + 6, { align: 'center' }); pdf.text(row.unit, 160, y + 6, { align: 'right' }); pdf.setFont('helvetica', 'bold'); pdf.text(row.total, 187, y + 6, { align: 'right' })
+        pdf.setDrawColor(...colors.line); pdf.line(margin, y + rowHeight, 192, y + rowHeight); y += rowHeight
+      })
+
+      const totalBoxY = y + 10
+      pdf.setFillColor(...colors.red); pdf.roundedRect(112, totalBoxY, 80, 25, 2, 2, 'F')
+      pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.text('TOTAL DO ORÇAMENTO', 118, totalBoxY + 8)
+      pdf.setFontSize(16); pdf.text(money(quoteTotal), 186, totalBoxY + 19, { align: 'right' })
+      pdf.setTextColor(...colors.ink); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.text('OBSERVAÇÕES', margin, totalBoxY + 8)
+      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); pdf.setTextColor(...colors.muted)
+      pdf.text(pdf.splitTextToSize(form.details || 'Serviço conforme avaliação técnica no local.', 84).slice(0, 4), margin, totalBoxY + 15)
+      drawFooter()
+
+      const infoBlocks = serviceType === 'seasonal'
+        ? [
+          { heading: 'Escopo do atendimento', text: `A Visita Técnica Especializada (${money(visitTotal)}) é um serviço preventivo e corretivo completo, realizado para identificar a causa do problema e restabelecer a segurança e o desempenho do equipamento.` },
+          { heading: 'O que está incluído', text: 'Diagnóstico preciso e identificação da causa raiz.\nLimpeza técnica dos componentes internos vitais.\nLubrificação técnica para reduzir atrito e desgaste.\nAjustes, calibração e alinhamento geral do equipamento.' },
+          { heading: 'Em caso de troca de peças', text: 'Sempre que possível, o problema será solucionado durante o primeiro atendimento. Se houver necessidade de substituição, um orçamento específico será enviado para aprovação. O valor das peças fica por conta do cliente.' },
+          { heading: 'Retorno e garantia de serviço', text: travelTotal > 0
+            ? `O retorno para instalação de uma peça aprovada não terá custo de mão de obra. Será cobrada apenas a taxa de deslocamento no valor de ${money(travelTotal)}.`
+            : 'O retorno para instalação de uma peça aprovada já está incluído no valor inicial da visita. Não há nova taxa de visita para concluir o serviço.' },
+        ]
+        : [
+          { heading: 'Sobre o plano mensal', text: 'A Manutenção Preventiva Especializada antecipa falhas, prolonga a vida útil dos equipamentos e mantém sua estrutura disponível com mais segurança e previsibilidade.' },
+          { heading: 'O que está incluído', text: 'Higienização e limpeza interna.\nLubrificação de motores, placas e componentes mecânicos.\nAjustes, tensionamento e alinhamento de lonas, correias e cabos.\nRevisão elétrica, eletrônica e relatório técnico de condição.' },
+          { heading: 'Benefícios para sua operação', text: 'Redução do risco de quebras graves e gastos emergenciais.\nMaior durabilidade do patrimônio.\nMais segurança para os usuários.\nEquipamentos disponíveis por mais tempo, com performance consistente.' },
+        ]
+
+      let infoY = 62
+      function startInfoPage() { pdf.addPage(); drawHeader('INFORMATIVO TÉCNICO', serviceLabel); infoY = 62 }
+      startInfoPage()
+      infoBlocks.forEach((block) => {
+        const lines = pdf.splitTextToSize(block.text, 164)
+        const blockHeight = 12 + lines.length * 5 + 10
+        if (infoY + blockHeight > 270) { drawFooter(); startInfoPage() }
+        pdf.setFillColor(...colors.pale); pdf.roundedRect(margin, infoY, contentWidth, blockHeight, 2, 2, 'F')
+        pdf.setTextColor(...colors.red); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(10); pdf.text(block.heading, margin + 6, infoY + 9)
+        pdf.setTextColor(...colors.ink); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9)
+        pdf.text(lines, margin + 6, infoY + 18, { lineHeightFactor: 1.35 }); infoY += blockHeight + 8
+      })
+      drawFooter()
       const pdfBlob = pdf.output('blob')
       const pdfUrl = URL.createObjectURL(pdfBlob)
       const pdfFileName = `orcamento-alpha-tec-${form.cep || 'manutencao'}.pdf`

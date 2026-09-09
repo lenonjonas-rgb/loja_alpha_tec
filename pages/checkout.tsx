@@ -38,6 +38,7 @@ export default function Checkout() {
   const [pixCopied, setPixCopied] = useState(false)
   const [pixSecondsLeft, setPixSecondsLeft] = useState(0)
   const [cardData, setCardData] = useState<CardData | null>(null)
+  const [cardBrickReady, setCardBrickReady] = useState(false)
   const [addressOptions, setAddressOptions] = useState<Address[]>([])
   const [selectedAddressId, setSelectedAddressId] = useState('')
   const [addressEditing, setAddressEditing] = useState(false)
@@ -270,6 +271,7 @@ export default function Checkout() {
       if (result.card) {
         savePendingPayment({ externalReference: result.externalReference })
         initMercadoPago(result.card.publicKey, { locale: 'pt-BR' })
+        setCardBrickReady(false)
         setCardData({ ...result.card, externalReference: result.externalReference })
         return
       }
@@ -304,16 +306,25 @@ export default function Checkout() {
     </section>
   }
   if (cardData) {
+    const payerDocument = cardData.payerDocument.replace(/\D/g, '')
     return <section className="container checkout-page success-page pix-screen">
       <h1 style={{ textAlign: 'center' }}>Pagamento com cartão</h1>
       <p className="cart-muted" style={{ textAlign: 'center' }}>Total {money(cardData.amount)} — escolha o número de parcelas e preencha os dados do cartão.</p>
       {error && <p className="form-status" style={{ textAlign: 'center' }}>{error}</p>}
       <div className="pix-card">
+        {!cardBrickReady && <p className="cart-muted" style={{ textAlign: 'center' }}>Carregando formulário seguro do cartão...</p>}
         <CardPayment
-          initialization={{ amount: cardData.amount, payer: { email: cardData.payerEmail } }}
+          key={cardData.externalReference}
+          id={`cardPaymentBrick_${cardData.externalReference}`}
+          initialization={{ amount: cardData.amount, payer: { email: cardData.payerEmail, identification: payerDocument ? { type: payerDocument.length > 11 ? 'CNPJ' : 'CPF', number: payerDocument } : undefined } }}
           customization={{ paymentMethods: { maxInstallments: 12 } }}
+          locale="pt-BR"
           onSubmit={submitCard}
-          onError={() => setError('Confira os dados do cartão e tente novamente.')}
+          onReady={() => setCardBrickReady(true)}
+          onError={(brickError) => {
+            console.error('[Mercado Pago] Falha ao carregar o formulário de cartão:', brickError)
+            setError('Não foi possível carregar o formulário do cartão. Atualize a página e tente novamente.')
+          }}
         />
       </div>
       <div style={{ textAlign: 'center' }}>

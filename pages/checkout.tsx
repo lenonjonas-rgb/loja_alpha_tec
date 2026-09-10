@@ -44,7 +44,7 @@ function CardPaymentForm({ cardData, onSubmit }: CardPaymentFormProps) {
               identification: payerDocument ? { type: payerDocument.length > 11 ? 'CNPJ' : 'CPF', number: payerDocument } : undefined,
             },
           },
-          customization: { paymentMethods: { maxInstallments: 12 } },
+          customization: { paymentMethods: { minInstallments: 1, maxInstallments: 12 } },
           locale: 'pt-BR',
           callbacks: {
             onReady: () => { if (!cancelled) setStatus('ready') },

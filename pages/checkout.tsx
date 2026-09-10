@@ -1,8 +1,7 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
-import dynamic from 'next/dynamic'
-import { initMercadoPago } from '@mercadopago/sdk-react'
+import { loadMercadoPago } from '@mercadopago/sdk-js'
 import { useCart } from '../components/CartContext'
 import { useCustomer } from '../components/CustomerContext'
 import { supabase } from '../lib/supabase'
@@ -11,12 +10,70 @@ import { maxRedeemablePoints, pointsToDiscount, purchasePointsPreview } from '..
 
 const money = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`
 
-// o brick monta iframes do Mercado Pago e só funciona no navegador
-const CardPayment = dynamic(() => import('@mercadopago/sdk-react').then((mod) => mod.CardPayment), { ssr: false })
-
 type PixData = { paymentId: string; qrCode: string; qrCodeBase64: string; expiresAt: string | null; externalReference: string }
 type CardData = { publicKey: string; amount: number; payerEmail: string; payerDocument: string; externalReference: string }
 type Address = { id: string; label: string; name: string; document: string; phone: string; cep: string; address: string; number: string; complement: string; city: string }
+
+type CardPaymentFormProps = {
+  cardData: CardData
+  onSubmit: (formData: any) => Promise<void>
+}
+
+function CardPaymentForm({ cardData, onSubmit }: CardPaymentFormProps) {
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [loadError, setLoadError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    let controller: { unmount?: () => void } | undefined
+    const containerId = 'cardPaymentBrick_container'
+
+    async function mountBrick() {
+      try {
+        await loadMercadoPago()
+        if (cancelled) return
+        const MercadoPago = (window as typeof window & { MercadoPago?: new (key: string, options?: { locale?: string }) => { bricks: () => { create: (name: string, id: string, settings: object) => Promise<{ unmount?: () => void }> } } }).MercadoPago
+        if (!MercadoPago) throw new Error('SDK do Mercado Pago não foi carregado.')
+        const mercadoPago = new MercadoPago(cardData.publicKey, { locale: 'pt-BR' })
+        const payerDocument = cardData.payerDocument.replace(/\D/g, '')
+        const settings = {
+          initialization: {
+            amount: cardData.amount,
+            payer: {
+              email: cardData.payerEmail,
+              identification: payerDocument ? { type: payerDocument.length > 11 ? 'CNPJ' : 'CPF', number: payerDocument } : undefined,
+            },
+          },
+          customization: { paymentMethods: { maxInstallments: 12 } },
+          locale: 'pt-BR',
+          callbacks: {
+            onReady: () => { if (!cancelled) setStatus('ready') },
+            onError: (error: unknown) => {
+              console.error('[Mercado Pago] Erro no Card Payment Brick:', error)
+              if (!cancelled) { setLoadError('Não foi possível carregar o formulário do cartão. Tente novamente.'); setStatus('error') }
+            },
+            onSubmit,
+          },
+        }
+        controller = await mercadoPago.bricks().create('cardPayment', containerId, settings)
+        if (!cancelled) setStatus('ready')
+        if (cancelled) controller?.unmount?.()
+      } catch (error) {
+        console.error('[Mercado Pago] Falha ao montar o Card Payment Brick:', error)
+        if (!cancelled) { setLoadError('Não foi possível carregar o formulário do cartão. Tente novamente.'); setStatus('error') }
+      }
+    }
+
+    void mountBrick()
+    return () => { cancelled = true; controller?.unmount?.() }
+  }, [cardData, onSubmit])
+
+  return <>
+    {status === 'loading' && <p className="cart-muted" style={{ textAlign: 'center' }}>Carregando formulário seguro do cartão...</p>}
+    {status === 'error' && <p className="form-status" style={{ textAlign: 'center' }}>{loadError}</p>}
+    <div id="cardPaymentBrick_container" />
+  </>
+}
 
 export default function Checkout() {
   const router = useRouter()
@@ -38,22 +95,10 @@ export default function Checkout() {
   const [pixCopied, setPixCopied] = useState(false)
   const [pixSecondsLeft, setPixSecondsLeft] = useState(0)
   const [cardData, setCardData] = useState<CardData | null>(null)
-  const [cardBrickReady, setCardBrickReady] = useState(false)
   const [addressOptions, setAddressOptions] = useState<Address[]>([])
   const [selectedAddressId, setSelectedAddressId] = useState('')
   const [addressEditing, setAddressEditing] = useState(false)
   const [newAddress, setNewAddress] = useState<Address | null>(null)
-  const cardInitialization = useMemo(() => {
-    if (!cardData) return null
-    const payerDocument = cardData.payerDocument.replace(/\D/g, '')
-    return { amount: cardData.amount, payer: { email: cardData.payerEmail, identification: payerDocument ? { type: payerDocument.length > 11 ? 'CNPJ' : 'CPF', number: payerDocument } : undefined } }
-  }, [cardData])
-  const cardCustomization = useMemo(() => ({ paymentMethods: { maxInstallments: 12 } }), [])
-  const handleCardReady = useCallback(() => setCardBrickReady(true), [])
-  const handleCardError = useCallback((brickError: unknown) => {
-    console.error('[Mercado Pago] Falha ao carregar o formulário de cartão:', brickError)
-    setError('Não foi possível carregar o formulário do cartão. Atualize a página e tente novamente.')
-  }, [])
   useEffect(() => { if (!customer && router.isReady) router.replace('/account?returnTo=checkout') }, [customer, router])
   useEffect(() => {
     if (!customer?.id) return
@@ -281,8 +326,6 @@ export default function Checkout() {
       }
       if (result.card) {
         savePendingPayment({ externalReference: result.externalReference })
-        initMercadoPago(result.card.publicKey, { locale: 'pt-BR' })
-        setCardBrickReady(false)
         setCardData({ ...result.card, externalReference: result.externalReference })
         return
       }
@@ -322,17 +365,7 @@ export default function Checkout() {
       <p className="cart-muted" style={{ textAlign: 'center' }}>Total {money(cardData.amount)} — escolha o número de parcelas e preencha os dados do cartão.</p>
       {error && <p className="form-status" style={{ textAlign: 'center' }}>{error}</p>}
       <div className="pix-card">
-        {!cardBrickReady && <p className="cart-muted" style={{ textAlign: 'center' }}>Carregando formulário seguro do cartão...</p>}
-        <CardPayment
-          key={cardData.externalReference}
-          id={`cardPaymentBrick_${cardData.externalReference}`}
-          initialization={cardInitialization || { amount: cardData.amount }}
-          customization={cardCustomization}
-          locale="pt-BR"
-          onSubmit={submitCard}
-          onReady={handleCardReady}
-          onError={handleCardError}
-        />
+        <CardPaymentForm cardData={cardData} onSubmit={submitCard} />
       </div>
       <div style={{ textAlign: 'center' }}>
         <button className="outline-button" type="button" onClick={() => { clearPendingPayment(); setCardData(null); setError('') }}>Cancelar e escolher outra forma de pagamento</button>

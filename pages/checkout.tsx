@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
@@ -43,6 +43,17 @@ export default function Checkout() {
   const [selectedAddressId, setSelectedAddressId] = useState('')
   const [addressEditing, setAddressEditing] = useState(false)
   const [newAddress, setNewAddress] = useState<Address | null>(null)
+  const cardInitialization = useMemo(() => {
+    if (!cardData) return null
+    const payerDocument = cardData.payerDocument.replace(/\D/g, '')
+    return { amount: cardData.amount, payer: { email: cardData.payerEmail, identification: payerDocument ? { type: payerDocument.length > 11 ? 'CNPJ' : 'CPF', number: payerDocument } : undefined } }
+  }, [cardData])
+  const cardCustomization = useMemo(() => ({ paymentMethods: { maxInstallments: 12 } }), [])
+  const handleCardReady = useCallback(() => setCardBrickReady(true), [])
+  const handleCardError = useCallback((brickError: unknown) => {
+    console.error('[Mercado Pago] Falha ao carregar o formulário de cartão:', brickError)
+    setError('Não foi possível carregar o formulário do cartão. Atualize a página e tente novamente.')
+  }, [])
   useEffect(() => { if (!customer && router.isReady) router.replace('/account?returnTo=checkout') }, [customer, router])
   useEffect(() => {
     if (!customer?.id) return
@@ -121,7 +132,7 @@ export default function Checkout() {
     }).catch(() => undefined)
   }
 
-  async function submitCard(formData: any) {
+  const submitCard = useCallback(async (formData: any) => {
     if (!cardData || !supabase) return
     setError('')
     const { data } = await supabase.auth.getSession()
@@ -163,7 +174,7 @@ export default function Checkout() {
       setConfirming(false)
       setError('Não foi possível processar o pagamento. Tente novamente.')
     }
-  }
+  }, [cardData])
 
   function checkPendingPayment(silent = false) {
     if (!router.isReady) return
@@ -306,7 +317,6 @@ export default function Checkout() {
     </section>
   }
   if (cardData) {
-    const payerDocument = cardData.payerDocument.replace(/\D/g, '')
     return <section className="container checkout-page success-page pix-screen">
       <h1 style={{ textAlign: 'center' }}>Pagamento com cartão</h1>
       <p className="cart-muted" style={{ textAlign: 'center' }}>Total {money(cardData.amount)} — escolha o número de parcelas e preencha os dados do cartão.</p>
@@ -316,15 +326,12 @@ export default function Checkout() {
         <CardPayment
           key={cardData.externalReference}
           id={`cardPaymentBrick_${cardData.externalReference}`}
-          initialization={{ amount: cardData.amount, payer: { email: cardData.payerEmail, identification: payerDocument ? { type: payerDocument.length > 11 ? 'CNPJ' : 'CPF', number: payerDocument } : undefined } }}
-          customization={{ paymentMethods: { maxInstallments: 12 } }}
+          initialization={cardInitialization || { amount: cardData.amount }}
+          customization={cardCustomization}
           locale="pt-BR"
           onSubmit={submitCard}
-          onReady={() => setCardBrickReady(true)}
-          onError={(brickError) => {
-            console.error('[Mercado Pago] Falha ao carregar o formulário de cartão:', brickError)
-            setError('Não foi possível carregar o formulário do cartão. Atualize a página e tente novamente.')
-          }}
+          onReady={handleCardReady}
+          onError={handleCardError}
         />
       </div>
       <div style={{ textAlign: 'center' }}>

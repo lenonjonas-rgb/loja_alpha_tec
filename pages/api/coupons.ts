@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
+import { hasProductCategory } from '../../lib/products'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido.' })
@@ -35,7 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
       if (fallback.data?.category) {
         if (items.length > 0) {
-          const hasCategory = items.some((item: any) => String(item.category || '').toLowerCase() === String(fallback.data?.category).toLowerCase())
+          const hasCategory = items.some((item: any) => hasProductCategory(item.category, String(fallback.data?.category || '')))
           if (!hasCategory) {
             return res.status(400).json({ error: 'Este cupom é exclusivo para uma categoria e nenhum item do seu carrinho corresponde a ela.' })
           }
@@ -75,7 +76,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (data.category) {
       if (items.length > 0) {
-        const hasCategory = items.some((item: any) => String(item.category || '').toLowerCase() === String(data.category).toLowerCase())
+        const hasCategory = items.some((item: any) => hasProductCategory(item.category, String(data.category)))
         if (!hasCategory) {
           return res.status(400).json({ error: 'Este cupom é exclusivo para uma categoria e nenhum item do seu carrinho corresponde a ela.' })
         }

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { products } from '../../lib/products'
+import { getProductCategories, hasProductCategory, products } from '../../lib/products'
 import { supabase } from '../../lib/supabase'
 
 const formatPrice = (price: any) => {
@@ -44,7 +44,7 @@ export default function Products() {
             (p) => Boolean(p.flashSale) || Number(p.discountPercent || 0) > 0
           )
         } else if (category) {
-          filtered = allProducts.filter((p) => normalize(p.category) === normalize(category))
+          filtered = allProducts.filter((p) => hasProductCategory(p.category, category))
         }
 
         setCatalog(
@@ -96,7 +96,7 @@ export default function Products() {
                   {!product.flashSale && hasDiscount && <b>OFERTA -{Number(product.discountPercent)}%</b>}
                 </Link>
                 <div className="catalog-card-body">
-                  <small>{product.brand || 'Alpha Tec'} · {product.category || 'Geral'}</small>
+                  <small>{product.brand || 'Alpha Tec'} · {getProductCategories(product.category).join(' / ') || 'Geral'}</small>
                   <h2>{product.name || 'Produto'}</h2>
                   <p>{product.description || ''}</p>
                   {isOutOfStock ? (

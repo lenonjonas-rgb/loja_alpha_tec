@@ -1,5 +1,6 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
 import { CORREIOS_PACKAGE_DEFAULTS } from '../lib/shipping-limits'
+import { getProductCategories } from '../lib/products'
 
 type Product = {
   id: string
@@ -25,6 +26,14 @@ type Product = {
 type Props = { products: Product[]; onSaved: (product: Product) => void; onMessage: (message: string) => void }
 
 const categories = ['Esteiras', 'Musculação', 'Bicicletas', 'Acessórios', 'Peças diversas']
+
+function toggleCategory(value: string, category: string) {
+  const selectedCategories = getProductCategories(value)
+  if (selectedCategories.includes(category)) {
+    return selectedCategories.length > 1 ? selectedCategories.filter((item) => item !== category).join(', ') : value
+  }
+  return [...selectedCategories, category].join(', ')
+}
 
 export default function AdminProducts({ products, onSaved, onMessage }: Props) {
   const [selected, setSelected] = useState<Product | null>(null)
@@ -117,7 +126,12 @@ export default function AdminProducts({ products, onSaved, onMessage }: Props) {
         <div className="form-grid">
           <label>Nome<input required value={selected.name} onChange={(event) => setSelected({ ...selected, name: event.target.value })} /></label>
           <label>Marca<input required value={selected.brand} onChange={(event) => setSelected({ ...selected, brand: event.target.value })} /></label>
-          <label>Categoria<select value={selected.category} onChange={(event) => setSelected({ ...selected, category: event.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
+          <fieldset className="category-checkbox-field">
+            <legend>Categorias</legend>
+            <div className="category-checkboxes">
+              {categories.map((category) => <label key={category}><input type="checkbox" checked={getProductCategories(selected.category).includes(category)} onChange={() => setSelected({ ...selected, category: toggleCategory(selected.category, category) })} /> {category}</label>)}
+            </div>
+          </fieldset>
           <label>Preço<input required type="number" min="0" step="0.01" value={selected.price} onChange={(event) => setSelected({ ...selected, price: Number(event.target.value) })} /></label>
           <label>Estoque disponível<input required type="number" min="0" value={selected.stock ?? 0} onChange={(event) => setSelected({ ...selected, stock: Number(event.target.value) })} /></label>
           <label>Desconto (%)<input type="number" min="0" max="100" value={selected.discountPercent ?? 0} onChange={(event) => setSelected({ ...selected, discountPercent: Number(event.target.value) })} /></label>
@@ -155,7 +169,7 @@ export default function AdminProducts({ products, onSaved, onMessage }: Props) {
           <div className="product-admin-row" key={product.id}>
             <span>
               <strong>{product.name}</strong>
-              <small>{product.brand} · {product.category}</small>
+              <small>{product.brand} · {getProductCategories(product.category).join(' / ')}</small>
             </span>
             <label>Estoque<input type="number" min="0" value={draft.stock || 0} onChange={(event) => updateDraft(product, { stock: Number(event.target.value) })} /></label>
             <label>Desconto %<input type="number" min="0" max="100" value={draft.discountPercent ?? 0} onChange={(event) => updateDraft(product, { discountPercent: Number(event.target.value) })} /></label>

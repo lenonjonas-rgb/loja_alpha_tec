@@ -1,5 +1,6 @@
 import { ChangeEvent, useState } from 'react'
 import { CORREIOS_PACKAGE_DEFAULTS } from '../lib/shipping-limits'
+import { getProductCategories } from '../lib/products'
 
 type ProductRow = {
   name: string
@@ -19,6 +20,14 @@ type ProductRow = {
 type Props = { onMessage: (message: string) => void }
 
 const categories = ['Esteiras', 'Musculação', 'Bicicletas', 'Acessórios', 'Peças diversas']
+
+function toggleCategory(value: string, category: string) {
+  const selectedCategories = getProductCategories(value)
+  if (selectedCategories.includes(category)) {
+    return selectedCategories.length > 1 ? selectedCategories.filter((item) => item !== category).join(', ') : value
+  }
+  return [...selectedCategories, category].join(', ')
+}
 
 const blank = (): ProductRow => ({
   name: '',
@@ -153,11 +162,9 @@ export default function AdminBulkProducts({ onMessage }: Props) {
           <div className="bulk-row" key={index}>
             <input value={row.name} onChange={(event) => update(index, 'name', event.target.value)} placeholder="Inversor" />
             <input value={row.brand} onChange={(event) => update(index, 'brand', event.target.value)} placeholder="Movement" />
-            <select value={row.category} onChange={(event) => update(index, 'category', event.target.value)}>
-              {categories.map((category) => (
-                <option key={category}>{category}</option>
-              ))}
-            </select>
+            <div className="bulk-category-checkboxes">
+              {categories.map((category) => <label key={category}><input type="checkbox" checked={getProductCategories(row.category).includes(category)} onChange={() => update(index, 'category', toggleCategory(row.category, category))} /> {category}</label>)}
+            </div>
             <textarea className="bulk-description-input" value={row.compatibleEquipment} onChange={(event) => update(index, 'compatibleEquipment', event.target.value)} placeholder={'Um modelo por linha'} />
             <input type="number" min="0.001" step="0.001" value={row.price} onChange={(event) => update(index, 'price', event.target.value)} placeholder="0,00" />
             <input type="number" min={CORREIOS_PACKAGE_DEFAULTS.weightKg} step="0.001" value={row.weightKg} onChange={(event) => update(index, 'weightKg', event.target.value)} />

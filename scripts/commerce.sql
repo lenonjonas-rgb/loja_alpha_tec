@@ -7,6 +7,8 @@ alter table public.products add column if not exists weight_kg numeric(10,3) not
 alter table public.products add column if not exists height_cm numeric(10,2) not null default 0;
 alter table public.products add column if not exists width_cm numeric(10,2) not null default 0;
 alter table public.products add column if not exists length_cm numeric(10,2) not null default 0;
+alter table public.products add column if not exists internal_code text;
+alter table public.order_items add column if not exists internal_code text;
 
 -- carrinho do cliente sincronizado entre dispositivos: 1 linha por cliente logado
 create table if not exists public.carts (

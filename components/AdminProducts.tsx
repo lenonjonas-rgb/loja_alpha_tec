@@ -5,6 +5,7 @@ import { getProductCategories } from '../lib/products'
 type Product = {
   id: string
   name: string
+  internalCode?: string
   brand: string
   category: string
   compatibleEquipment: string
@@ -125,6 +126,7 @@ export default function AdminProducts({ products, onSaved, onMessage }: Props) {
 
         <div className="form-grid">
           <label>Nome<input required value={selected.name} onChange={(event) => setSelected({ ...selected, name: event.target.value })} /></label>
+          <label>Código interno<input value={selected.internalCode || ''} onChange={(event) => setSelected({ ...selected, internalCode: event.target.value })} placeholder="Ex.: AT-EST-001" /></label>
           <label>Marca<input required value={selected.brand} onChange={(event) => setSelected({ ...selected, brand: event.target.value })} /></label>
           <fieldset className="category-checkbox-field">
             <legend>Categorias</legend>
@@ -169,7 +171,7 @@ export default function AdminProducts({ products, onSaved, onMessage }: Props) {
           <div className="product-admin-row" key={product.id}>
             <span>
               <strong>{product.name}</strong>
-              <small>{product.brand} · {getProductCategories(product.category).join(' / ')}</small>
+              <small>{product.internalCode ? `Cód. ${product.internalCode} · ` : ''}{product.brand} · {getProductCategories(product.category).join(' / ')}</small>
             </span>
             <label>Estoque<input type="number" min="0" value={draft.stock || 0} onChange={(event) => updateDraft(product, { stock: Number(event.target.value) })} /></label>
             <label>Desconto %<input type="number" min="0" max="100" value={draft.discountPercent ?? 0} onChange={(event) => updateDraft(product, { discountPercent: Number(event.target.value) })} /></label>

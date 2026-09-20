@@ -7,13 +7,13 @@ import { getCorreiosLimitViolation } from '../../lib/shipping-limits'
 import { getCompatibleModels } from '../../lib/products'
 
 type CheckoutItem = { id: string; quantity: number; selectedModel?: string }
-type PricedProduct = { name: string; price: number; pictureUrl: string; weightKg: number; heightCm: number; widthCm: number; lengthCm: number; compatibleModels: string[] }
+type PricedProduct = { name: string; internalCode: string; price: number; pictureUrl: string; weightKg: number; heightCm: number; widthCm: number; lengthCm: number; compatibleModels: string[] }
 
 async function loadPricedProducts(supabase: ReturnType<typeof getSupabaseServer>, items: CheckoutItem[], appUrl: string) {
   const productIds = Array.from(new Set(items.map((item) => item.id)))
   const { data: products, error } = await supabase
     .from('products')
-    .select('id,name,price,active,discount_percent,image_url,weight_kg,height_cm,width_cm,length_cm,compatible_equipment')
+    .select('id,name,internal_code,price,active,discount_percent,image_url,weight_kg,height_cm,width_cm,length_cm,compatible_equipment')
     .in('id', productIds)
 
   if (error) throw error
@@ -26,7 +26,7 @@ async function loadPricedProducts(supabase: ReturnType<typeof getSupabaseServer>
     const basePrice = Number(product.price)
     const discountPercent = Number(product.discount_percent || 0)
     const finalPrice = discountPercent > 0 ? basePrice * (1 - discountPercent / 100) : basePrice
-    return [product.id, { name: product.name, price: finalPrice, pictureUrl: toAbsoluteUrl(product.image_url), weightKg: Number(product.weight_kg || 0), heightCm: Number(product.height_cm || 0), widthCm: Number(product.width_cm || 0), lengthCm: Number(product.length_cm || 0), compatibleModels: getCompatibleModels(product.compatible_equipment) }]
+    return [product.id, { name: product.name, internalCode: product.internal_code || '', price: finalPrice, pictureUrl: toAbsoluteUrl(product.image_url), weightKg: Number(product.weight_kg || 0), heightCm: Number(product.height_cm || 0), widthCm: Number(product.width_cm || 0), lengthCm: Number(product.length_cm || 0), compatibleModels: getCompatibleModels(product.compatible_equipment) }]
   }))
   return productById
 }
@@ -144,6 +144,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         order_id: orderId,
         product_id: item.id,
         product_name: item.selectedModel ? `${product.name} - Modelo: ${item.selectedModel}` : product.name,
+        internal_code: product.internalCode || null,
         quantity: item.quantity,
         unit_price: product.price,
         total: product.price * item.quantity,

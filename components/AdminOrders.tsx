@@ -2,7 +2,7 @@ import { ChangeEvent, useEffect, useState } from 'react'
 import { getCarrierTrackingUrl } from '../lib/carrier-tracking'
 import { generateShippingLabels, resolveLabelAddress, type LabelAddress, type LabelCustomer } from '../lib/shipping-label'
 
-type Order = { id: string; created_at: string; status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'; payment_status: 'pending' | 'paid' | 'failed' | 'refunded'; payment_method: 'pix' | 'card' | 'boleto' | null; total: number; tracking_code: string | null; carrier: string | null; invoice_url: string | null; shipping_address: LabelAddress | null; customer_address?: LabelAddress | null; customers: LabelCustomer | null; order_items: { product_name: string; quantity: number }[] }
+type Order = { id: string; created_at: string; status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'; payment_status: 'pending' | 'paid' | 'failed' | 'refunded'; payment_method: 'pix' | 'card' | 'boleto' | null; total: number; tracking_code: string | null; carrier: string | null; invoice_url: string | null; shipping_address: LabelAddress | null; customer_address?: LabelAddress | null; customers: LabelCustomer | null; order_items: { product_name: string; internal_code: string | null; quantity: number }[] }
 type Props = { onMessage: (message: string) => void }
 
 const orderStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'] as const
@@ -146,7 +146,7 @@ export default function AdminOrders({ onMessage }: Props) {
         return <article className={`order-card ${expanded ? 'expanded' : ''}`} key={order.id} onClick={() => toggleExpanded(order.id)}>
           <div className="order-summary">
             <div className="order-select" onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(order.id)} onChange={() => toggleSelection(order.id)} aria-label={`Selecionar pedido ${order.id.slice(0, 8)}`} /></div>
-            <div className="order-summary-main"><h3>Pedido #{order.id.slice(0, 8)}</h3><p>{order.customers?.name || 'Cliente'} · {order.customers?.email || 'E-mail não informado'} · {new Date(order.created_at).toLocaleString('pt-BR')}</p><small>{order.order_items.map((item) => `${item.product_name} x${item.quantity}`).join(' · ')}</small></div>
+            <div className="order-summary-main"><h3>Pedido #{order.id.slice(0, 8)}</h3><p>{order.customers?.name || 'Cliente'} · {order.customers?.email || 'E-mail não informado'} · {new Date(order.created_at).toLocaleString('pt-BR')}</p><small>{order.order_items.map((item) => `${item.internal_code ? `[${item.internal_code}] ` : ''}${item.product_name} x${item.quantity}`).join(' · ')}</small></div>
             <strong>R$ {Number(order.total).toFixed(2).replace('.', ',')}</strong>
             <span className="order-expand-icon" aria-hidden="true">{expanded ? '−' : '+'}</span>
           </div>

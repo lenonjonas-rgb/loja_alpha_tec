@@ -8,7 +8,7 @@ import AdminQuestions from '../components/AdminQuestions'
 import AdminStoreProfile from '../components/AdminStoreProfile'
 import AdminCouponsPage from './admin/coupons'
 
-type Product = { id: string; name: string; brand: string; category: string; compatibleEquipment: string; description: string; specifications: string; image: string; price: number; active: boolean; stock: number; discountPercent: number; flashSale: boolean; showInBanner: boolean; weightKg?: number; heightCm?: number; widthCm?: number; lengthCm?: number }
+type Product = { id: string; name: string; internalCode?: string; brand: string; category: string; compatibleEquipment: string; description: string; specifications: string; image: string; price: number; active: boolean; stock: number; discountPercent: number; flashSale: boolean; showInBanner: boolean; weightKg?: number; heightCm?: number; widthCm?: number; lengthCm?: number }
 export default function Admin() {
   const [authenticated, setAuthenticated] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
@@ -18,7 +18,7 @@ export default function Admin() {
   const [message, setMessage] = useState('')
   useEffect(() => { fetch('/api/admin/session').then((response) => response.json()).then((result) => { setAuthenticated(result.authenticated) }).finally(() => setCheckingSession(false)) }, [])
   useEffect(() => { if (authenticated) void loadProducts() }, [authenticated])
-  async function loadProducts() { const response = await fetch('/api/products'); if (response.ok) setProducts(await response.json()) }
+  async function loadProducts() { const response = await fetch('/api/products?admin=1'); if (response.ok) setProducts(await response.json()) }
   async function signIn(event: FormEvent) { event.preventDefault(); const response = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(login) }); if (!response.ok) return setMessage('Usuário ou senha inválidos.'); setAuthenticated(true) }
   if (checkingSession) return <section className="admin-page container"><p className="form-hint">Carregando central administrativa...</p></section>
   if (!authenticated) return <section className="admin-page container"><Link href="/" className="back-link">← Voltar para a loja</Link><div className="admin-login"><p className="eyebrow">ÁREA RESTRITA</p><h1>Painel Master</h1><p>Controle leads, pedidos e catálogo em um só lugar.</p><form onSubmit={signIn}><label>Usuário<input required value={login.username} onChange={(event) => setLogin({ ...login, username: event.target.value })} /></label><label>Senha<input required type="password" value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} /></label>{message && <p className="form-status">{message}</p>}<button className="primary-button" type="submit">Entrar <span>→</span></button></form></div></section>

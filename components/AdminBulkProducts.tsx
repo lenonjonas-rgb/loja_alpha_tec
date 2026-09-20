@@ -4,6 +4,7 @@ import { getProductCategories } from '../lib/products'
 
 type ProductRow = {
   name: string
+  internalCode: string
   brand: string
   category: string
   compatibleEquipment: string
@@ -31,6 +32,7 @@ function toggleCategory(value: string, category: string) {
 
 const blank = (): ProductRow => ({
   name: '',
+  internalCode: '',
   brand: '',
   category: categories[0],
   compatibleEquipment: '',
@@ -144,6 +146,7 @@ export default function AdminBulkProducts({ onMessage }: Props) {
       <div className="bulk-table">
         <div className="bulk-head">
           <span>Nome</span>
+          <span>Código interno</span>
           <span>Marca</span>
           <span>Categoria</span>
           <span>Modelos compatíveis</span>
@@ -161,6 +164,7 @@ export default function AdminBulkProducts({ onMessage }: Props) {
         {rows.map((row, index) => (
           <div className="bulk-row" key={index}>
             <input value={row.name} onChange={(event) => update(index, 'name', event.target.value)} placeholder="Inversor" />
+            <input value={row.internalCode} onChange={(event) => update(index, 'internalCode', event.target.value)} placeholder="AT-EST-001" />
             <input value={row.brand} onChange={(event) => update(index, 'brand', event.target.value)} placeholder="Movement" />
             <div className="bulk-category-checkboxes">
               {categories.map((category) => <label key={category}><input type="checkbox" checked={getProductCategories(row.category).includes(category)} onChange={() => update(index, 'category', toggleCategory(row.category, category))} /> {category}</label>)}

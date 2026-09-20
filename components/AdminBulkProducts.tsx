@@ -137,7 +137,7 @@ export default function AdminBulkProducts({ onMessage }: Props) {
           <span>Nome</span>
           <span>Marca</span>
           <span>Categoria</span>
-          <span>Compatibilidade</span>
+          <span>Modelos compatíveis</span>
           <span>Preço</span>
           <span>Peso (kg)</span>
           <span>Altura (cm)</span>
@@ -158,7 +158,7 @@ export default function AdminBulkProducts({ onMessage }: Props) {
                 <option key={category}>{category}</option>
               ))}
             </select>
-            <input value={row.compatibleEquipment} onChange={(event) => update(index, 'compatibleEquipment', event.target.value)} placeholder="Modelo" />
+            <textarea className="bulk-description-input" value={row.compatibleEquipment} onChange={(event) => update(index, 'compatibleEquipment', event.target.value)} placeholder={'Um modelo por linha'} />
             <input type="number" min="0.001" step="0.001" value={row.price} onChange={(event) => update(index, 'price', event.target.value)} placeholder="0,00" />
             <input type="number" min={CORREIOS_PACKAGE_DEFAULTS.weightKg} step="0.001" value={row.weightKg} onChange={(event) => update(index, 'weightKg', event.target.value)} />
             <input type="number" min={CORREIOS_PACKAGE_DEFAULTS.heightCm} step="0.1" value={row.heightCm} onChange={(event) => update(index, 'heightCm', event.target.value)} />

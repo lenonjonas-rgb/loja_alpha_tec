@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { FormEvent, useEffect, useState } from 'react'
-import { products } from '../../lib/products'
+import { getCompatibleModels, products } from '../../lib/products'
 import { useCart } from '../../components/CartContext'
 import { useCustomer } from '../../components/CustomerContext'
 import { supabase } from '../../lib/supabase'
@@ -26,6 +26,8 @@ export default function ProductPage() {
   const { addItem } = useCart()
   const { customer } = useCustomer()
   const [added, setAdded] = useState(false)
+  const [selectedModel, setSelectedModel] = useState('')
+  const [modelError, setModelError] = useState('')
   const [activeTab, setActiveTab] = useState<DetailTab>('description')
   const [loading, setLoading] = useState(true)
   const [product, setProduct] = useState<any>(null)
@@ -79,6 +81,10 @@ export default function ProductPage() {
   useEffect(() => {
     if (!router.isReady || !productId) return
 
+    setSelectedModel('')
+    setModelError('')
+    setAdded(false)
+
     setLoading(true)
     fetch('/api/products')
       .then((response) => (response.ok ? response.json() : []))
@@ -131,6 +137,7 @@ export default function ProductPage() {
   const discountNum = Number(product.discountPercent || 0)
   const finalPrice = discountNum > 0 ? priceNum * (1 - discountNum / 100) : priceNum
   const stockNum = typeof product.stock === 'number' ? product.stock : 1
+  const compatibleModels = getCompatibleModels(product.compatibleEquipment)
   const specificationLines = (product.specifications || '')
     .split(/\n|\r\n|\;\s*/)
     .map((line: string) => line.trim())
@@ -188,11 +195,31 @@ export default function ProductPage() {
               </ul>
             )}
             {activeTab === 'compatibility' && (
-              <p className="detail-description">
-                {product.compatibleEquipment || 'Consulte a compatibilidade com nossa equipe.'}
-              </p>
+              compatibleModels.length > 0 ? (
+                <ul className="detail-spec-list">
+                  {compatibleModels.map((model) => <li key={model}>{model}</li>)}
+                </ul>
+              ) : <p className="detail-description">Consulte a compatibilidade com nossa equipe.</p>
             )}
           </div>
+
+          {compatibleModels.length > 0 && (
+            <label className="product-model-selector">
+              Selecione o modelo do equipamento
+              <select
+                value={selectedModel}
+                onChange={(event) => {
+                  setSelectedModel(event.target.value)
+                  setModelError('')
+                  setAdded(false)
+                }}
+              >
+                <option value="">Escolha um modelo</option>
+                {compatibleModels.map((model) => <option key={model} value={model}>{model}</option>)}
+              </select>
+            </label>
+          )}
+          {modelError && <p className="product-model-error">{modelError}</p>}
 
           {discountNum > 0 && (
             <del className="detail-old-price">{formatPrice(priceNum)}</del>
@@ -207,7 +234,11 @@ export default function ProductPage() {
                 className="primary-button"
                 type="button"
                 onClick={() => {
-                  addItem({ ...product, price: finalPrice })
+                  if (compatibleModels.length > 0 && !selectedModel) {
+                    setModelError('Selecione o modelo do equipamento antes de adicionar ao carrinho.')
+                    return
+                  }
+                  addItem({ ...product, price: finalPrice, selectedModel: selectedModel || undefined })
                   setAdded(true)
                 }}
               >

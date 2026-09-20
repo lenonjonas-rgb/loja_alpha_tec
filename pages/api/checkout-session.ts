@@ -4,17 +4,20 @@ import { getSupabaseServer } from '../../lib/supabase-server'
 import { getStripe } from '../../lib/stripe'
 import { maxRedeemablePoints, pointsToDiscount } from '../../lib/loyalty'
 import { getCorreiosLimitViolation } from '../../lib/shipping-limits'
+import { getCompatibleModels } from '../../lib/products'
 
-type PricedProduct = { name: string; price: number; pictureUrl: string; weightKg: number; heightCm: number; widthCm: number; lengthCm: number }
+type CheckoutItem = { id: string; quantity: number; selectedModel?: string }
+type PricedProduct = { name: string; price: number; pictureUrl: string; weightKg: number; heightCm: number; widthCm: number; lengthCm: number; compatibleModels: string[] }
 
-async function loadPricedProducts(supabase: ReturnType<typeof getSupabaseServer>, items: Array<{ id: string; quantity: number }>, appUrl: string) {
+async function loadPricedProducts(supabase: ReturnType<typeof getSupabaseServer>, items: CheckoutItem[], appUrl: string) {
+  const productIds = Array.from(new Set(items.map((item) => item.id)))
   const { data: products, error } = await supabase
     .from('products')
-    .select('id,name,price,active,discount_percent,image_url,weight_kg,height_cm,width_cm,length_cm')
-    .in('id', items.map((item) => item.id))
+    .select('id,name,price,active,discount_percent,image_url,weight_kg,height_cm,width_cm,length_cm,compatible_equipment')
+    .in('id', productIds)
 
   if (error) throw error
-  if (!products || products.length !== items.length || products.some((product) => !product.active)) {
+  if (!products || products.length !== productIds.length || products.some((product) => !product.active)) {
     return null
   }
 
@@ -23,7 +26,7 @@ async function loadPricedProducts(supabase: ReturnType<typeof getSupabaseServer>
     const basePrice = Number(product.price)
     const discountPercent = Number(product.discount_percent || 0)
     const finalPrice = discountPercent > 0 ? basePrice * (1 - discountPercent / 100) : basePrice
-    return [product.id, { name: product.name, price: finalPrice, pictureUrl: toAbsoluteUrl(product.image_url), weightKg: Number(product.weight_kg || 0), heightCm: Number(product.height_cm || 0), widthCm: Number(product.width_cm || 0), lengthCm: Number(product.length_cm || 0) }]
+    return [product.id, { name: product.name, price: finalPrice, pictureUrl: toAbsoluteUrl(product.image_url), weightKg: Number(product.weight_kg || 0), heightCm: Number(product.height_cm || 0), widthCm: Number(product.width_cm || 0), lengthCm: Number(product.length_cm || 0), compatibleModels: getCompatibleModels(product.compatible_equipment) }]
   }))
   return productById
 }
@@ -54,6 +57,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const productById = await loadPricedProducts(supabase, items, appUrl)
     if (!productById) {
       return res.status(400).json({ error: 'Um ou mais produtos não estão disponíveis.' })
+    }
+    const checkoutItems = items as CheckoutItem[]
+    const invalidModel = checkoutItems.find((item) => {
+      const compatibleModels = productById.get(item.id)?.compatibleModels || []
+      return compatibleModels.length > 0 && !compatibleModels.includes(String(item.selectedModel || ''))
+    })
+    if (invalidModel) {
+      return res.status(400).json({ error: `Selecione um modelo válido para ${productById.get(invalidModel.id)?.name || 'a peça'}.` })
     }
     if (String(carrier || '').toLowerCase() === 'correios') {
       const correiosLimitViolation = getCorreiosLimitViolation((items as Array<{ id: string; quantity: number }>).map((item) => ({ ...productById.get(item.id), quantity: item.quantity })))
@@ -127,12 +138,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!order) throw new Error('Não foi possível criar o pedido.')
     const orderId = order.id
 
-    const orderItems = (items as Array<{ id: string; quantity: number }>).map((item) => {
+    const orderItems = checkoutItems.map((item) => {
       const product = productById.get(item.id)!
       return {
         order_id: orderId,
         product_id: item.id,
-        product_name: product.name,
+        product_name: item.selectedModel ? `${product.name} - Modelo: ${item.selectedModel}` : product.name,
         quantity: item.quantity,
         unit_price: product.price,
         total: product.price * item.quantity,
@@ -237,7 +248,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const product = productById.get(item.id)!
         return {
           id: item.id,
-          title: product.name,
+          title: 'selectedModel' in item && item.selectedModel ? `${product.name} - Modelo: ${item.selectedModel}` : product.name,
           picture_url: product.pictureUrl,
           quantity: Number(item.quantity),
           currency_id: 'BRL',
@@ -313,7 +324,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         price_data: {
           currency: 'brl',
           product_data: {
-            name: product.name,
+            name: 'selectedModel' in item && item.selectedModel ? `${product.name} - Modelo: ${item.selectedModel}` : product.name,
             images: [product.pictureUrl],
           },
           unit_amount: Math.round(product.price * discountFactor * 100),

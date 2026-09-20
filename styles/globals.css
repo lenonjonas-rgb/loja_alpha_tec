@@ -83,6 +83,10 @@ a { color: inherit; text-decoration: none; }
 .detail-tab-panel { background: #f8f8f8; border: 1px solid #e2e3e4; margin-bottom: 20px; padding: 18px 20px; max-height: 280px; overflow-y: auto; }
 .detail-description { color: #686c70; font-size: 13px; line-height: 1.7; margin: 0; }
 .detail-spec-list { color: #686c70; font-size: 13px; line-height: 1.7; list-style: disc; margin: 0; padding-left: 18px; }
+.product-model-selector { color: #303336; display: block; font-size: 12px; font-weight: 700; margin: 0 0 16px; }
+.product-model-selector select { background: #fff; border: 1px solid #cfd2d4; display: block; font: inherit; margin-top: 7px; padding: 12px; width: 100%; }
+.product-model-error { color: #b42318; font-size: 12px; margin: -7px 0 14px; }
+.cart-item-model { color: #303336; font-size: 12px; font-weight: 700; }
 .product-questions { border-top: 1px solid #e2e3e4; margin-top: 48px; padding-top: 32px; }
 .product-reviews { border-top: 1px solid #e2e3e4; margin-top: 48px; padding-top: 32px; }
 .product-reviews h2 { font-family: 'Barlow Condensed'; font-size: 32px; margin: 0 0 18px; text-transform: uppercase; }

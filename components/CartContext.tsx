@@ -8,13 +8,18 @@ type CartContextValue = { items: CartItem[]; count: number; subtotal: number; ad
 const CartContext = createContext<CartContextValue | null>(null)
 const storageKey = 'alpha-tec-cart'
 
+function getCartKey(item: Product) {
+  return item.cartKey || `${item.id}::${item.selectedModel || ''}`
+}
+
 function mergeCarts(local: CartItem[], server: CartItem[]): CartItem[] {
   // usa a maior quantidade entre os dois lados em vez de somar: como o carrinho local já foi
   // salvo no servidor em syncs anteriores, somar dobraria a quantidade a cada nova sincronização
-  const merged = new Map<string, CartItem>(server.map((item) => [item.id, item]))
+  const merged = new Map<string, CartItem>(server.map((item) => [getCartKey(item), { ...item, cartKey: getCartKey(item) }]))
   for (const item of local) {
-    const existing = merged.get(item.id)
-    merged.set(item.id, existing ? { ...existing, quantity: Math.max(existing.quantity || 0, item.quantity || 0) } : item)
+    const cartKey = getCartKey(item)
+    const existing = merged.get(cartKey)
+    merged.set(cartKey, existing ? { ...existing, quantity: Math.max(existing.quantity || 0, item.quantity || 0) } : { ...item, cartKey })
   }
   return Array.from(merged.values())
 }
@@ -32,7 +37,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       if (stored) {
         const parsed = JSON.parse(stored)
         if (Array.isArray(parsed)) {
-          setItems(parsed.filter((item) => item && typeof item === 'object' && item.id))
+          setItems(parsed
+            .filter((item) => item && typeof item === 'object' && item.id)
+            .map((item) => ({ ...item, cartKey: getCartKey(item) })))
         }
       }
     } catch (e) {
@@ -99,24 +106,25 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   function addItem(product: Product) {
     if (!product || !product.id) return
     setItems((current) => {
-      const existing = current.find((item) => item.id === product.id)
+      const cartKey = getCartKey(product)
+      const existing = current.find((item) => getCartKey(item) === cartKey)
       const price = Number(product.price || 0)
       return existing
-        ? current.map((item) => (item.id === product.id ? { ...item, quantity: (item.quantity || 1) + 1 } : item))
-        : [...current, { ...product, price, quantity: 1 }]
+        ? current.map((item) => (getCartKey(item) === cartKey ? { ...item, quantity: (item.quantity || 1) + 1 } : item))
+        : [...current, { ...product, cartKey, price, quantity: 1 }]
     })
   }
 
-  function updateQuantity(id: string, quantity: number) {
+  function updateQuantity(cartKey: string, quantity: number) {
     setItems((current) =>
       quantity > 0
-        ? current.map((item) => (item.id === id ? { ...item, quantity } : item))
-        : current.filter((item) => item.id !== id)
+        ? current.map((item) => (getCartKey(item) === cartKey ? { ...item, quantity } : item))
+        : current.filter((item) => getCartKey(item) !== cartKey)
     )
   }
 
-  function removeItem(id: string) {
-    setItems((current) => current.filter((item) => item.id !== id))
+  function removeItem(cartKey: string) {
+    setItems((current) => current.filter((item) => getCartKey(item) !== cartKey))
   }
 
   function clearCart() {

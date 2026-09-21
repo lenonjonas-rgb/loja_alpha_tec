@@ -1,6 +1,9 @@
 import Link from 'next/link'
+import Head from 'next/head'
 import { useEffect, useState } from 'react'
 import type { Product } from '../lib/products'
+
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://lojaalphatec.com.br').replace(/\/$/, '')
 
 const categories = [
   { title: 'Esteiras', detail: 'Correias, roletes e placas', slug: 'esteiras', image: 'https://www.movement.com.br/wp-content/uploads/2025/04/iTouch-Cinza-2.png', video: 'https://assets.mixkit.co/videos/47879/47879-360.mp4' },
@@ -212,6 +215,16 @@ export default function Home() {
 
   return (
     <>
+      <Head>
+        <title>Loja Alpha Tec | Peças e acessórios para fitness</title>
+        <meta name="description" content="Loja Alpha Tec oferece peças e acessórios para esteiras, bicicletas, elipticos e equipamentos de musculação com entrega para todo o Brasil." />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href={siteUrl} />
+        <meta property="og:title" content="Loja Alpha Tec | Peças e acessórios para fitness" />
+        <meta property="og:description" content="Loja Alpha Tec oferece peças e acessórios para esteiras, bicicletas, elipticos e equipamentos de musculação com entrega para todo o Brasil." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={siteUrl} />
+      </Head>
       <section className="hero container">
         <div className="hero-copy">
           <p className="eyebrow">MANUTENÇÃO SEM PARAR</p>

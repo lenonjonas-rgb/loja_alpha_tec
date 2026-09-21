@@ -1,10 +1,13 @@
 import Link from 'next/link'
+import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { FormEvent, useEffect, useState } from 'react'
 import { getCompatibleModels, products } from '../../lib/products'
 import { useCart } from '../../components/CartContext'
 import { useCustomer } from '../../components/CustomerContext'
 import { supabase } from '../../lib/supabase'
+
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://lojaalphatec.com.br').replace(/\/$/, '')
 
 type ProductQuestion = { id: string; question: string; answer: string | null; answered_at: string | null; created_at: string }
 type ProductReview = { id: string; rating: number; comment: string; photos: string[]; createdAt: string; customerName: string }
@@ -111,25 +114,47 @@ export default function ProductPage() {
       .finally(() => setLoading(false))
   }, [router.isReady, productId])
 
+  const pageTitle = product ? `${product.name} | Loja Alpha Tec` : 'Produto não encontrado | Loja Alpha Tec'
+  const pageDescription = product
+    ? (product.description || `Confira ${product.name} na Loja Alpha Tec.`)
+    : 'Produto não encontrado na Loja Alpha Tec.'
+  const canonicalUrl = product ? `${siteUrl}/products/${product.id}` : `${siteUrl}/products`
+
   if (loading && !product) {
     return (
-      <section className="container product-detail">
-        <Link href="/products" className="back-link">
-          ← Voltar para produtos
-        </Link>
-        <div style={{ padding: '40px 0', color: '#686c70' }}>Carregando dados da peça...</div>
-      </section>
+      <>
+        <Head>
+          <title>{pageTitle}</title>
+          <meta name="description" content={pageDescription} />
+          <meta name="robots" content="index, follow" />
+          <link rel="canonical" href={canonicalUrl} />
+        </Head>
+        <section className="container product-detail">
+          <Link href="/products" className="back-link">
+            ← Voltar para produtos
+          </Link>
+          <div style={{ padding: '40px 0', color: '#686c70' }}>Carregando dados da peça...</div>
+        </section>
+      </>
     )
   }
 
   if (!product) {
     return (
-      <section className="container product-detail">
-        <Link href="/products" className="back-link">
-          ← Voltar para produtos
-        </Link>
-        <h1>Produto não encontrado</h1>
-      </section>
+      <>
+        <Head>
+          <title>{pageTitle}</title>
+          <meta name="description" content={pageDescription} />
+          <meta name="robots" content="noindex, follow" />
+          <link rel="canonical" href={canonicalUrl} />
+        </Head>
+        <section className="container product-detail">
+          <Link href="/products" className="back-link">
+            ← Voltar para produtos
+          </Link>
+          <h1>Produto não encontrado</h1>
+        </section>
+      </>
     )
   }
 
@@ -144,10 +169,22 @@ export default function ProductPage() {
     .filter(Boolean)
 
   return (
-    <section className="container product-detail">
-      <Link href="/products" className="back-link">
-        ← Voltar para produtos
-      </Link>
+    <>
+      <Head>
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageDescription} />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href={canonicalUrl} />
+        <meta property="og:title" content={pageTitle} />
+        <meta property="og:description" content={pageDescription} />
+        <meta property="og:type" content="product" />
+        <meta property="og:url" content={canonicalUrl} />
+        <meta property="og:image" content={product.image || '/logo-header-uniform.jpg'} />
+      </Head>
+      <section className="container product-detail">
+        <Link href="/products" className="back-link">
+          ← Voltar para produtos
+        </Link>
       <div className="detail-layout">
         <div className="detail-image">
           <img src={product.image || '/logo-header-uniform.jpg'} alt={product.name || 'Produto'} />
@@ -328,5 +365,6 @@ export default function ProductPage() {
         )}
       </div>
     </section>
+    </>
   )
 }

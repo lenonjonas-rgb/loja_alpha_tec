@@ -6,9 +6,9 @@ import Head from 'next/head'
 import { useCart } from './CartContext'
 import { useCustomer } from './CustomerContext'
 
-const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://lojaalphatec.com.br').replace(/\/$/, '')
-const siteTitle = 'Loja Alpha Tec | Pecas e acessorios para equipamentos fitness'
-const siteDescription = 'Loja Alpha Tec: pecas, acessorios e suporte especializado para esteiras, bicicletas, elipticos, musculacao e equipamentos fitness com entrega para todo o Brasil.'
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://lojaalphatec.com.br').replace(/\/$/, '')
+const siteTitle = 'Loja Alpha Tec | Peças e acessórios para equipamentos fitness'
+const siteDescription = 'Loja Alpha Tec: peças, acessórios e suporte especializado para esteiras, bicicletas, elipticos, musculação e equipamentos fitness com entrega para todo o Brasil.'
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { count } = useCart()
@@ -20,6 +20,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <meta name="description" content={siteDescription} />
         <meta name="robots" content="index, follow" />
         <meta name="keywords" content="Loja Alpha Tec, lojaalphatec, Alpha Tec, pecas fitness, acessorios fitness, esteiras, bicicletas, elipticos, musculacao" />
+        <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+        <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+        <link rel="apple-touch-icon" href="/logo-header-uniform.jpg" />
         <link rel="canonical" href={siteUrl} />
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="Loja Alpha Tec" />

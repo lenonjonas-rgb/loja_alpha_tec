@@ -1,8 +1,11 @@
 import Link from 'next/link'
+import Head from 'next/head'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { getProductCategories, hasProductCategory, products } from '../../lib/products'
 import { supabase } from '../../lib/supabase'
+
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://lojaalphatec.com.br').replace(/\/$/, '')
 
 const formatPrice = (price: any) => {
   const num = Number(price)
@@ -75,9 +78,33 @@ export default function Products() {
   }, [router.query.q])
 
   const safeCatalog = Array.isArray(catalog) ? catalog.filter(Boolean) : []
+  const category = String(router.query.category || '')
+  const searchTerm = String(router.query.q || '').trim()
+  const pageTitle = category
+    ? category === 'ofertas'
+      ? 'Ofertas em peças e acessórios - Loja Alpha Tec'
+      : `${category.charAt(0).toUpperCase() + category.slice(1)} - Loja Alpha Tec`
+    : searchTerm
+      ? `Busca por "${searchTerm}" - Loja Alpha Tec`
+      : 'Peças e acessórios para equipamentos fitness - Loja Alpha Tec'
+
+  const pageDescription = category
+    ? `Encontre peças e acessórios para ${category} com qualidade e compatibilidade para seu equipamento.`
+    : searchTerm
+      ? `Resultados da busca por ${searchTerm} na Loja Alpha Tec.`
+      : 'Explore o catálogo da Loja Alpha Tec com peças para esteiras, bicicletas, elipticos e equipamentos de musculação.'
+
+  const canonicalUrl = `${siteUrl}/products${category ? `?category=${encodeURIComponent(category)}` : ''}${searchTerm ? `${category ? '&' : '?'}q=${encodeURIComponent(searchTerm)}` : ''}`
 
   return (
-    <section className="catalog-page container">
+    <>
+      <Head>
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageDescription} />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href={canonicalUrl} />
+      </Head>
+      <section className="catalog-page container">
       <div className="catalog-heading">
         <p className="eyebrow">CATÁLOGO ALPHA TEC</p>
         <h1>Peças e acessórios</h1>
@@ -120,5 +147,6 @@ export default function Products() {
         <p className="empty-catalog">Nenhuma peça cadastrada nesta categoria.</p>
       )}
     </section>
+    </>
   )
 }

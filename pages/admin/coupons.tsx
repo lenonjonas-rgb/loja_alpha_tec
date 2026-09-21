@@ -28,7 +28,7 @@ type CouponForm = {
 }
 
 const shippingCategory = 'Frete'
-const categories = [shippingCategory, 'Esteiras', 'Musculação', 'Bicicletas', 'Acessórios', 'Peças diversas']
+const categories = [shippingCategory, 'Esteiras', 'Musculação', 'Bicicletas', 'Elípticos', 'Acessórios', 'Peças diversas']
 
 export default function AdminCouponsPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([])

@@ -26,7 +26,7 @@ type Product = {
 
 type Props = { products: Product[]; onSaved: (product: Product) => void; onMessage: (message: string) => void }
 
-const categories = ['Esteiras', 'Musculação', 'Bicicletas', 'Acessórios', 'Peças diversas']
+const categories = ['Esteiras', 'Musculação', 'Bicicletas', 'Elípticos', 'Acessórios', 'Peças diversas']
 
 function toggleCategory(value: string, category: string) {
   const selectedCategories = getProductCategories(value)

@@ -2,13 +2,6 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import type { Product } from '../lib/products'
 
-const categories = [
-  { title: 'Esteiras', detail: 'Correias, roletes e placas', image: 'https://www.movement.com.br/wp-content/uploads/2025/04/iTouch-Cinza-2.png' },
-  { title: 'Musculação', detail: 'Cabos, polias e estruturas', image: 'https://images.unsplash.com/photo-1646656130630-07af3a262a9b?auto=format&fit=crop&w=800&q=80' },
-  { title: 'Bicicletas', detail: 'Pedais, correias e sensores', image: 'https://images.unsplash.com/photo-1707985287164-c84627ad6eba?auto=format&fit=crop&w=800&q=80' },
-  { title: 'Acessórios', detail: 'Manoplas, parafusos e mais', image: 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=800&q=80' },
-]
-
 const formatPrice = (price: any) => {
   const num = Number(price)
   return !isNaN(num) && num > 0 ? `R$ ${num.toFixed(2).replace('.', ',')}` : 'Consulte o preço'
@@ -194,20 +187,6 @@ export default function Home() {
           <div><b>Compra protegida</b><span>Seus dados sempre seguros</span></div>
           <div><b>Suporte especializado</b><span>Fale com quem entende</span></div>
           <div><b>Peças de qualidade</b><span>Para você treinar tranquilo</span></div>
-        </div>
-      </section>
-      <section className="container content-section">
-        <div className="section-heading">
-          <div><p className="eyebrow">ENCONTRE O QUE PRECISA</p><h2>Compre por categoria</h2></div>
-          <Link href="/products">Ver todas <span>→</span></Link>
-        </div>
-        <div className="category-grid">
-          {categories.map((category) => (
-            <Link className="category-card" href={`/products?category=${category.title.toLowerCase()}`} key={category.title}>
-              <img src={category.image} alt="" />
-              <div><h3>{category.title}</h3><p>{category.detail}</p><span>Ver peças →</span></div>
-            </Link>
-          ))}
         </div>
       </section>
       <section className="featured-band">

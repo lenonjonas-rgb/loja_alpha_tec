@@ -82,17 +82,17 @@ export default function Products() {
   const searchTerm = String(router.query.q || '').trim()
   const pageTitle = category
     ? category === 'ofertas'
-      ? 'Ofertas em peças e acessórios - Loja Alpha Tec'
-      : `${category.charAt(0).toUpperCase() + category.slice(1)} - Loja Alpha Tec`
+      ? 'Ofertas em peças para academia e fitness - Alpha Tec'
+      : `${category.charAt(0).toUpperCase() + category.slice(1)} | Peças para Academia e Fitness - Alpha Tec`
     : searchTerm
-      ? `Busca por "${searchTerm}" - Loja Alpha Tec`
-      : 'Peças e acessórios para equipamentos fitness - Loja Alpha Tec'
+      ? `Busca por "${searchTerm}" | Alpha Tec`
+      : 'Peças para Esteira, Bicicleta, Elíptico e Musculação | Alpha Tec'
 
   const pageDescription = category
-    ? `Encontre peças e acessórios para ${category} com qualidade e compatibilidade para seu equipamento.`
+    ? `Encontre peças e acessórios para ${category} com qualidade e compatibilidade para sua academia ou equipamento fitness.`
     : searchTerm
-      ? `Resultados da busca por ${searchTerm} na Loja Alpha Tec.`
-      : 'Explore o catálogo da Loja Alpha Tec com peças para esteiras, bicicletas, elipticos e equipamentos de musculação.'
+      ? `Resultados da busca por ${searchTerm} na Alpha Tec, loja de peças e acessórios para academia e fitness.`
+      : 'Encontre peças para esteira, bicicletas, elipticos, musculação e manutenção de equipamentos fitness com entrega para todo o Brasil.'
 
   const canonicalUrl = `${siteUrl}/products${category ? `?category=${encodeURIComponent(category)}` : ''}${searchTerm ? `${category ? '&' : '?'}q=${encodeURIComponent(searchTerm)}` : ''}`
 
@@ -107,8 +107,8 @@ export default function Products() {
       <section className="catalog-page container">
       <div className="catalog-heading">
         <p className="eyebrow">CATÁLOGO ALPHA TEC</p>
-        <h1>Peças e acessórios</h1>
-        <p>Encontre componentes para manter seus equipamentos em movimento.</p>
+        <h1>Peças para Esteira, Bicicleta, Elíptico e Musculação</h1>
+        <p>Encontre peças, acessórios e reposição para seu equipamento de academia e fitness com qualidade e compatibilidade.</p>
       </div>
       {safeCatalog.length ? (
         <div className="catalog-grid">

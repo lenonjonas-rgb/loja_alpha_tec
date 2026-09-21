@@ -7,8 +7,8 @@ import { useCart } from './CartContext'
 import { useCustomer } from './CustomerContext'
 
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://lojaalphatec.com.br').replace(/\/$/, '')
-const siteTitle = 'Loja Alpha Tec | Peças e acessórios para equipamentos fitness'
-const siteDescription = 'Loja Alpha Tec: peças, acessórios e suporte especializado para esteiras, bicicletas, elipticos, musculação e equipamentos fitness com entrega para todo o Brasil.'
+const siteTitle = 'Alpha Tec | Peças para Esteira, Bicicleta, Elíptico e Musculação'
+const siteDescription = 'Alpha Tec oferece peças, acessórios e manutenção para esteiras, bicicletas, elipticos, musculação e equipamentos fitness com entrega para todo o Brasil.'
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { count } = useCart()
@@ -19,7 +19,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <title>{siteTitle}</title>
         <meta name="description" content={siteDescription} />
         <meta name="robots" content="index, follow" />
-        <meta name="keywords" content="Loja Alpha Tec, lojaalphatec, Alpha Tec, pecas fitness, acessorios fitness, esteiras, bicicletas, elipticos, musculacao" />
+        <meta name="keywords" content="peças para esteira, peças para bicicleta, peças para academia, peças para eliptico, acessorios para academia, reposição de peças fitness, manutenção de esteira, manutenção de bike, rolete para esteira, correia para esteira, polia para musculação, peçase acessorios fitness, Alpha Tec" />
         <link rel="icon" href="/favicon.ico" type="image/x-icon" />
         <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
         <link rel="apple-touch-icon" href="/logo-header-uniform.jpg" />

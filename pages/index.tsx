@@ -216,21 +216,21 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Loja Alpha Tec | Peças e acessórios para fitness</title>
-        <meta name="description" content="Loja Alpha Tec oferece peças e acessórios para esteiras, bicicletas, elipticos e equipamentos de musculação com entrega para todo o Brasil." />
+        <title>Alpha Tec | Peças para Esteira, Bicicleta, Elíptico e Musculação</title>
+        <meta name="description" content="Alpha Tec oferece peças, acessórios e manutenção para esteiras, bicicletas, elipticos, musculação e equipamentos fitness com entrega para todo o Brasil." />
         <meta name="robots" content="index, follow" />
         <link rel="canonical" href={siteUrl} />
-        <meta property="og:title" content="Loja Alpha Tec | Peças e acessórios para fitness" />
-        <meta property="og:description" content="Loja Alpha Tec oferece peças e acessórios para esteiras, bicicletas, elipticos e equipamentos de musculação com entrega para todo o Brasil." />
+        <meta property="og:title" content="Alpha Tec | Peças para Esteira, Bicicleta, Elíptico e Musculação" />
+        <meta property="og:description" content="Alpha Tec oferece peças, acessórios e manutenção para esteiras, bicicletas, elipticos, musculação e equipamentos fitness com entrega para todo o Brasil." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={siteUrl} />
       </Head>
       <section className="hero container">
         <div className="hero-copy">
-          <p className="eyebrow">MANUTENÇÃO SEM PARAR</p>
+          <p className="eyebrow">PEÇAS E ACESSÓRIOS PARA ACADEMIA</p>
           <h1>
-            Seu equipamento.<br />
-            <em>Nosso compromisso.</em>
+            Peças para esteira,<br />
+            <em>bicicleta, elíptico e musculação.</em>
           </h1>
           <p>Peças e acessórios para manter sua academia sempre pronta para o próximo treino.</p>
           <Link href="/products" className="primary-button">

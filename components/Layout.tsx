@@ -2,22 +2,55 @@ import CheckoutAddressSelector from './CheckoutAddressSelector'
 import NotificationBell from './NotificationBell'
 import CustomerMenu from './CustomerMenu'
 import Link from 'next/link'
+import Head from 'next/head'
 import { useCart } from './CartContext'
 import { useCustomer } from './CustomerContext'
 
-const productCategories = [
-  { label: 'Esteiras', slug: 'esteiras', image: 'https://www.movement.com.br/wp-content/uploads/2025/04/iTouch-Cinza-2.png' },
-  { label: 'Musculação', slug: 'musculacao', image: 'https://images.unsplash.com/photo-1646656130630-07af3a262a9b?auto=format&fit=crop&w=240&q=75' },
-  { label: 'Bicicletas', slug: 'bicicletas', image: 'https://images.unsplash.com/photo-1707985287164-c84627ad6eba?auto=format&fit=crop&w=240&q=75' },
-  { label: 'Elípticos', slug: 'elipticos', image: 'https://www.movement.com.br/wp-content/uploads/2025/08/categ-elipticos-2025.png' },
-  { label: 'Acessórios', slug: 'acessorios', image: 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=240&q=75' },
-]
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://lojaalphatec.com.br').replace(/\/$/, '')
+const siteTitle = 'Loja Alpha Tec | Pecas e acessorios para equipamentos fitness'
+const siteDescription = 'Loja Alpha Tec: pecas, acessorios e suporte especializado para esteiras, bicicletas, elipticos, musculacao e equipamentos fitness com entrega para todo o Brasil.'
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { count } = useCart()
   const { customer } = useCustomer()
   return (
     <div className="site-shell">
+      <Head>
+        <title>{siteTitle}</title>
+        <meta name="description" content={siteDescription} />
+        <meta name="robots" content="index, follow" />
+        <meta name="keywords" content="Loja Alpha Tec, lojaalphatec, Alpha Tec, pecas fitness, acessorios fitness, esteiras, bicicletas, elipticos, musculacao" />
+        <link rel="canonical" href={siteUrl} />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Loja Alpha Tec" />
+        <meta property="og:title" content={siteTitle} />
+        <meta property="og:description" content={siteDescription} />
+        <meta property="og:url" content={siteUrl} />
+        <meta property="og:image" content={`${siteUrl}/logo-header-uniform.jpg`} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'Store',
+              name: 'Loja Alpha Tec',
+              alternateName: ['Alpha Tec', 'lojaalphatec', 'Alphatec Online'],
+              url: siteUrl,
+              logo: `${siteUrl}/logo-header-uniform.jpg`,
+              description: siteDescription,
+              address: {
+                '@type': 'PostalAddress',
+                streetAddress: 'MAR MAX SCHRAMM Z92890, 2499',
+                addressLocality: 'Florianopolis',
+                addressRegion: 'SC',
+                postalCode: '88095-000',
+                addressCountry: 'BR',
+              },
+            }),
+          }}
+        />
+      </Head>
       <div className="top-strip">ENVIO PARA TODO O BRASIL <span>•</span> ATENDIMENTO TÉCNICO ESPECIALIZADO</div>
       <header className="site-header">
         <div className="header-main container">
@@ -34,15 +67,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
         <nav className="category-nav">
           <div className="container nav-inner">
-            <Link href="/products" className="nav-utility-link">Todas as peças</Link>
-            {productCategories.map((category) => (
-              <Link href={`/products?category=${category.slug}`} className="category-nav-link" key={category.slug}>
-                <img src={category.image} alt="" />
-                <span>{category.label}</span>
-              </Link>
-            ))}
-            <Link href="/products?category=ofertas" className="nav-utility-link sale-link">Ofertas</Link>
-            <Link href="/maintenance" className="nav-utility-link">Manutenção</Link>
+            <Link href="/products">Todas as peças</Link>
+            <Link href="/products?category=esteiras">Esteiras</Link>
+            <Link href="/products?category=musculacao">Musculação</Link>
+            <Link href="/products?category=bicicletas">Bicicletas</Link>
+            <Link href="/products?category=elipticos">Elípticos</Link>
+            <Link href="/products?category=acessorios">Acessórios</Link>
+            <Link href="/products?category=ofertas" className="sale-link">Ofertas</Link>
+            <Link href="/maintenance" className="nav-service-callout">
+              <span>Precisa de ajuda?</span>
+              <strong>Manutenção para o seu equipamento?</strong>
+              <b>Quero manutenção <i>→</i></b>
+            </Link>
           </div>
         </nav>
       </header>

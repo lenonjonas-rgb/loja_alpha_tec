@@ -3,16 +3,55 @@ import { useEffect, useState } from 'react'
 import type { Product } from '../lib/products'
 
 const categories = [
-  { title: 'Esteiras', detail: 'Correias, roletes e placas', image: 'https://www.movement.com.br/wp-content/uploads/2025/04/iTouch-Cinza-2.png' },
-  { title: 'Musculação', detail: 'Cabos, polias e estruturas', image: 'https://images.unsplash.com/photo-1646656130630-07af3a262a9b?auto=format&fit=crop&w=800&q=80' },
-  { title: 'Bicicletas', detail: 'Pedais, correias e sensores', image: 'https://images.unsplash.com/photo-1707985287164-c84627ad6eba?auto=format&fit=crop&w=800&q=80' },
-  { title: 'Elípticos', detail: 'Pedaleiras, correias e sensores', image: 'https://www.movement.com.br/wp-content/uploads/2025/08/categ-elipticos-2025.png' },
-  { title: 'Acessórios', detail: 'Manoplas, parafusos e mais', image: 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=800&q=80' },
+  { title: 'Esteiras', detail: 'Correias, roletes e placas', slug: 'esteiras', image: 'https://www.movement.com.br/wp-content/uploads/2025/04/iTouch-Cinza-2.png', video: 'https://assets.mixkit.co/videos/47879/47879-360.mp4' },
+  { title: 'Musculação', detail: 'Cabos, polias e estruturas', slug: 'musculacao', image: 'https://images.unsplash.com/photo-1646656130630-07af3a262a9b?auto=format&fit=crop&w=800&q=80', video: 'https://assets.mixkit.co/videos/44433/44433-360.mp4' },
+  { title: 'Bicicletas', detail: 'Pedais, correias e sensores', slug: 'bicicletas', image: 'https://images.unsplash.com/photo-1707985287164-c84627ad6eba?auto=format&fit=crop&w=800&q=80', video: 'https://assets.mixkit.co/videos/50982/50982-360.mp4' },
+  { title: 'Elípticos', detail: 'Pedaleiras, correias e sensores', slug: 'elipticos', image: 'https://www.movement.com.br/wp-content/uploads/2025/08/categ-elipticos-2025.png', video: '/videos/Preciso_que_o_video_foque_mais.mp4' },
+  { title: 'Acessórios', detail: 'Manoplas, parafusos e mais', slug: 'acessorios', image: 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=800&q=80', video: 'https://assets.mixkit.co/videos/52099/52099-360.mp4' },
 ]
 
 const formatPrice = (price: any) => {
   const num = Number(price)
   return !isNaN(num) && num > 0 ? `R$ ${num.toFixed(2).replace('.', ',')}` : 'Consulte o preço'
+}
+
+function CategoryCard({ category }: { category: (typeof categories)[number] }) {
+  const handleVideoTimeUpdate = (event: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = event.currentTarget
+    if (video.currentTime >= 4) {
+      video.currentTime = 0
+      void video.play().catch(() => undefined)
+    }
+  }
+
+  const handleCardEnter = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    const video = event.currentTarget.querySelector('video')
+    if (!video) return
+    video.currentTime = 0
+    void video.play().catch(() => undefined)
+  }
+
+  const handleCardLeave = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    const video = event.currentTarget.querySelector('video')
+    if (!video) return
+    video.pause()
+    video.currentTime = 0
+  }
+
+  return (
+    <Link
+      className="category-card"
+      href={`/products?category=${category.slug}`}
+      onMouseEnter={handleCardEnter}
+      onMouseLeave={handleCardLeave}
+    >
+      <img src={category.image} alt="" />
+      <video className="category-card-video" muted playsInline preload="metadata" onTimeUpdate={handleVideoTimeUpdate} aria-hidden="true">
+        <source src={category.video} type="video/mp4" />
+      </video>
+      <div><h3>{category.title}</h3><p>{category.detail}</p><span>Ver peças →</span></div>
+    </Link>
+  )
 }
 
 function HeroBanner({ products }: { products: Product[] }) {
@@ -204,10 +243,7 @@ export default function Home() {
         </div>
         <div className="category-grid">
           {categories.map((category) => (
-            <Link className="category-card" href={`/products?category=${category.title.toLowerCase()}`} key={category.title}>
-              <img src={category.image} alt="" />
-              <div><h3>{category.title}</h3><p>{category.detail}</p><span>Ver peças →</span></div>
-            </Link>
+            <CategoryCard category={category} key={category.title} />
           ))}
         </div>
       </section>

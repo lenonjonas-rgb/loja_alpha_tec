@@ -80,17 +80,23 @@ export default function Products() {
   const safeCatalog = Array.isArray(catalog) ? catalog.filter(Boolean) : []
   const category = String(router.query.category || '')
   const searchTerm = String(router.query.q || '').trim()
+  const normalizedSearchTerm = searchTerm.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  const isMovementInverterSearch = normalizedSearchTerm.includes('inversor movement')
   const pageTitle = category
     ? category === 'ofertas'
       ? 'Ofertas em peças para academia e fitness - Alpha Tec'
       : `${category.charAt(0).toUpperCase() + category.slice(1)} | Peças para Academia e Fitness - Alpha Tec`
-    : searchTerm
+    : isMovementInverterSearch
+      ? 'Inversor Movement para Esteira | Peças e Reposição - Alpha Tec'
+      : searchTerm
       ? `Busca por "${searchTerm}" | Alpha Tec`
       : 'Peças para Esteira, Bicicleta, Elíptico e Musculação | Alpha Tec'
 
   const pageDescription = category
     ? `Encontre peças e acessórios para ${category} com qualidade e compatibilidade para sua academia ou equipamento fitness.`
-    : searchTerm
+    : isMovementInverterSearch
+      ? 'Encontre inversor Movement para esteira e peças de reposição compatíveis na Alpha Tec. Consulte disponibilidade e envio para todo o Brasil.'
+      : searchTerm
       ? `Resultados da busca por ${searchTerm} na Alpha Tec, loja de peças e acessórios para academia e fitness.`
       : 'Encontre peças para esteira, bicicletas, elipticos, musculação e manutenção de equipamentos fitness com entrega para todo o Brasil.'
 

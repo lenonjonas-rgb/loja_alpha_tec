@@ -114,9 +114,15 @@ export default function ProductPage() {
       .finally(() => setLoading(false))
   }, [router.isReady, productId])
 
-  const pageTitle = product ? `${product.name} | Loja Alpha Tec` : 'Produto não encontrado | Loja Alpha Tec'
+  const productSearchText = product ? `${product.name} ${product.brand || ''}`.toLowerCase() : ''
+  const isMovementInverter = productSearchText.includes('inversor') && productSearchText.includes('movement')
+  const pageTitle = product
+    ? isMovementInverter
+      ? `${product.name} | Inversor Movement para Esteira | Alpha Tec`
+      : `${product.name} | Loja Alpha Tec`
+    : 'Produto não encontrado | Loja Alpha Tec'
   const pageDescription = product
-    ? (product.description || `Confira ${product.name} na Loja Alpha Tec.`)
+    ? `${product.description || `Confira ${product.name} na Loja Alpha Tec.`}${isMovementInverter ? ' Inversor Movement para esteira com envio para todo o Brasil.' : ''}`
     : 'Produto não encontrado na Loja Alpha Tec.'
   const canonicalUrl = product ? `${siteUrl}/products/${product.id}` : `${siteUrl}/products`
 

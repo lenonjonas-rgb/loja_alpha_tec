@@ -216,12 +216,12 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Alpha Tec | Peças para Esteira, Bicicleta, Elíptico e Musculação</title>
-        <meta name="description" content="Alpha Tec oferece peças, acessórios e manutenção para esteiras, bicicletas, elipticos, musculação e equipamentos fitness com entrega para todo o Brasil." />
+        <title>Inversor Movement e Peças para Esteira | Alpha Tec</title>
+        <meta name="description" content="Encontre inversor Movement para esteira, peças e acessórios para equipamentos de academia na Alpha Tec, com envio para todo o Brasil." />
         <meta name="robots" content="index, follow" />
         <link rel="canonical" href={siteUrl} />
-        <meta property="og:title" content="Alpha Tec | Peças para Esteira, Bicicleta, Elíptico e Musculação" />
-        <meta property="og:description" content="Alpha Tec oferece peças, acessórios e manutenção para esteiras, bicicletas, elipticos, musculação e equipamentos fitness com entrega para todo o Brasil." />
+        <meta property="og:title" content="Inversor Movement e Peças para Esteira | Alpha Tec" />
+        <meta property="og:description" content="Encontre inversor Movement para esteira, peças e acessórios para equipamentos de academia na Alpha Tec, com envio para todo o Brasil." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={siteUrl} />
       </Head>
@@ -232,7 +232,7 @@ export default function Home() {
             Peças para esteira,<br />
             <em>bicicleta, elíptico e musculação.</em>
           </h1>
-          <p>Peças e acessórios para manter sua academia sempre pronta para o próximo treino.</p>
+          <p>Peças, inversor Movement e acessórios para manter sua academia sempre pronta para o próximo treino.</p>
           <Link href="/products" className="primary-button">
             Explorar peças <span>→</span>
           </Link>

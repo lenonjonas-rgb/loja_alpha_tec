@@ -20,8 +20,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <meta name="description" content={siteDescription} />
         <meta name="robots" content="index, follow" />
         <meta name="keywords" content="peças para esteira, peças para bicicleta, peças para academia, peças para eliptico, acessorios para academia, reposição de peças fitness, manutenção de esteira, manutenção de bike, rolete para esteira, correia para esteira, polia para musculação, peçase acessorios fitness, Alpha Tec" />
-        <link rel="icon" href="/favicon.ico" type="image/x-icon" />
-        <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="/favicon.ico?v=2" type="image/x-icon" />
+        <link rel="shortcut icon" href="/favicon.ico?v=2" type="image/x-icon" />
         <link rel="apple-touch-icon" href="/logo-header-uniform.jpg" />
         <link rel="canonical" href={siteUrl} />
         <meta property="og:type" content="website" />

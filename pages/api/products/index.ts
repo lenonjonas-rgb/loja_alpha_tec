@@ -37,7 +37,7 @@ async function persistImage(image: string | undefined, id?: string) {
   const bucket = 'product-images'
   await supabase.storage.createBucket(bucket, { public: true }).catch(() => undefined)
   const extension = match[1].split('/')[1].replace('jpeg', 'jpg')
-  const filePath = `${id || crypto.randomUUID()}.${extension}`
+  const filePath = `${id || crypto.randomUUID()}-${crypto.randomUUID()}.${extension}`
   const { error } = await supabase.storage.from(bucket).upload(filePath, Buffer.from(match[2], 'base64'), { contentType: match[1], upsert: true })
   if (error) throw error
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${filePath}`

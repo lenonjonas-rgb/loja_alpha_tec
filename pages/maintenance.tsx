@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react'
+import { ChangeEvent, FormEvent, useState } from 'react'
 import Link from 'next/link'
 import { storeConfig } from '../lib/store-config'
 import { formatCep, formatDocument, formatPhone } from '../lib/formatters'
@@ -6,6 +6,7 @@ import { formatCep, formatDocument, formatPhone } from '../lib/formatters'
 type ServiceType = 'seasonal' | 'monthly'
 type FormState = { document: string; name: string; email: string; phone: string; cep: string; street: string; number: string; complement: string; neighborhood: string; city: string; state: string; equipment: string; quantity: string; details: string; toll: string }
 type Equipment = { id: string; name: string; description: string; price: number }
+type MediaFile = { file: File; preview: string }
 
 const equipmentList: Equipment[] = [
   { id: 'esteira', name: 'Esteira', description: 'Inspeção e manutenção preventiva', price: 70 },
@@ -43,6 +44,7 @@ export default function Maintenance() {
   const [quoteSubmitted, setQuoteSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [lastPdfBase64, setLastPdfBase64] = useState('')
+  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
 
   function resetQuotePdf() { setQuotePdfUrl((previousUrl) => { if (previousUrl) URL.revokeObjectURL(previousUrl); return '' }); setQuotePdfName('') }
   function invalidateQuote() { setQuoteReady(false); setQuoteSubmitted(false); setLastPdfBase64(''); resetQuotePdf() }
@@ -64,11 +66,7 @@ export default function Maintenance() {
       if (!coverageResponse.ok) throw new Error(coverageResult.error)
       if (typeof coverageResult.distanceKm !== 'number' || typeof coverageResult.withinRadius !== 'boolean') throw new Error('A análise de cobertura retornou dados incompletos.')
       const validCoverage = { distanceKm: coverageResult.distanceKm, withinRadius: coverageResult.withinRadius }
-      const roundTripDistance = validCoverage.distanceKm * 2
-      const travelMessage = validCoverage.distanceKm < 30
-        ? 'Deslocamento isento para este endereço.'
-        : `Deslocamento ida e volta: R$ ${roundTripDistance.toFixed(2).replace('.', ',')}.`
-      setCoverage(validCoverage); invalidateQuote(); setStatus(validCoverage.withinRadius ? `Atendimento disponível. ${travelMessage}` : `Este endereço está fora do raio de atendimento de ${storeConfig.serviceRadiusKm} km.`)
+      setCoverage(validCoverage); invalidateQuote(); setStatus(validCoverage.withinRadius ? 'Atendimento disponível.' : `Este endereço está fora do raio de atendimento de ${storeConfig.serviceRadiusKm} km.`)
     } catch (error) { setStatus(error instanceof Error ? error.message : 'Não foi possível consultar o CEP.') }
     finally { setLoadingCep(false) }
   }
@@ -123,7 +121,7 @@ export default function Maintenance() {
   async function downloadQuote() {
     setSubmitting(true)
     try {
-      const leadResponse = await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, serviceType: serviceType === 'seasonal' ? 'Visita Técnica' : 'Contrato mensal', details: form.details, equipment: selectedRows.map((equipment) => ({ name: equipment.name, quantity: equipment.quantity, unitPrice: equipment.price })), estimatedTotal: quoteTotal }) })
+      const leadResponse = await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, serviceType: serviceType === 'seasonal' ? 'Visita Técnica' : 'Contrato mensal', details: form.details, equipment: selectedRows.map((equipment) => ({ name: equipment.name, quantity: equipment.quantity, unitPrice: equipment.price })), media: await encodeMedia(), estimatedTotal: quoteTotal }) })
       if (!leadResponse.ok) {
         const leadResult = await leadResponse.json().catch(() => ({}))
         throw new Error(leadResult.error || 'Não foi possível registrar a solicitação.')
@@ -271,6 +269,18 @@ export default function Maintenance() {
     const body = encodeURIComponent(`Novo orçamento de manutenção.\nCliente: ${form.name}\nCEP: ${form.cep}\nTipo: ${serviceType === 'seasonal' ? 'Manutenção sazonal' : 'Contrato mensal'}\nO PDF foi aberto para ser anexado.`)
     window.location.href = `mailto:${recipients}?subject=${subject}&body=${body}`
   }
+  function addMedia(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files || []).filter((file) => /^(image|video)\//.test(file.type) && file.size <= 25 * 1024 * 1024)
+    setMediaFiles((current) => [...current, ...files.map((file) => ({ file, preview: URL.createObjectURL(file) }))])
+    event.target.value = ''
+  }
+  function removeMedia(index: number) {
+    setMediaFiles((current) => { URL.revokeObjectURL(current[index].preview); return current.filter((_, itemIndex) => itemIndex !== index) })
+    invalidateQuote()
+  }
+  async function encodeMedia() {
+    return Promise.all(mediaFiles.map(async ({ file }) => ({ name: file.name, type: file.type, data: await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(file) }) })))
+  }
   return <section className="maintenance-page container">
     <Link href="/" className="back-link">← Voltar para a loja</Link>
     <div className="maintenance-intro"><p className="eyebrow">ATENDIMENTO TÉCNICO</p><h1>Quero manutenção</h1><p>Escolha o tipo de atendimento. Depois informe apenas o CEP para verificarmos a cobertura em um raio de {storeConfig.serviceRadiusKm} km.</p></div>
@@ -280,7 +290,7 @@ export default function Maintenance() {
       <fieldset><legend>1. Verifique seu CEP</legend><div className="cep-field large"><input required value={formatCep(form.cep)} onChange={(event) => update('cep', formatCep(event.target.value))} placeholder="00000-000" /><button type="button" onClick={lookupCep}>{loadingCep ? 'Buscando' : 'Consultar cobertura'}</button></div>{status && <p className={coverage?.withinRadius ? 'form-status success' : 'form-status'}>{status}</p>}</fieldset>
       {coverage?.withinRadius && <><fieldset><legend>2. Seus dados</legend><div className="form-grid"><label>CPF ou CNPJ<input required value={formatDocument(form.document)} onChange={(event) => update('document', formatDocument(event.target.value))} /></label><label>Nome completo ou empresa<input required value={form.name} onChange={(event) => update('name', event.target.value)} /></label><label>E-mail<input required type="email" value={form.email} onChange={(event) => update('email', event.target.value)} /></label><label>Telefone<input required value={formatPhone(form.phone)} onChange={(event) => update('phone', formatPhone(event.target.value))} /></label></div></fieldset>
       <fieldset><legend>3. Endereço do atendimento</legend><div className="form-grid"><label>Rua / avenida<input required value={form.street} onChange={(event) => update('street', event.target.value)} /></label><label>Número<input required value={form.number} onChange={(event) => update('number', event.target.value)} /></label><label>Complemento<input value={form.complement} onChange={(event) => update('complement', event.target.value)} /></label><label>Bairro<input required value={form.neighborhood} onChange={(event) => update('neighborhood', event.target.value)} /></label><label>Cidade<input required value={form.city} onChange={(event) => update('city', event.target.value)} /></label><label>Estado<input required maxLength={2} value={form.state} onChange={(event) => update('state', event.target.value)} /></label></div></fieldset>
-      <fieldset><legend>4. Equipamentos e detalhes</legend><p className="form-hint">Selecione os equipamentos e informe as quantidades necessárias.</p><div className="equipment-list">{equipmentList.map((equipment) => <label className="equipment-row" key={equipment.id}><input type="checkbox" checked={Boolean(selectedEquipment[equipment.id])} onChange={(event) => toggleEquipment(equipment.id, event.target.checked)} /><span><strong>{equipment.name}</strong><small>{equipment.description}</small></span>{selectedEquipment[equipment.id] && <input className="quantity" type="number" min="1" value={selectedEquipment[equipment.id]} onChange={(event) => setEquipmentQuantity(equipment.id, event.target.value)} aria-label={`Quantidade de ${equipment.name}`} />}</label>)}</div><p className="form-hint">Pedágios aplicáveis serão verificados pela Alpha Tec na análise da rota.</p><label className="wide">Descreva o problema / observações<textarea required rows={4} value={form.details} onChange={(event) => update('details', event.target.value)} /></label></fieldset>
+      <fieldset><legend>4. Equipamentos e detalhes</legend><p className="form-hint">Selecione os equipamentos e informe as quantidades necessárias.</p><div className="equipment-list">{equipmentList.map((equipment) => <label className="equipment-row" key={equipment.id}><input type="checkbox" checked={Boolean(selectedEquipment[equipment.id])} onChange={(event) => toggleEquipment(equipment.id, event.target.checked)} /><span><strong>{equipment.name}</strong><small>{equipment.description}</small></span>{selectedEquipment[equipment.id] && <input className="quantity" type="number" min="1" value={selectedEquipment[equipment.id]} onChange={(event) => setEquipmentQuantity(equipment.id, event.target.value)} aria-label={`Quantidade de ${equipment.name}`} />}</label>)}</div><p className="form-hint">Pedágios aplicáveis serão verificados pela Alpha Tec na análise da rota.</p><label className="wide">Descreva o problema / observações<textarea required rows={4} value={form.details} onChange={(event) => update('details', event.target.value)} /></label><div className="media-upload wide"><strong>Fotos e vídeos do equipamento</strong><span>Envie até 25 MB por arquivo para ajudar na avaliação.</span><div className="media-upload-actions"><label>Tirar foto<input type="file" accept="image/*" capture="environment" onChange={addMedia} /></label><label>Gravar vídeo<input type="file" accept="video/*" capture="environment" onChange={addMedia} /></label><label>Enviar arquivo<input type="file" accept="image/*,video/*" multiple onChange={addMedia} /></label></div>{mediaFiles.length > 0 && <div className="media-file-list">{mediaFiles.map((media, index) => <div key={`${media.file.name}-${index}`}><span>{media.file.type.startsWith('video/') ? 'Vídeo' : 'Foto'}: {media.file.name}</span><button type="button" onClick={() => removeMedia(index)}>Remover</button></div>)}</div>}</div></fieldset>
       <button className="primary-button" type="submit" disabled={submitting}>{submitting ? 'Enviando...' : quoteSubmitted ? 'Reenviar orçamento' : 'Gerar orçamento'} <span>→</span></button>{quoteReady && <div className="quote-result"><strong>Orçamento disponível em PDF</strong><div className="quote-actions"><button className="download-button" type="button" onClick={downloadQuotePdf} disabled={!quotePdfUrl}>Baixar PDF do orçamento</button><button className="email-button" type="button" onClick={openEmailDraft}>Preparar e-mail</button></div></div>}</>}
     </form>}
   </section>

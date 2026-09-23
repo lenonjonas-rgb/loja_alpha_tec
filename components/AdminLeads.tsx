@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 
 type Status = 'new' | 'contacted' | 'proposal' | 'won' | 'lost'
-type Lead = { id: string; created_at: string; name: string; email: string; phone: string; cep: string; city: string; state: string; service_type: string; details: string; equipment: { name: string; quantity: number }[]; estimated_total: number; status: Status; notes: string }
+type LeadMedia = { name: string; type: string; url: string }
+type Lead = { id: string; created_at: string; name: string; email: string; phone: string; cep: string; city: string; state: string; service_type: string; details: string; equipment: { name: string; quantity: number }[]; media?: LeadMedia[]; estimated_total: number; status: Status; notes: string }
 const labels: Record<Status, string> = { new: 'Novo', contacted: 'Em contato', proposal: 'Ganha', won: 'Perda', lost: 'Perdido' }
 const columns: Status[] = ['new', 'contacted', 'proposal', 'won', 'lost']
 type Props = { onMessage: (message: string) => void }
@@ -62,6 +63,7 @@ export default function AdminLeads({ onMessage }: Props) {
             <p><a href={`mailto:${lead.email}`}>{lead.email}</a> · <a href={`tel:${lead.phone}`}>{lead.phone}</a> · CEP {lead.cep}</p>
             <p className="lead-details">{lead.details}</p>
             <small>{lead.equipment.map((item) => `${item.name} (${item.quantity})`).join(' · ')}</small>
+            {lead.media?.length ? <div className="lead-media"><strong>Anexos enviados</strong><div>{lead.media.map((media) => <a key={media.url} href={media.url} target="_blank" rel="noreferrer">{media.type.startsWith('video/') ? 'Ver vídeo' : 'Ver foto'}: {media.name}</a>)}</div></div> : null}
             <div className="lead-actions lead-detail-actions">
               <select value={lead.status} onChange={(event) => void updateLead(lead, event.target.value as Status)}>{columns.map((status) => <option key={status} value={status}>{labels[status]}</option>)}</select>
               <input defaultValue={lead.notes} placeholder="Observação do atendimento" onBlur={(event) => { if (event.target.value !== lead.notes) void updateLead(lead, lead.status, event.target.value) }} />

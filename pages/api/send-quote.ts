@@ -4,7 +4,7 @@ import { storeConfig } from '../../lib/store-config'
 
 type ResponseData = { sent?: boolean; configured?: boolean; error?: string }
 
-export const config = { api: { bodyParser: { sizeLimit: '5mb' } } }
+export const config = { api: { bodyParser: { sizeLimit: '12mb' } } }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse<ResponseData>) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido.' })

@@ -121,11 +121,6 @@ export default function Maintenance() {
   async function downloadQuote() {
     setSubmitting(true)
     try {
-      const leadResponse = await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, serviceType: serviceType === 'seasonal' ? 'Visita Técnica' : 'Contrato mensal', details: form.details, equipment: selectedRows.map((equipment) => ({ name: equipment.name, quantity: equipment.quantity, unitPrice: equipment.price })), media: await encodeMedia(), estimatedTotal: quoteTotal }) })
-      if (!leadResponse.ok) {
-        const leadResult = await leadResponse.json().catch(() => ({}))
-        throw new Error(leadResult.error || 'Não foi possível registrar a solicitação.')
-      }
       const { jsPDF } = await import('jspdf')
       const pdf = new jsPDF()
       const money = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`
@@ -232,8 +227,8 @@ export default function Maintenance() {
       const pdfFileName = `orcamento-alpha-tec-${form.cep || 'manutencao'}.pdf`
       setQuotePdfUrl((previousUrl) => { if (previousUrl) URL.revokeObjectURL(previousUrl); return pdfUrl })
       setQuotePdfName(pdfFileName)
-      window.open(pdfUrl, '_blank')
-      setStatus('Orçamento gerado e aberto em uma nova aba. Use o botão abaixo se quiser baixar o PDF.')
+      const quoteWindow = window.open(pdfUrl, '_blank')
+      setStatus(quoteWindow ? 'Orçamento gerado e aberto em uma nova aba. Use o botão abaixo se quiser baixar o PDF.' : 'Orçamento gerado. Toque em “Baixar PDF do orçamento” para abrir o arquivo.')
       const pdfBase64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
         reader.onloadend = () => resolve(String(reader.result).split(',')[1] || '')
@@ -242,14 +237,28 @@ export default function Maintenance() {
       })
       setLastPdfBase64(pdfBase64)
       setQuoteSubmitted(true)
+      let leadWarning = ''
+      try {
+        const leadResponse = await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, serviceType: serviceType === 'seasonal' ? 'Visita Técnica' : 'Contrato mensal', details: form.details, equipment: selectedRows.map((equipment) => ({ name: equipment.name, quantity: equipment.quantity, unitPrice: equipment.price })), media: await encodeMedia(), estimatedTotal: quoteTotal }) })
+        if (!leadResponse.ok) {
+          const leadResult = await leadResponse.json().catch(() => ({}))
+          leadWarning = leadResult.error || 'A solicitação não foi registrada.'
+        }
+      } catch (error) {
+        console.error('Erro ao registrar solicitação:', error)
+        leadWarning = 'O orçamento foi gerado, mas a solicitação não foi registrada.'
+      }
       try {
         const response = await fetch('/api/send-quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pdfBase64, customerName: form.name, customerEmail: form.email, cep: form.cep, serviceType: serviceType === 'seasonal' ? 'Visita Técnica' : 'Contrato mensal' }) })
         const result = await response.json()
-        if (result.sent) setStatus('Orçamento gerado, aberto em PDF e enviado por e-mail para você e para a loja.')
+        if (result.sent) setStatus(`${leadWarning ? `${leadWarning} ` : ''}Orçamento gerado, aberto em PDF e enviado por e-mail para você e para a loja.`)
         else if (result.configured === false) setStatus('Orçamento gerado e aberto em PDF. O envio automático por e-mail ainda não foi configurado (SMTP) — anexe o PDF manualmente por enquanto.')
         else setStatus(result.error || 'Orçamento gerado e aberto em PDF, mas não foi possível enviar por e-mail.')
       } catch { setStatus('Orçamento gerado e aberto em PDF. O envio por e-mail ficará pendente.') }
-    } catch { setStatus('Não foi possível gerar o PDF. Atualize a página e tente novamente.') }
+    } catch (error) {
+      console.error('Erro ao gerar orçamento:', error)
+      setStatus(error instanceof Error ? error.message : 'Não foi possível gerar o PDF. Atualize a página e tente novamente.')
+    }
     finally { setSubmitting(false) }
   }
 

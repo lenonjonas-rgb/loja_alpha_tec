@@ -62,6 +62,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json(data)
   } catch (error) {
     console.error('Erro na API de leads:', error)
-    return res.status(500).json({ error: 'Não foi possível acessar os leads. Verifique se a tabela leads foi criada no Supabase.' })
+    const message = error instanceof Error ? error.message : ''
+    const missingMedia = /media|column .* does not exist|schema cache/i.test(message)
+    return res.status(500).json({ error: missingMedia ? 'A coluna media ainda não existe na tabela leads. Execute o SQL de atualização no Supabase.' : 'Não foi possível acessar os leads. Verifique se a tabela leads foi criada no Supabase.' })
   }
 }

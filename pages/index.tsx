@@ -249,6 +249,14 @@ export default function Home() {
           <div><b>Peças de qualidade</b><span>Para você treinar tranquilo</span></div>
         </div>
       </section>
+      <section className="container service-callout" aria-labelledby="maintenance-callout-title">
+        <div>
+          <p className="eyebrow">ATENDIMENTO TÉCNICO</p>
+          <h2 id="maintenance-callout-title">Seu equipamento precisa de manutenção?</h2>
+          <p>Solicite uma visita técnica ou um contrato mensal. Consulte a cobertura pelo seu CEP e receba seu orçamento.</p>
+        </div>
+        <Link href="/maintenance" className="outline-button">Solicitar manutenção <span>→</span></Link>
+      </section>
       <section className="container content-section">
         <div className="section-heading">
           <div><p className="eyebrow">ENCONTRE O QUE PRECISA</p><h2>Compre por categoria</h2></div>

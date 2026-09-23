@@ -82,6 +82,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <strong>Manutenção para o seu equipamento?</strong>
               <b>Quero manutenção <i>→</i></b>
             </Link>
+            <Link href="/maintenance" className="mobile-maintenance-link">Manutenção <span>→</span></Link>
           </div>
         </nav>
       </header>

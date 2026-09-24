@@ -28,8 +28,16 @@ export default function AdminPushSetup() {
     const response = await fetch('/api/admin/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(subscription) })
     if (!response.ok) return setStatus((await response.json()).error || 'Não foi possível ativar os alertas.')
     setEnabled(true)
-    setStatus('Alertas ativos neste celular.')
+    const testResponse = await fetch('/api/admin/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ test: true }) })
+    if (!testResponse.ok) return setStatus((await testResponse.json()).error || 'Inscrição salva, mas o alerta de teste falhou.')
+    setStatus('Alerta de teste enviado.')
   }
 
-  return <><button className={`admin-push-toggle ${enabled ? 'enabled' : ''}`} type="button" title={enabled ? 'Alertas ativos' : 'Ativar alertas'} aria-label={enabled ? 'Alertas ativos' : 'Ativar alertas'} disabled={enabled} onClick={() => void enableNotifications()}><span className="bell-icon" aria-hidden="true" /></button>{status && <p className="admin-push-status" role="status">{status}</p>}</>
+  async function testNotifications() {
+    const response = await fetch('/api/admin/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ test: true }) })
+    if (!response.ok) return setStatus((await response.json()).error || 'Não foi possível enviar o alerta de teste.')
+    setStatus('Alerta de teste enviado.')
+  }
+
+  return <><button className={`admin-push-toggle ${enabled ? 'enabled' : ''}`} type="button" title={enabled ? 'Enviar alerta de teste' : 'Ativar alertas'} aria-label={enabled ? 'Enviar alerta de teste' : 'Ativar alertas'} onClick={() => void (enabled ? testNotifications() : enableNotifications())}><span className="bell-icon" aria-hidden="true" /></button>{status && <p className="admin-push-status" role="status">{status}</p>}</>
 }

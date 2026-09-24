@@ -1,5 +1,6 @@
 import { getSupabaseServer } from './supabase-server'
 import { sendOrderConfirmationEmail } from './order-email'
+import { sendAdminPush } from './admin-push'
 
 type StripeSessionLike = {
   id: string
@@ -35,6 +36,7 @@ export async function createOrderFromStripeSession(session: StripeSessionLike) {
   if (!confirmed) return { orderId: order.id, alreadyExists: true as const }
 
   await sendOrderConfirmationEmail(order.id).catch(() => undefined)
+  await sendAdminPush({ title: 'Pagamento aprovado', body: `Pedido #${String(order.id).slice(0, 8)} foi confirmado.` })
 
   return { orderId: order.id, alreadyExists: false as const }
 }

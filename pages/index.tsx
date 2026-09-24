@@ -207,11 +207,7 @@ export default function Home() {
       .catch(() => setAllProducts([]))
   }, [])
 
-  const featured = Array.isArray(allProducts)
-    ? allProducts
-        .filter((item) => item && (Boolean(item.showInBanner) || Boolean(item.flashSale) || Number(item.discountPercent || 0) > 0))
-        .slice(0, 3)
-    : []
+  const featured = Array.isArray(allProducts) ? allProducts.filter((item) => item && Boolean(item.showInFeatured)) : []
 
   return (
     <>

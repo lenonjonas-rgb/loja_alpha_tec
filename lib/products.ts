@@ -17,6 +17,7 @@ export type Product = {
   discountPercent?: number
   flashSale?: boolean
   showInBanner?: boolean
+  showInFeatured?: boolean
   weightKg?: number
   heightCm?: number
   widthCm?: number

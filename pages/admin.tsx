@@ -8,7 +8,7 @@ import AdminQuestions from '../components/AdminQuestions'
 import AdminStoreProfile from '../components/AdminStoreProfile'
 import AdminCouponsPage from './admin/coupons'
 
-type Product = { id: string; name: string; internalCode?: string; displayOrder?: number; brand: string; category: string; compatibleEquipment: string; description: string; specifications: string; image: string; price: number; active: boolean; stock: number; discountPercent: number; flashSale: boolean; showInBanner: boolean; weightKg?: number; heightCm?: number; widthCm?: number; lengthCm?: number }
+type Product = { id: string; name: string; internalCode?: string; displayOrder?: number; brand: string; category: string; compatibleEquipment: string; description: string; specifications: string; image: string; price: number; active: boolean; stock: number; discountPercent: number; flashSale: boolean; showInBanner: boolean; showInFeatured: boolean; weightKg?: number; heightCm?: number; widthCm?: number; lengthCm?: number }
 export default function Admin() {
   const [authenticated, setAuthenticated] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)

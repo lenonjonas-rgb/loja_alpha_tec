@@ -2,6 +2,7 @@ alter table public.products add column if not exists stock integer not null defa
 alter table public.products add column if not exists discount_percent numeric(5,2) not null default 0;
 alter table public.products add column if not exists flash_sale boolean not null default false;
 alter table public.products add column if not exists show_in_banner boolean not null default false;
+alter table public.products add column if not exists show_in_featured boolean not null default false;
 alter table public.products add column if not exists specifications text;
 alter table public.products add column if not exists weight_kg numeric(10,3) not null default 0;
 alter table public.products add column if not exists height_cm numeric(10,2) not null default 0;

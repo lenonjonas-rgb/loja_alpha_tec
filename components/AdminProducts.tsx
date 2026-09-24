@@ -19,6 +19,7 @@ type Product = {
   discountPercent: number
   flashSale: boolean
   showInBanner: boolean
+  showInFeatured: boolean
   weightKg?: number
   heightCm?: number
   widthCm?: number
@@ -203,6 +204,7 @@ export default function AdminProducts({ products, onSaved, onReordered, onMessag
             <label>Desconto %<input type="number" min="0" max="100" value={draft.discountPercent ?? 0} onChange={(event) => updateDraft(product, { discountPercent: Number(event.target.value) })} /></label>
             <label className="active-toggle"><input type="checkbox" checked={Boolean(draft.flashSale)} onChange={(event) => updateDraft(product, { flashSale: event.target.checked })} /> Oferta</label>
             <label className="active-toggle"><input type="checkbox" checked={Boolean(draft.showInBanner)} onChange={(event) => updateDraft(product, { showInBanner: event.target.checked })} /> Banner</label>
+              <label className="active-toggle"><input type="checkbox" checked={Boolean(draft.showInFeatured)} onChange={(event) => updateDraft(product, { showInFeatured: event.target.checked })} /> Destaque</label>
             <button
               type="button"
               onClick={() => setSelected({

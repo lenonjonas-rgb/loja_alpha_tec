@@ -76,80 +76,88 @@ export default function AdminPromotions({ products, onMessage }: Props) {
 
     const draw = (image?: HTMLImageElement) => {
       context.clearRect(0, 0, width, height)
-      context.fillStyle = '#f4f0e9'
+      context.fillStyle = '#090a0c'
       context.fillRect(0, 0, width, height)
-      context.fillStyle = '#17191c'
-      context.fillRect(0, 0, width, format === 'portrait' ? 470 : 400)
       context.fillStyle = '#d83232'
-      context.fillRect(0, 0, width, 18)
+      context.fillRect(0, 0, width, 16)
       context.fillStyle = '#ffffff'
-      context.font = '800 28px Arial, sans-serif'
-      context.fillText('ALPHA TEC', 72, 78)
-      context.fillStyle = '#f6c548'
-      context.font = '800 22px Arial, sans-serif'
-      context.fillText(headline.trim().toUpperCase() || 'OFERTA ESPECIAL', 72, 128)
-      context.fillStyle = '#aeb3b8'
-      context.font = '500 20px Arial, sans-serif'
-      context.fillText('PEÇAS QUE MANTÊM SEU TREINO EM MOVIMENTO', 72, 168)
+      context.font = '800 30px Arial, sans-serif'
+      context.fillText('ALPHA TEC', 72, 72)
+      context.fillStyle = '#7f858b'
+      context.font = '700 18px Arial, sans-serif'
+      context.fillText('PEÇAS E ACESSÓRIOS FITNESS', 72, 105)
 
-      const imageBox = { x: 72, y: 222, width: width - 144, height: format === 'portrait' ? 430 : 350 }
+      const nameX = 72
+      let nameY = 174
       context.fillStyle = '#ffffff'
-      context.fillRect(imageBox.x, imageBox.y, imageBox.width, imageBox.height)
+      context.font = '800 58px Arial, sans-serif'
+      const nameLines = wrapText(context, selectedProduct.name.toUpperCase(), width - 144).slice(0, 3)
+      nameLines.forEach((line) => { context.fillText(line, nameX, nameY); nameY += 66 })
       context.fillStyle = '#d83232'
-      context.fillRect(imageBox.x, imageBox.y, 12, imageBox.height)
-      if (image) drawImageContain(context, image, imageBox.x + 42, imageBox.y + 28, imageBox.width - 84, imageBox.height - 56)
+      context.fillRect(nameX, nameY + 2, 240, 6)
+      context.fillStyle = '#aeb3b8'
+      context.font = '700 20px Arial, sans-serif'
+      const category = selectedProduct.brand ? `${selectedProduct.brand}  /  ${selectedProduct.category}` : selectedProduct.category
+      context.fillText(category.toUpperCase(), nameX, nameY + 42)
+
+      const imageBox = { x: 42, y: nameY + 75, width: width - 84, height: format === 'portrait' ? 470 : 360 }
+      context.fillStyle = '#111316'
+      context.fillRect(imageBox.x, imageBox.y, imageBox.width, imageBox.height)
+      context.strokeStyle = '#33373b'
+      context.lineWidth = 2
+      context.strokeRect(imageBox.x, imageBox.y, imageBox.width, imageBox.height)
+      if (image) drawImageContain(context, image, imageBox.x + 34, imageBox.y + 24, imageBox.width - 68, imageBox.height - 48)
       else {
-        context.fillStyle = '#7b8086'
+        context.fillStyle = '#73787e'
         context.font = '600 24px Arial, sans-serif'
         context.textAlign = 'center'
         context.fillText('IMAGEM DO PRODUTO', width / 2, imageBox.y + imageBox.height / 2)
         context.textAlign = 'left'
       }
 
-      let cursor = imageBox.y + imageBox.height + 62
-      context.fillStyle = '#17191c'
-      context.font = '800 48px Arial, sans-serif'
-      const nameLines = wrapText(context, selectedProduct.name, width - 144).slice(0, 3)
-      nameLines.forEach((line) => { context.fillText(line, 72, cursor); cursor += 58 })
-      context.fillStyle = '#6f7479'
-      context.font = '700 21px Arial, sans-serif'
-      const category = selectedProduct.brand ? `${selectedProduct.brand}  /  ${selectedProduct.category}` : selectedProduct.category
-      context.fillText(category.toUpperCase(), 72, cursor + 4)
-      cursor += 68
-
-      if (hasDiscount) {
-        context.fillStyle = '#d83232'
-        context.font = '800 23px Arial, sans-serif'
-        context.fillText(`OFERTA ESPECIAL  -${discountPercent}%`, 72, cursor)
-        cursor += 40
-        context.fillStyle = '#6f7479'
-        context.font = '500 26px Arial, sans-serif'
-        context.fillText(money(originalPrice), 72, cursor)
-        cursor += 51
-      }
-      context.fillStyle = '#17191c'
-      context.font = '800 58px Arial, sans-serif'
-      context.fillText(originalPrice > 0 ? money(finalPrice) : 'CONSULTE O PREÇO', 72, cursor)
-      cursor += 68
-
-      if (normalizedCoupon) {
-        context.fillStyle = matchedCoupon ? '#d83232' : '#9a9da0'
-        context.fillRect(72, cursor, width - 144, 78)
-        context.fillStyle = '#ffffff'
-        context.font = '800 22px Arial, sans-serif'
-        context.fillText(matchedCoupon ? `CUPOM  ${normalizedCoupon}` : `CUPOM  ${normalizedCoupon}`, 98, cursor + 32)
-        context.font = '800 25px Arial, sans-serif'
-        context.fillText(matchedCoupon ? (couponBenefit || 'VANTAGEM ESPECIAL') : 'CONFIRA AS CONDIÇÕES', 98, cursor + 61)
-      }
-
-      context.fillStyle = '#17191c'
-      context.font = '800 24px Arial, sans-serif'
-      context.fillText('COMPRE AGORA', 72, height - 76)
+      let cursor = imageBox.y + imageBox.height + 48
       context.fillStyle = '#d83232'
-      context.fillRect(width - 290, height - 100, 218, 5)
-      context.fillStyle = '#6f7479'
-      context.font = '500 20px Arial, sans-serif'
-      context.fillText('lojaalphatec.com.br', width - 360, height - 40)
+      context.font = '800 21px Arial, sans-serif'
+      context.fillText('ESPECIFICAÇÕES', 72, cursor)
+      cursor += 35
+      context.fillStyle = '#b7bcc1'
+      context.font = '500 19px Arial, sans-serif'
+      const descriptionLines = wrapText(context, selectedProduct.description || 'Peça de qualidade para manter seu equipamento em movimento.', width - 144).slice(0, 3)
+      descriptionLines.forEach((line) => { context.fillText(line, 72, cursor); cursor += 27 })
+      cursor += 22
+
+      const detailsX = width / 2 + 24
+      context.fillStyle = '#d83232'
+      context.font = '800 21px Arial, sans-serif'
+      context.fillText('PRINCIPAIS UTILIZAÇÕES', detailsX, imageBox.y + imageBox.height + 48)
+      context.fillStyle = '#b7bcc1'
+      context.font = '500 18px Arial, sans-serif'
+      const usageLines = wrapText(context, selectedProduct.compatibleEquipment || selectedProduct.category || 'Equipamentos fitness', width / 2 - 100).slice(0, 4)
+      usageLines.forEach((line, index) => context.fillText(`${index === 0 ? '•' : '•'} ${line}`, detailsX, imageBox.y + imageBox.height + 82 + index * 26))
+
+      const footerY = height - 190
+      context.fillStyle = '#ffffff'
+      context.font = '800 48px Arial, sans-serif'
+      context.fillText(originalPrice > 0 ? money(finalPrice) : 'CONSULTE O PREÇO', 72, footerY)
+      if (hasDiscount) {
+        context.fillStyle = '#7f858b'
+        context.font = '500 21px Arial, sans-serif'
+        context.fillText(`DE ${money(originalPrice)}  |  -${discountPercent}%`, 72, footerY - 34)
+      }
+      if (normalizedCoupon) {
+        context.fillStyle = matchedCoupon ? '#d83232' : '#555b61'
+        context.fillRect(72, footerY + 34, width - 144, 86)
+        context.fillStyle = '#ffffff'
+        context.font = '800 21px Arial, sans-serif'
+        context.fillText(`UTILIZE O CUPOM  ${normalizedCoupon}`, 96, footerY + 67)
+        context.font = '800 24px Arial, sans-serif'
+        context.fillText(matchedCoupon ? (matchedCoupon.free_shipping ? 'E GANHE FRETE GRÁTIS. APROVEITE!' : `E GANHE ${couponDiscountPercent}% DE DESCONTO. APROVEITE!`) : 'CONFIRA AS CONDIÇÕES', 96, footerY + 99)
+      }
+      context.fillStyle = '#d83232'
+      context.fillRect(72, height - 38, 120, 4)
+      context.fillStyle = '#8a9096'
+      context.font = '500 18px Arial, sans-serif'
+      context.fillText('COMPRE AGORA  |  lojaalphatec.com.br', 216, height - 30)
       setCanvasReady(true)
     }
 

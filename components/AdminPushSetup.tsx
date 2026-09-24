@@ -7,24 +7,14 @@ function base64UrlToUint8Array(value: string) {
 }
 
 export default function AdminPushSetup() {
-  const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [status, setStatus] = useState('')
   const [enabled, setEnabled] = useState(false)
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
     navigator.serviceWorker.register('/sw.js').catch(() => setStatus('Não foi possível preparar o aplicativo neste navegador.'))
-    const captureInstallPrompt = (event: Event) => { event.preventDefault(); setInstallPrompt(event) }
-    window.addEventListener('beforeinstallprompt', captureInstallPrompt)
     navigator.serviceWorker.ready.then(async (registration) => setEnabled(Boolean(await registration.pushManager.getSubscription()))).catch(() => undefined)
-    return () => window.removeEventListener('beforeinstallprompt', captureInstallPrompt)
   }, [])
-
-  async function install() {
-    if (!installPrompt) return setStatus('Abra o menu do navegador e escolha “Instalar aplicativo” ou “Adicionar à tela inicial”.')
-    await installPrompt.prompt()
-    setInstallPrompt(null)
-  }
 
   async function enableNotifications() {
     if (!('Notification' in window) || !('serviceWorker' in navigator)) return setStatus('Este navegador não oferece notificações para aplicativos.')
@@ -41,9 +31,5 @@ export default function AdminPushSetup() {
     setStatus('Alertas ativos neste celular.')
   }
 
-  return <section className="admin-mobile-tools" aria-label="Aplicativo e alertas">
-    <div><strong>Painel no celular</strong><span>Instale e receba alertas de pedidos e novos leads.</span></div>
-    <div className="admin-mobile-tool-actions"><button className="outline-button" type="button" onClick={() => void install()}>Instalar</button><button className="primary-button" type="button" disabled={enabled} onClick={() => void enableNotifications()}>{enabled ? 'Alertas ativos' : 'Ativar alertas'}</button></div>
-    {status && <p className="form-hint">{status}</p>}
-  </section>
+  return <><button className={`admin-push-toggle ${enabled ? 'enabled' : ''}`} type="button" title={enabled ? 'Alertas ativos' : 'Ativar alertas'} aria-label={enabled ? 'Alertas ativos' : 'Ativar alertas'} disabled={enabled} onClick={() => void enableNotifications()}><span className="bell-icon" aria-hidden="true" /></button>{status && <p className="admin-push-status" role="status">{status}</p>}</>
 }

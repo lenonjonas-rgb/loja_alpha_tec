@@ -59,12 +59,15 @@ export default function AdminPromotions({ products, onMessage }: Props) {
     if (!selectedProduct) return ''
     const lines = [`🔥 ${headline.trim().toUpperCase() || 'OFERTA ESPECIAL'}: ${selectedProduct.name}!`, '']
     if (selectedProduct.description) lines.push(selectedProduct.description.trim(), '')
-    if (hasDiscount) lines.push(`💥 Aproveite o preço especial: de ${money(priceBeforeCoupon)} por ${money(promotionalPrice)}.`)
-    else if (originalPrice > 0) lines.push(`💥 Garanta o seu por ${money(promotionalPrice)}.`)
-    if (hasDiscount) lines.push(`Você economiza ${discountPercent}% no produto.`)
+    if (hasDiscount) {
+      lines.push(`💥 De ${money(originalPrice)} por ${money(priceBeforeCoupon)}: ${discountPercent}% de desconto no produto.`)
+    } else if (hasCouponDiscount) {
+      lines.push(`💥 De ${money(originalPrice)} por ${money(promotionalPrice)} usando o cupom ${normalizedCoupon}: ${couponDiscountPercent}% de desconto.`)
+    } else if (originalPrice > 0) lines.push(`💥 Garanta o seu por ${money(promotionalPrice)}.`)
     if (matchedCoupon) {
       if (matchedCoupon.free_shipping) lines.push(`🚚 Use o cupom ${normalizedCoupon} e ganhe FRETE GRÁTIS.`)
-      else if (couponDiscountPercent > 0) lines.push(`🎁 Use o cupom ${normalizedCoupon} e ganhe mais ${couponDiscountPercent}% de desconto.`)
+      else if (couponDiscountPercent > 0 && hasDiscount) lines.push(`🎯 Com o cupom ${normalizedCoupon}, ganhe mais ${couponDiscountPercent}% e pague apenas ${money(promotionalPrice)}.`)
+      else if (couponDiscountPercent > 0) lines.push(`🎁 Use o cupom ${normalizedCoupon} e ganhe ${couponDiscountPercent}% de desconto.`)
       else lines.push(`🎁 Use o cupom ${normalizedCoupon} e aproveite essa condição especial.`)
     }
     lines.push('', 'Garanta sua peça e mantenha seu treino em movimento. Compre agora pelo site:', '👉 lojaalphatec.com.br', '', '#AlphaTec #PecasFitness #Academia #EquipamentosFitness')

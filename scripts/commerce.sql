@@ -8,6 +8,17 @@ alter table public.products add column if not exists height_cm numeric(10,2) not
 alter table public.products add column if not exists width_cm numeric(10,2) not null default 0;
 alter table public.products add column if not exists length_cm numeric(10,2) not null default 0;
 alter table public.products add column if not exists internal_code text;
+alter table public.products add column if not exists display_order integer;
+with ordered_products as (
+  select id, row_number() over (order by created_at desc, id) - 1 as position
+  from public.products
+  where display_order is null
+)
+update public.products
+set display_order = ordered_products.position
+from ordered_products
+where public.products.id = ordered_products.id;
+create index if not exists products_display_order_idx on public.products (display_order, created_at desc);
 alter table public.order_items add column if not exists internal_code text;
 
 -- carrinho do cliente sincronizado entre dispositivos: 1 linha por cliente logado

@@ -4,6 +4,7 @@ import { getProductCategories } from '../lib/products'
 
 type Product = {
   id: string
+  displayOrder?: number
   name: string
   internalCode?: string
   brand: string
@@ -24,7 +25,7 @@ type Product = {
   lengthCm?: number
 }
 
-type Props = { products: Product[]; onSaved: (product: Product) => void; onMessage: (message: string) => void }
+type Props = { products: Product[]; onSaved: (product: Product) => void; onReordered: (products: Product[]) => void; onMessage: (message: string) => void }
 
 const categories = ['Esteiras', 'Musculação', 'Bicicletas', 'Elípticos', 'Acessórios', 'Peças diversas']
 
@@ -36,13 +37,37 @@ function toggleCategory(value: string, category: string) {
   return [...selectedCategories, category].join(', ')
 }
 
-export default function AdminProducts({ products, onSaved, onMessage }: Props) {
+export default function AdminProducts({ products, onSaved, onReordered, onMessage }: Props) {
   const [selected, setSelected] = useState<Product | null>(null)
+  const [orderedProducts, setOrderedProducts] = useState<Product[]>(products)
   const [drafts, setDrafts] = useState<Record<string, Product>>(() => Object.fromEntries(products.map((product) => [product.id, product])))
+  const [draggedId, setDraggedId] = useState<string | null>(null)
 
   useEffect(() => {
+    setOrderedProducts(products)
     setDrafts(Object.fromEntries(products.map((product) => [product.id, product])))
   }, [products])
+
+  async function reorderProducts(targetId: string) {
+    if (!draggedId || draggedId === targetId) return
+    const fromIndex = orderedProducts.findIndex((product) => product.id === draggedId)
+    const toIndex = orderedProducts.findIndex((product) => product.id === targetId)
+    if (fromIndex < 0 || toIndex < 0) return
+    const previous = orderedProducts
+    const next = [...orderedProducts]
+    const [moved] = next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, moved)
+    setOrderedProducts(next)
+    setDraggedId(null)
+    const response = await fetch('/api/products', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ productIds: next.map((product) => product.id) }) })
+    if (!response.ok) {
+      setOrderedProducts(previous)
+      const result = await response.json().catch(() => ({}))
+      return onMessage(result.error || 'Não foi possível salvar a ordem dos produtos.')
+    }
+    onReordered(next)
+    onMessage('Ordem dos produtos atualizada.')
+  }
 
   function updateDraft(product: Product, patch: Partial<Product>) {
     setDrafts((items) => {
@@ -165,10 +190,11 @@ export default function AdminProducts({ products, onSaved, onMessage }: Props) {
         <button className="primary-button" type="button" onClick={saveAllChanges}>Salvar alterações</button>
       </div>
 
-      {products.map((product) => {
+      {orderedProducts.map((product) => {
         const draft = drafts[product.id] || product
         return (
-          <div className="product-admin-row" key={product.id}>
+          <div className={`product-admin-row ${draggedId === product.id ? 'is-dragging' : ''}`} key={product.id} draggable onDragStart={() => setDraggedId(product.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => void reorderProducts(product.id)} onDragEnd={() => setDraggedId(null)}>
+            <button className="product-drag-handle" type="button" draggable={false} aria-label={`Arrastar ${product.name}`} title="Arrastar para reordenar">::</button>
             <span>
               <strong>{product.name}</strong>
               <small>{product.internalCode ? `Cód. ${product.internalCode} · ` : ''}{product.brand} · {getProductCategories(product.category).join(' / ')}</small>

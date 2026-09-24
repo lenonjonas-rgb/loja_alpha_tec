@@ -1,5 +1,6 @@
 export type Product = {
   id: string
+  displayOrder?: number
   name: string
   internalCode?: string
   brand?: string

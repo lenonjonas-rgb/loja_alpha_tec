@@ -52,6 +52,9 @@ export default function AdminPromotions({ products, onMessage }: Props) {
   const matchedCoupon = coupons.find((item) => item.active && item.code.toUpperCase() === normalizedCoupon)
   const couponDiscountPercent = Number(matchedCoupon?.discount_percent || 0)
   const couponBenefit = matchedCoupon?.free_shipping ? 'FRETE GRÁTIS' : couponDiscountPercent > 0 ? `${couponDiscountPercent}% OFF` : ''
+  const priceBeforeCoupon = hasDiscount ? finalPrice : originalPrice
+  const hasCouponDiscount = Boolean(matchedCoupon && couponDiscountPercent > 0)
+  const promotionalPrice = hasCouponDiscount ? priceBeforeCoupon * (1 - couponDiscountPercent / 100) : priceBeforeCoupon
 
   useEffect(() => {
     if (!selectedProduct && activeProducts[0]) setSelectedId(activeProducts[0].id)
@@ -122,7 +125,9 @@ export default function AdminPromotions({ products, onMessage }: Props) {
       cursor += 35
       context.fillStyle = '#b7bcc1'
       context.font = '500 19px Arial, sans-serif'
-      const descriptionLines = wrapText(context, selectedProduct.description || 'Peça de qualidade para manter seu equipamento em movimento.', width - 144).slice(0, 3)
+      const detailsWidth = width / 2 - 120
+      const specificationText = selectedProduct.specifications || selectedProduct.description || 'Peça de qualidade para manter seu equipamento em movimento.'
+      const descriptionLines = wrapText(context, specificationText, detailsWidth).slice(0, 5)
       descriptionLines.forEach((line) => { context.fillText(line, 72, cursor); cursor += 27 })
       cursor += 22
 
@@ -132,17 +137,29 @@ export default function AdminPromotions({ products, onMessage }: Props) {
       context.fillText('PRINCIPAIS UTILIZAÇÕES', detailsX, imageBox.y + imageBox.height + 48)
       context.fillStyle = '#b7bcc1'
       context.font = '500 18px Arial, sans-serif'
-      const usageLines = wrapText(context, selectedProduct.compatibleEquipment || selectedProduct.category || 'Equipamentos fitness', width / 2 - 100).slice(0, 4)
+      const usageLines = wrapText(context, selectedProduct.compatibleEquipment || selectedProduct.category || 'Equipamentos fitness', width - detailsX - 72).slice(0, 5)
       usageLines.forEach((line, index) => context.fillText(`${index === 0 ? '•' : '•'} ${line}`, detailsX, imageBox.y + imageBox.height + 82 + index * 26))
 
       const footerY = height - 190
-      context.fillStyle = '#ffffff'
-      context.font = '800 48px Arial, sans-serif'
-      context.fillText(originalPrice > 0 ? money(finalPrice) : 'CONSULTE O PREÇO', 72, footerY)
-      if (hasDiscount) {
+      if (hasDiscount || hasCouponDiscount) {
         context.fillStyle = '#7f858b'
-        context.font = '500 21px Arial, sans-serif'
-        context.fillText(`DE ${money(originalPrice)}  |  -${discountPercent}%`, 72, footerY - 34)
+        context.font = '500 28px Arial, sans-serif'
+        const previousPriceText = `DE ${money(priceBeforeCoupon)}`
+        context.fillText(previousPriceText, 72, footerY)
+        const previousPriceWidth = context.measureText(previousPriceText).width
+        context.strokeStyle = '#d83232'
+        context.lineWidth = 4
+        context.beginPath()
+        context.moveTo(72, footerY - 10)
+        context.lineTo(72 + previousPriceWidth, footerY - 10)
+        context.stroke()
+        context.fillStyle = '#f6c548'
+        context.font = '800 48px Arial, sans-serif'
+        context.fillText(originalPrice > 0 ? `POR ${money(promotionalPrice)}` : 'CONSULTE O PREÇO', 72 + previousPriceWidth + 38, footerY)
+      } else {
+        context.fillStyle = '#ffffff'
+        context.font = '800 48px Arial, sans-serif'
+        context.fillText(originalPrice > 0 ? money(promotionalPrice) : 'CONSULTE O PREÇO', 72, footerY)
       }
       if (normalizedCoupon) {
         context.fillStyle = matchedCoupon ? '#d83232' : '#555b61'
@@ -167,7 +184,7 @@ export default function AdminPromotions({ products, onMessage }: Props) {
     image.onload = () => draw(image)
     image.onerror = () => draw()
     image.src = selectedProduct.image
-  }, [coupon, couponBenefit, format, headline, hasDiscount, originalPrice, normalizedCoupon, selectedFormat, selectedProduct, discountPercent, matchedCoupon])
+  }, [coupon, couponBenefit, format, headline, hasCouponDiscount, hasDiscount, originalPrice, normalizedCoupon, priceBeforeCoupon, promotionalPrice, selectedFormat, selectedProduct, discountPercent, matchedCoupon])
 
   function handleProductChange(event: ChangeEvent<HTMLSelectElement>) {
     setSelectedId(event.target.value)
@@ -208,7 +225,7 @@ export default function AdminPromotions({ products, onMessage }: Props) {
           <label>Cupom de desconto<input value={coupon} maxLength={20} onChange={(event) => setCoupon(event.target.value.toUpperCase())} placeholder="EX.: ALPHA10" />{normalizedCoupon && <small className={`promotion-coupon-status ${matchedCoupon ? 'valid' : 'invalid'}`}>{matchedCoupon ? `Cupom válido: ${couponBenefit || 'benefício cadastrado'}` : 'Cupom não encontrado ou inativo'}</small>}</label>
           <label>Formato<select value={format} onChange={(event) => setFormat(event.target.value as PostFormat)}>{formatOptions.map((option) => <option key={option.value} value={option.value}>{option.label} ({option.width} x {option.height})</option>)}</select></label>
           <label className="promotion-toggle"><input type="checkbox" checked={showDiscount} onChange={(event) => setShowDiscount(event.target.checked)} /> Mostrar desconto cadastrado{discountPercent > 0 ? ` (-${discountPercent}%)` : ' (este produto não tem desconto)'}</label>
-          <div className="promotion-product-summary"><span>Preço atual</span><strong>{originalPrice > 0 ? money(finalPrice) : 'Consulte o preço'}</strong>{hasDiscount && <small>De {money(originalPrice)} por {money(finalPrice)}</small>}</div>
+          <div className="promotion-product-summary"><span>Preço para o post</span><strong>{originalPrice > 0 ? money(promotionalPrice) : 'Consulte o preço'}</strong>{(hasDiscount || hasCouponDiscount) && <small>De {money(priceBeforeCoupon)} por {money(promotionalPrice)}{hasCouponDiscount ? ` com cupom -${couponDiscountPercent}%` : ''}</small>}</div>
           <p className="form-hint">A porcentagem exibida vem do cupom salvo na aba Cupons. O post não aceita valores inventados e identifica quando o código ainda não existe.</p>
         </div>
         <div className="promotion-preview-panel">

@@ -10,10 +10,19 @@ export default function AdminPushSetup() {
   const [status, setStatus] = useState('')
   const [enabled, setEnabled] = useState(false)
 
+  async function saveSubscription(subscription: PushSubscription) {
+    const response = await fetch('/api/admin/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(subscription) })
+    if (!response.ok) throw new Error((await response.json()).error || 'Não foi possível sincronizar os alertas.')
+  }
+
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
     navigator.serviceWorker.register('/sw.js').catch(() => setStatus('Não foi possível preparar o aplicativo neste navegador.'))
-    navigator.serviceWorker.ready.then(async (registration) => setEnabled(Boolean(await registration.pushManager.getSubscription()))).catch(() => undefined)
+    navigator.serviceWorker.ready.then(async (registration) => {
+      const subscription = await registration.pushManager.getSubscription()
+      setEnabled(Boolean(subscription))
+      if (subscription) await saveSubscription(subscription)
+    }).catch(() => setStatus('Não foi possível sincronizar os alertas deste celular.'))
   }, [])
 
   async function enableNotifications() {
@@ -25,8 +34,11 @@ export default function AdminPushSetup() {
     if (!configResponse.ok || !config.configured) return setStatus(config.error || 'As chaves de notificação ainda não foram configuradas no servidor.')
     const registration = await navigator.serviceWorker.ready
     const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToUint8Array(config.publicKey) })
-    const response = await fetch('/api/admin/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(subscription) })
-    if (!response.ok) return setStatus((await response.json()).error || 'Não foi possível ativar os alertas.')
+    try {
+      await saveSubscription(subscription)
+    } catch (error) {
+      return setStatus(error instanceof Error ? error.message : 'Não foi possível ativar os alertas.')
+    }
     setEnabled(true)
     const testResponse = await fetch('/api/admin/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ test: true }) })
     if (!testResponse.ok) return setStatus((await testResponse.json()).error || 'Inscrição salva, mas o alerta de teste falhou.')

@@ -28,6 +28,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48" />
         <link rel="alternate icon" href="/favicon.ico" type="image/x-icon" />
         <link rel="apple-touch-icon" href="/logo-header-uniform.jpg" />
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <meta name="theme-color" content="#202225" />
         <link rel="canonical" href={siteUrl} />
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="Loja Alpha Tec" />

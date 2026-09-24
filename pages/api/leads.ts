@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
 import { isAdmin } from '../../lib/admin-auth'
+import { sendAdminPush } from '../../lib/admin-push'
 
 type LeadStatus = 'new' | 'contacted' | 'proposal' | 'won' | 'lost'
 export const config = { api: { bodyParser: { sizeLimit: '30mb' } } }
@@ -33,6 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const mediaUrls = Array.isArray(media) ? await persistMedia(media, leadId) : []
       const { data, error } = await supabase.from('leads').insert({ id: leadId, name, email, phone, document: document || null, cep, street: street || '', number: number || '', complement: complement || null, neighborhood: neighborhood || '', city: city || '', state: state || '', service_type: serviceType, details, equipment: Array.isArray(equipment) ? equipment : [], media: mediaUrls, estimated_total: Number(estimatedTotal) || 0, status: 'new' }).select('id').single()
       if (error) throw error
+      await sendAdminPush({ title: 'Novo lead', body: `${name} enviou uma solicitação de ${serviceType}.` })
       return res.status(201).json({ leadId: data.id })
     }
     if (!isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })

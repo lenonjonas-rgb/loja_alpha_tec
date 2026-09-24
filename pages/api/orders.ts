@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
 import { isAdmin } from '../../lib/admin-auth'
+import { sendAdminPush } from '../../lib/admin-push'
 
 export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
 
@@ -131,6 +132,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { error: itemError } = await supabase.from('order_items').insert(orderItems)
     if (itemError) throw itemError
     if (appliedCoupon) await supabase.from('coupons').update({ used_count: appliedCoupon.used_count + 1 }).eq('id', appliedCoupon.id)
+    await sendAdminPush({ title: 'Novo pedido', body: `Pedido #${String(order.id).slice(0, 8)} aguardando pagamento.` })
     return res.status(201).json({ orderId: order.id, paymentMethod })
   } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível registrar o pedido.' }) }
 }

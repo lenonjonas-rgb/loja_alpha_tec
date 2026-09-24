@@ -87,6 +87,14 @@ create table if not exists public.notifications (
 );
 create index if not exists notifications_customer_created_idx on public.notifications (customer_id, created_at desc);
 
+create table if not exists public.admin_push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  endpoint text not null unique,
+  subscription jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.password_reset_codes (
   id uuid primary key default gen_random_uuid(),
   customer_id uuid not null references public.customers(id) on delete cascade,

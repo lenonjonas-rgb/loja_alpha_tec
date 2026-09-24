@@ -1,0 +1,13 @@
+{
+  "name": "Alpha Tec - Painel Master",
+  "short_name": "Alpha Tec",
+  "start_url": "/admin",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f5f6",
+  "theme_color": "#202225",
+  "icons": [
+    { "src": "/favicon-48.png", "sizes": "48x48", "type": "image/png" },
+    { "src": "/pwa-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

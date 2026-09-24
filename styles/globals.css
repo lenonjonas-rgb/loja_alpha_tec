@@ -52,6 +52,7 @@ a { color: inherit; text-decoration: none; }
 .nav-inner a { color: #dfe3e7; }
 .nav-inner a:hover { color: #fff; }
 .nav-inner .sale-link { color: #f0b0a9; }
+.nav-inner a.active-category { color: #ff6f68; }
 .nav-service-callout { align-items: center; border-left: 1px solid #414346; display: flex; gap: 14px; margin-left: auto; padding: 9px 0 9px 24px; text-transform: none; }
 .nav-service-callout span { color: #ef4b46; font-size: 9px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .nav-service-callout strong { color: #fff; font-family: 'Barlow Condensed'; font-size: 17px; font-weight: 500; line-height: 1; text-transform: uppercase; }

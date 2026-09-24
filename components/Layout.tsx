@@ -3,6 +3,7 @@ import NotificationBell from './NotificationBell'
 import CustomerMenu from './CustomerMenu'
 import Link from 'next/link'
 import Head from 'next/head'
+import { useRouter } from 'next/router'
 import { useCart } from './CartContext'
 import { useCustomer } from './CustomerContext'
 
@@ -11,8 +12,12 @@ const siteTitle = 'Alpha Tec | Peças para Esteira, Bicicleta, Elíptico e Muscu
 const siteDescription = 'Alpha Tec oferece peças, inversor Movement, acessórios e manutenção para esteiras, bicicletas, elipticos, musculação e equipamentos fitness com entrega para todo o Brasil.'
 
 export default function Layout({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
   const { count } = useCart()
   const { customer } = useCustomer()
+  const activeCategory = router.pathname === '/products' ? String(router.query.category || '') : ''
+  const categoryClass = (category: string) => activeCategory === category ? 'active-category' : ''
+  const categoryCurrent = (category: string) => activeCategory === category ? 'page' as const : undefined
   return (
     <div className="site-shell">
       <Head>
@@ -70,13 +75,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
         <nav className="category-nav">
           <div className="container nav-inner">
-            <Link href="/products">Todas as peças</Link>
-            <Link href="/products?category=esteiras">Esteiras</Link>
-            <Link href="/products?category=musculacao">Musculação</Link>
-            <Link href="/products?category=bicicletas">Bicicletas</Link>
-            <Link href="/products?category=elipticos">Elípticos</Link>
-            <Link href="/products?category=acessorios">Acessórios</Link>
-            <Link href="/products?category=ofertas" className="sale-link">Ofertas</Link>
+            <Link href="/products" className={categoryClass('')} aria-current={categoryCurrent('')}>Todas as peças</Link>
+            <Link href="/products?category=esteiras" className={categoryClass('esteiras')} aria-current={categoryCurrent('esteiras')}>Esteiras</Link>
+            <Link href="/products?category=musculacao" className={categoryClass('musculacao')} aria-current={categoryCurrent('musculacao')}>Musculação</Link>
+            <Link href="/products?category=bicicletas" className={categoryClass('bicicletas')} aria-current={categoryCurrent('bicicletas')}>Bicicletas</Link>
+            <Link href="/products?category=elipticos" className={categoryClass('elipticos')} aria-current={categoryCurrent('elipticos')}>Elípticos</Link>
+            <Link href="/products?category=acessorios" className={categoryClass('acessorios')} aria-current={categoryCurrent('acessorios')}>Acessórios</Link>
+            <Link href="/products?category=ofertas" className={`sale-link ${categoryClass('ofertas')}`} aria-current={categoryCurrent('ofertas')}>Ofertas</Link>
             <Link href="/maintenance" className="nav-service-callout">
               <span>Precisa de ajuda?</span>
               <strong>Manutenção para o seu equipamento?</strong>

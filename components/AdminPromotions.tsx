@@ -55,6 +55,21 @@ export default function AdminPromotions({ products, onMessage }: Props) {
   const priceBeforeCoupon = hasDiscount ? finalPrice : originalPrice
   const hasCouponDiscount = Boolean(matchedCoupon && couponDiscountPercent > 0)
   const promotionalPrice = hasCouponDiscount ? priceBeforeCoupon * (1 - couponDiscountPercent / 100) : priceBeforeCoupon
+  const caption = useMemo(() => {
+    if (!selectedProduct) return ''
+    const lines = [`🔥 ${headline.trim().toUpperCase() || 'OFERTA ESPECIAL'}: ${selectedProduct.name}!`, '']
+    if (selectedProduct.description) lines.push(selectedProduct.description.trim(), '')
+    if (hasDiscount) lines.push(`💥 Aproveite o preço especial: de ${money(priceBeforeCoupon)} por ${money(promotionalPrice)}.`)
+    else if (originalPrice > 0) lines.push(`💥 Garanta o seu por ${money(promotionalPrice)}.`)
+    if (hasDiscount) lines.push(`Você economiza ${discountPercent}% no produto.`)
+    if (matchedCoupon) {
+      if (matchedCoupon.free_shipping) lines.push(`🚚 Use o cupom ${normalizedCoupon} e ganhe FRETE GRÁTIS.`)
+      else if (couponDiscountPercent > 0) lines.push(`🎁 Use o cupom ${normalizedCoupon} e ganhe mais ${couponDiscountPercent}% de desconto.`)
+      else lines.push(`🎁 Use o cupom ${normalizedCoupon} e aproveite essa condição especial.`)
+    }
+    lines.push('', 'Garanta sua peça e mantenha seu treino em movimento. Compre agora pelo site:', '👉 lojaalphatec.com.br', '', '#AlphaTec #PecasFitness #Academia #EquipamentosFitness')
+    return lines.join('\n')
+  }, [couponDiscountPercent, discountPercent, hasDiscount, headline, matchedCoupon, normalizedCoupon, originalPrice, priceBeforeCoupon, promotionalPrice, selectedProduct])
 
   useEffect(() => {
     if (!selectedProduct && activeProducts[0]) setSelectedId(activeProducts[0].id)
@@ -206,6 +221,15 @@ export default function AdminPromotions({ products, onMessage }: Props) {
     }
   }
 
+  async function copyCaption() {
+    try {
+      await navigator.clipboard.writeText(caption)
+      onMessage('Legenda copiada para a área de transferência.')
+    } catch {
+      onMessage('Não foi possível copiar automaticamente. Selecione o texto da legenda para copiar.')
+    }
+  }
+
   return (
     <div className="promotion-studio">
       <div className="promotion-studio-header">
@@ -231,6 +255,10 @@ export default function AdminPromotions({ products, onMessage }: Props) {
         <div className="promotion-preview-panel">
           <div className="promotion-preview-toolbar"><span>Prévia do post</span><small>{selectedFormat.width} x {selectedFormat.height}px</small></div>
           <canvas ref={canvasRef} className="promotion-canvas" aria-label="Prévia do post promocional" />
+          <div className="promotion-caption-panel">
+            <div className="promotion-preview-toolbar"><span>Legenda para Instagram</span><button type="button" onClick={() => void copyCaption()}>Copiar legenda</button></div>
+            <textarea value={caption} onChange={() => undefined} readOnly aria-label="Legenda gerada para Instagram" />
+          </div>
         </div>
       </div>}
     </div>

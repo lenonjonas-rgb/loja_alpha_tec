@@ -25,20 +25,6 @@ function wrapText(context: CanvasRenderingContext2D, text: string, maxWidth: num
   return lines
 }
 
-function drawFittedText(context: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, maxHeight: number, color: string, maxFontSize: number) {
-  let fontSize = maxFontSize
-  let lines: string[] = []
-  let lineHeight = fontSize + 4
-  for (; fontSize >= 10; fontSize -= 1) {
-    context.font = `500 ${fontSize}px Arial, sans-serif`
-    lines = wrapText(context, text, maxWidth)
-    lineHeight = fontSize + 4
-    if (lines.length * lineHeight <= maxHeight) break
-  }
-  context.fillStyle = color
-  lines.forEach((line, index) => context.fillText(line, x, y + index * lineHeight))
-}
-
 function drawImageContain(context: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, width: number, height: number) {
   const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight)
   const drawWidth = image.naturalWidth * scale
@@ -144,15 +130,19 @@ export default function AdminPromotions({ products, onMessage }: Props) {
       context.font = `700 ${squareLayout ? 17 : 20}px Arial, sans-serif`
       const category = selectedProduct.brand ? `${selectedProduct.brand}  /  ${selectedProduct.category}` : selectedProduct.category
       const categoryY = nameY + (squareLayout ? 30 : 42)
-      context.fillText(category.toUpperCase(), nameX, categoryY)
+      if (!squareLayout) context.fillText(category.toUpperCase(), nameX, categoryY)
 
-      const imageBox = { x: 42, y: categoryY + (squareLayout ? 24 : 33), width: width - 84, height: format === 'portrait' ? 470 : 330 }
+      const footerY = squareLayout ? height - 188 : height - 190
+      const imageY = squareLayout ? nameY + 20 : categoryY + 33
+      const imageBox = { x: 42, y: imageY, width: width - 84, height: squareLayout ? Math.max(260, footerY - imageY - 64) : 470 }
       context.fillStyle = '#111316'
       context.fillRect(imageBox.x, imageBox.y, imageBox.width, imageBox.height)
       context.strokeStyle = '#33373b'
       context.lineWidth = 2
       context.strokeRect(imageBox.x, imageBox.y, imageBox.width, imageBox.height)
-      if (image) drawImageContain(context, image, imageBox.x + 34, imageBox.y + 24, imageBox.width - 68, imageBox.height - 48)
+      const imagePadding = squareLayout ? 18 : 34
+      const imageVerticalPadding = squareLayout ? 18 : 24
+      if (image) drawImageContain(context, image, imageBox.x + imagePadding, imageBox.y + imageVerticalPadding, imageBox.width - imagePadding * 2, imageBox.height - imageVerticalPadding * 2)
       else {
         context.fillStyle = '#73787e'
         context.font = '600 24px Arial, sans-serif'
@@ -161,24 +151,19 @@ export default function AdminPromotions({ products, onMessage }: Props) {
         context.textAlign = 'left'
       }
 
-      const detailsHeadingY = imageBox.y + imageBox.height + (squareLayout ? 32 : 48)
-      const detailsTextY = detailsHeadingY + (squareLayout ? 26 : 35)
-      const footerY = squareLayout ? height - 188 : height - 190
-      context.fillStyle = '#d83232'
-      context.font = `800 ${squareLayout ? 18 : 21}px Arial, sans-serif`
-      context.fillText('ESPECIFICAÇÕES', 72, detailsHeadingY)
-      const detailsWidth = width / 2 - 120
-      const specificationText = selectedProduct.specifications || selectedProduct.description || 'Peça de qualidade para manter seu equipamento em movimento.'
-      const detailsX = width / 2 + 24
-      context.fillStyle = '#d83232'
-      context.font = `800 ${squareLayout ? 18 : 21}px Arial, sans-serif`
-      context.fillText('PRINCIPAIS UTILIZAÇÕES', detailsX, detailsHeadingY)
-      const usageText = selectedProduct.compatibleEquipment || selectedProduct.category || 'Equipamentos fitness'
-      if (squareLayout) {
-        const detailsHeight = Math.max(24, footerY - detailsTextY - 54)
-        drawFittedText(context, specificationText, 72, detailsTextY, detailsWidth, detailsHeight, '#b7bcc1', 16)
-        drawFittedText(context, `• ${usageText.replace(/\r?\n/g, ' · ')}`, detailsX, detailsTextY, width - detailsX - 72, detailsHeight, '#b7bcc1', 16)
-      } else {
+      if (!squareLayout) {
+        const detailsHeadingY = imageBox.y + imageBox.height + 48
+        const detailsTextY = detailsHeadingY + 35
+        context.fillStyle = '#d53232'
+        context.font = '800 21px Arial, sans-serif'
+        context.fillText('ESPECIFICAÇÕES', 72, detailsHeadingY)
+        const detailsWidth = width / 2 - 120
+        const specificationText = selectedProduct.specifications || selectedProduct.description || 'Peça de qualidade para manter seu equipamento em movimento.'
+        const detailsX = width / 2 + 24
+        context.fillStyle = '#d53232'
+        context.font = '800 21px Arial, sans-serif'
+        context.fillText('PRINCIPAIS UTILIZAÇÕES', detailsX, detailsHeadingY)
+        const usageText = selectedProduct.compatibleEquipment || selectedProduct.category || 'Equipamentos fitness'
         let cursor = detailsTextY
         context.fillStyle = '#b7bcc1'
         context.font = '500 19px Arial, sans-serif'

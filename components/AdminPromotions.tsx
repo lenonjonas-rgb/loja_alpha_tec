@@ -50,6 +50,7 @@ export default function AdminPromotions({ products, onMessage }: Props) {
   const finalPrice = hasDiscount ? originalPrice * (1 - discountPercent / 100) : originalPrice
   const normalizedCoupon = coupon.trim().toUpperCase()
   const matchedCoupon = coupons.find((item) => item.active && item.code.toUpperCase() === normalizedCoupon)
+  const couponUsageLimit = Number(matchedCoupon?.usage_limit) > 0 ? Number(matchedCoupon?.usage_limit) : null
   const couponDiscountPercent = Number(matchedCoupon?.discount_percent || 0)
   const couponBenefit = matchedCoupon?.free_shipping ? 'FRETE GRÁTIS' : couponDiscountPercent > 0 ? `${couponDiscountPercent}% OFF` : ''
   const priceBeforeCoupon = hasDiscount ? finalPrice : originalPrice
@@ -69,10 +70,11 @@ export default function AdminPromotions({ products, onMessage }: Props) {
       else if (couponDiscountPercent > 0 && hasDiscount) lines.push(`🎯 Com o cupom ${normalizedCoupon}, ganhe mais ${couponDiscountPercent}% e pague apenas ${money(promotionalPrice)}.`)
       else if (couponDiscountPercent > 0) lines.push(`🎁 Use o cupom ${normalizedCoupon} e ganhe ${couponDiscountPercent}% de desconto.`)
       else lines.push(`🎁 Use o cupom ${normalizedCoupon} e aproveite essa condição especial.`)
+      if (couponUsageLimit) lines.push(`⏳ Cupom válido para os primeiros ${couponUsageLimit} clientes.`)
     }
     lines.push('', 'Garanta sua peça e mantenha seu treino em movimento. Compre agora pelo site:', '👉 lojaalphatec.com.br', '', '#AlphaTec #PecasFitness #Academia #EquipamentosFitness')
     return lines.join('\n')
-  }, [couponDiscountPercent, discountPercent, hasDiscount, headline, matchedCoupon, normalizedCoupon, originalPrice, priceBeforeCoupon, promotionalPrice, selectedProduct])
+  }, [couponDiscountPercent, couponUsageLimit, discountPercent, hasCouponDiscount, hasDiscount, headline, matchedCoupon, normalizedCoupon, originalPrice, priceBeforeCoupon, promotionalPrice, selectedProduct])
 
   useEffect(() => {
     if (!selectedProduct && activeProducts[0]) setSelectedId(activeProducts[0].id)
@@ -181,12 +183,16 @@ export default function AdminPromotions({ products, onMessage }: Props) {
       }
       if (normalizedCoupon) {
         context.fillStyle = matchedCoupon ? '#d83232' : '#555b61'
-        context.fillRect(72, footerY + 34, width - 144, 86)
+        context.fillRect(72, footerY + 22, width - 144, couponUsageLimit ? 124 : 86)
         context.fillStyle = '#ffffff'
         context.font = '800 21px Arial, sans-serif'
-        context.fillText(`UTILIZE O CUPOM  ${normalizedCoupon}`, 96, footerY + 67)
+        context.fillText(`UTILIZE O CUPOM  ${normalizedCoupon}`, 96, footerY + 54)
         context.font = '800 24px Arial, sans-serif'
-        context.fillText(matchedCoupon ? (matchedCoupon.free_shipping ? 'E GANHE FRETE GRÁTIS. APROVEITE!' : `E GANHE ${couponDiscountPercent}% DE DESCONTO. APROVEITE!`) : 'CONFIRA AS CONDIÇÕES', 96, footerY + 99)
+        context.fillText(matchedCoupon ? (matchedCoupon.free_shipping ? 'E GANHE FRETE GRÁTIS. APROVEITE!' : `E GANHE ${couponDiscountPercent}% DE DESCONTO. APROVEITE!`) : 'CONFIRA AS CONDIÇÕES', 96, footerY + 86)
+        if (couponUsageLimit) {
+          context.font = '700 18px Arial, sans-serif'
+          context.fillText(`VÁLIDO PARA OS PRIMEIROS ${couponUsageLimit} CLIENTES`, 96, footerY + 118)
+        }
       }
       context.fillStyle = '#d83232'
       context.fillRect(72, height - 38, 120, 4)
@@ -202,7 +208,7 @@ export default function AdminPromotions({ products, onMessage }: Props) {
     image.onload = () => draw(image)
     image.onerror = () => draw()
     image.src = selectedProduct.image
-  }, [coupon, couponBenefit, format, headline, hasCouponDiscount, hasDiscount, originalPrice, normalizedCoupon, priceBeforeCoupon, promotionalPrice, selectedFormat, selectedProduct, discountPercent, matchedCoupon])
+  }, [coupon, couponBenefit, couponDiscountPercent, couponUsageLimit, format, headline, hasCouponDiscount, hasDiscount, originalPrice, normalizedCoupon, priceBeforeCoupon, promotionalPrice, selectedFormat, selectedProduct, discountPercent, matchedCoupon])
 
   function handleProductChange(event: ChangeEvent<HTMLSelectElement>) {
     setSelectedId(event.target.value)

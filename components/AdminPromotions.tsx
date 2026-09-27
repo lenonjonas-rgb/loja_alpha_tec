@@ -126,9 +126,9 @@ export default function AdminPromotions({ products, onMessage }: Props) {
 
       const squareLayout = format === 'square'
       const nameX = 72
-      let nameY = squareLayout ? 156 : 174
+      let nameY = squareLayout ? 140 : 174
       context.fillStyle = '#ffffff'
-      let nameFontSize = squareLayout ? 52 : 58
+      let nameFontSize = squareLayout ? 44 : 58
       let nameLines: string[]
       do {
         context.font = `800 ${nameFontSize}px Arial, sans-serif`
@@ -143,10 +143,10 @@ export default function AdminPromotions({ products, onMessage }: Props) {
       context.fillStyle = '#aeb3b8'
       context.font = `700 ${squareLayout ? 17 : 20}px Arial, sans-serif`
       const category = selectedProduct.brand ? `${selectedProduct.brand}  /  ${selectedProduct.category}` : selectedProduct.category
-      const categoryY = nameY + (squareLayout ? 36 : 42)
+      const categoryY = nameY + (squareLayout ? 30 : 42)
       context.fillText(category.toUpperCase(), nameX, categoryY)
 
-      const imageBox = { x: 42, y: categoryY + (squareLayout ? 34 : 33), width: width - 84, height: format === 'portrait' ? 470 : 235 }
+      const imageBox = { x: 42, y: categoryY + (squareLayout ? 24 : 33), width: width - 84, height: format === 'portrait' ? 470 : 330 }
       context.fillStyle = '#111316'
       context.fillRect(imageBox.x, imageBox.y, imageBox.width, imageBox.height)
       context.strokeStyle = '#33373b'
@@ -161,8 +161,8 @@ export default function AdminPromotions({ products, onMessage }: Props) {
         context.textAlign = 'left'
       }
 
-      const detailsHeadingY = imageBox.y + imageBox.height + (squareLayout ? 42 : 48)
-      const detailsTextY = detailsHeadingY + (squareLayout ? 29 : 35)
+      const detailsHeadingY = imageBox.y + imageBox.height + (squareLayout ? 32 : 48)
+      const detailsTextY = detailsHeadingY + (squareLayout ? 26 : 35)
       const footerY = squareLayout ? height - 188 : height - 190
       context.fillStyle = '#d83232'
       context.font = `800 ${squareLayout ? 18 : 21}px Arial, sans-serif`

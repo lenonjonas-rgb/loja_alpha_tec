@@ -94,7 +94,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </nav>
       </header>
       <main><CheckoutAddressSelector />{children}</main>
-      <footer className="site-footer"><div className="container"><strong>ALPHA TEC</strong><span>Peças que mantêm seu treino em movimento.</span><nav className="footer-links" aria-label="Links institucionais"><Link href="/privacidade">Privacidade</Link><Link href="/admin">Acesso administrativo</Link></nav></div></footer>
+      <footer className="site-footer"><div className="container"><strong>ALPHA TEC</strong><span>Peças que mantêm seu treino em movimento.</span><nav className="footer-links" aria-label="Links institucionais"><Link href="/privacidade">Privacidade</Link><Link href="/admin" target="_blank" rel="noopener noreferrer">Acesso administrativo</Link></nav></div></footer>
     </div>
   )
 }

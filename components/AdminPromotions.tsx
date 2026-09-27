@@ -25,6 +25,20 @@ function wrapText(context: CanvasRenderingContext2D, text: string, maxWidth: num
   return lines
 }
 
+function drawFittedText(context: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, maxHeight: number, color: string, maxFontSize: number) {
+  let fontSize = maxFontSize
+  let lines: string[] = []
+  let lineHeight = fontSize + 4
+  for (; fontSize >= 10; fontSize -= 1) {
+    context.font = `500 ${fontSize}px Arial, sans-serif`
+    lines = wrapText(context, text, maxWidth)
+    lineHeight = fontSize + 4
+    if (lines.length * lineHeight <= maxHeight) break
+  }
+  context.fillStyle = color
+  lines.forEach((line, index) => context.fillText(line, x, y + index * lineHeight))
+}
+
 function drawImageContain(context: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, width: number, height: number) {
   const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight)
   const drawWidth = image.naturalWidth * scale
@@ -110,20 +124,29 @@ export default function AdminPromotions({ products, onMessage }: Props) {
       context.font = '700 18px Arial, sans-serif'
       context.fillText('PEÇAS E ACESSÓRIOS FITNESS', 72, 105)
 
+      const squareLayout = format === 'square'
       const nameX = 72
-      let nameY = 174
+      let nameY = squareLayout ? 156 : 174
       context.fillStyle = '#ffffff'
-      context.font = '800 58px Arial, sans-serif'
-      const nameLines = wrapText(context, selectedProduct.name.toUpperCase(), width - 144).slice(0, 3)
-      nameLines.forEach((line) => { context.fillText(line, nameX, nameY); nameY += 66 })
+      let nameFontSize = squareLayout ? 52 : 58
+      let nameLines: string[]
+      do {
+        context.font = `800 ${nameFontSize}px Arial, sans-serif`
+        nameLines = wrapText(context, selectedProduct.name.toUpperCase(), width - 144)
+        if (nameLines.length <= 3 || nameFontSize <= 38) break
+        nameFontSize -= 2
+      } while (true)
+      const nameLineHeight = squareLayout ? nameFontSize + 6 : 66
+      nameLines.forEach((line) => { context.fillText(line, nameX, nameY); nameY += nameLineHeight })
       context.fillStyle = '#d83232'
-      context.fillRect(nameX, nameY + 2, 240, 6)
+      context.fillRect(nameX, nameY + 2, squareLayout ? 180 : 240, 6)
       context.fillStyle = '#aeb3b8'
-      context.font = '700 20px Arial, sans-serif'
+      context.font = `700 ${squareLayout ? 17 : 20}px Arial, sans-serif`
       const category = selectedProduct.brand ? `${selectedProduct.brand}  /  ${selectedProduct.category}` : selectedProduct.category
-      context.fillText(category.toUpperCase(), nameX, nameY + 42)
+      const categoryY = nameY + (squareLayout ? 36 : 42)
+      context.fillText(category.toUpperCase(), nameX, categoryY)
 
-      const imageBox = { x: 42, y: nameY + 75, width: width - 84, height: format === 'portrait' ? 470 : 360 }
+      const imageBox = { x: 42, y: categoryY + (squareLayout ? 34 : 33), width: width - 84, height: format === 'portrait' ? 470 : 235 }
       context.fillStyle = '#111316'
       context.fillRect(imageBox.x, imageBox.y, imageBox.width, imageBox.height)
       context.strokeStyle = '#33373b'
@@ -138,29 +161,32 @@ export default function AdminPromotions({ products, onMessage }: Props) {
         context.textAlign = 'left'
       }
 
-      let cursor = imageBox.y + imageBox.height + 48
+      const detailsHeadingY = imageBox.y + imageBox.height + (squareLayout ? 42 : 48)
+      const detailsTextY = detailsHeadingY + (squareLayout ? 29 : 35)
+      const footerY = squareLayout ? height - 188 : height - 190
       context.fillStyle = '#d83232'
-      context.font = '800 21px Arial, sans-serif'
-      context.fillText('ESPECIFICAÇÕES', 72, cursor)
-      cursor += 35
-      context.fillStyle = '#b7bcc1'
-      context.font = '500 19px Arial, sans-serif'
+      context.font = `800 ${squareLayout ? 18 : 21}px Arial, sans-serif`
+      context.fillText('ESPECIFICAÇÕES', 72, detailsHeadingY)
       const detailsWidth = width / 2 - 120
       const specificationText = selectedProduct.specifications || selectedProduct.description || 'Peça de qualidade para manter seu equipamento em movimento.'
-      const descriptionLines = wrapText(context, specificationText, detailsWidth).slice(0, 5)
-      descriptionLines.forEach((line) => { context.fillText(line, 72, cursor); cursor += 27 })
-      cursor += 22
-
       const detailsX = width / 2 + 24
       context.fillStyle = '#d83232'
-      context.font = '800 21px Arial, sans-serif'
-      context.fillText('PRINCIPAIS UTILIZAÇÕES', detailsX, imageBox.y + imageBox.height + 48)
-      context.fillStyle = '#b7bcc1'
-      context.font = '500 18px Arial, sans-serif'
-      const usageLines = wrapText(context, selectedProduct.compatibleEquipment || selectedProduct.category || 'Equipamentos fitness', width - detailsX - 72).slice(0, 5)
-      usageLines.forEach((line, index) => context.fillText(`${index === 0 ? '•' : '•'} ${line}`, detailsX, imageBox.y + imageBox.height + 82 + index * 26))
+      context.font = `800 ${squareLayout ? 18 : 21}px Arial, sans-serif`
+      context.fillText('PRINCIPAIS UTILIZAÇÕES', detailsX, detailsHeadingY)
+      const usageText = selectedProduct.compatibleEquipment || selectedProduct.category || 'Equipamentos fitness'
+      if (squareLayout) {
+        const detailsHeight = Math.max(24, footerY - detailsTextY - 54)
+        drawFittedText(context, specificationText, 72, detailsTextY, detailsWidth, detailsHeight, '#b7bcc1', 16)
+        drawFittedText(context, `• ${usageText.replace(/\r?\n/g, ' · ')}`, detailsX, detailsTextY, width - detailsX - 72, detailsHeight, '#b7bcc1', 16)
+      } else {
+        let cursor = detailsTextY
+        context.fillStyle = '#b7bcc1'
+        context.font = '500 19px Arial, sans-serif'
+        wrapText(context, specificationText, detailsWidth).slice(0, 5).forEach((line) => { context.fillText(line, 72, cursor); cursor += 27 })
+        context.font = '500 18px Arial, sans-serif'
+        wrapText(context, usageText, width - detailsX - 72).slice(0, 5).forEach((line, index) => context.fillText(`• ${line}`, detailsX, detailsTextY + index * 26))
+      }
 
-      const footerY = height - 190
       if (hasDiscount || hasCouponDiscount) {
         context.fillStyle = '#7f858b'
         context.font = '500 28px Arial, sans-serif'

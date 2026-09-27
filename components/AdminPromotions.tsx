@@ -72,7 +72,7 @@ export default function AdminPromotions({ products, onMessage }: Props) {
   const promotionalPrice = hasCouponDiscount ? priceBeforeCoupon * (1 - couponDiscountPercent / 100) : priceBeforeCoupon
   const caption = useMemo(() => {
     if (!selectedProduct) return ''
-    const lines = [`🔥 ${headline.trim().toUpperCase() || 'OFERTA ESPECIAL'}: ${selectedProduct.name}!`, '']
+    const lines = ['🛒 ACESSE AGORA: www.lojaalphatec.com.br', '', `🔥 ${headline.trim().toUpperCase() || 'OFERTA ESPECIAL'}: ${selectedProduct.name}!`, '']
     if (selectedProduct.description) lines.push(selectedProduct.description.trim(), '')
     if (hasDiscount) {
       lines.push(`💥 De ${money(originalPrice)} por ${money(priceBeforeCoupon)}: ${discountPercent}% de desconto no produto.`)
@@ -86,7 +86,7 @@ export default function AdminPromotions({ products, onMessage }: Props) {
       else lines.push(`🎁 Use o cupom ${normalizedCoupon} e aproveite essa condição especial.`)
       if (couponUsageLimit) lines.push(`⏳ Cupom válido para os primeiros ${couponUsageLimit} clientes.`)
     }
-    lines.push('', 'Garanta sua peça e mantenha seu treino em movimento. Compre agora pelo site:', '👉 lojaalphatec.com.br', '', '#AlphaTec #PecasFitness #Academia #EquipamentosFitness')
+    lines.push('', 'Garanta sua peça e mantenha seu treino em movimento.', '', '#AlphaTec #PecasFitness #Academia #EquipamentosFitness')
     return lines.join('\n')
   }, [couponDiscountPercent, couponUsageLimit, discountPercent, hasCouponDiscount, hasDiscount, headline, matchedCoupon, normalizedCoupon, originalPrice, priceBeforeCoupon, promotionalPrice, selectedProduct])
 
@@ -221,10 +221,10 @@ export default function AdminPromotions({ products, onMessage }: Props) {
         }
       }
       context.fillStyle = '#d83232'
-      context.fillRect(72, height - 38, 120, 4)
-      context.fillStyle = '#8a9096'
-      context.font = '500 18px Arial, sans-serif'
-      context.fillText('COMPRE AGORA  |  lojaalphatec.com.br', 216, height - 30)
+      context.fillRect(72, height - 32, 120, 4)
+      context.fillStyle = '#f6c548'
+      context.font = '800 23px Arial, sans-serif'
+      context.fillText('ACESSE www.lojaalphatec.com.br', 216, height - 18)
       setCanvasReady(true)
     }
 

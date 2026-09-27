@@ -224,7 +224,7 @@ a { color: inherit; text-decoration: none; }
 .dashboard-product-track { background: #eceeef; height: 5px; margin-top: 7px; }
 .dashboard-product-track span { background: #d5322f; display: block; height: 100%; }
 .dashboard-leads-panel { margin-top: 16px; }
-.dashboard-leads-grid { display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 18px; }
+.dashboard-leads-grid { display: grid; gap: 10px; grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: 18px; }
 .dashboard-leads-grid article { background: #f5f6f7; display: grid; gap: 8px; padding: 13px; }
 .dashboard-leads-grid strong { font-size: 22px; }
 @media (max-width: 760px) { .admin-dashboard { margin-left: -14px; margin-right: -14px; padding: 18px; }.admin-dashboard-header { align-items: flex-start; flex-direction: column; gap: 9px; }.admin-dashboard-header > p { text-align: left; }.dashboard-period-grid, .dashboard-quick-grid { grid-template-columns: 1fr; }.dashboard-detail-grid { grid-template-columns: 1fr; }.dashboard-panel { padding: 15px; }.dashboard-panel-heading { align-items: flex-start; flex-direction: column; }.dashboard-leads-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -357,9 +357,9 @@ a { color: inherit; text-decoration: none; }
 .lead-status-tabs button.active { background: #fff; color: #202225; }
 .lead-status-tabs button.active.new { border-color: #d5322f; color: #d5322f; }
 .lead-status-tabs button.active.contacted { border-color: #a86a00; color: #a86a00; }
-.lead-status-tabs button.active.proposal { border-color: #315e9b; color: #315e9b; }
 .lead-status-tabs button.active.won { border-color: #29834a; color: #29834a; }
-.lead-status-tabs button.active.lost { border-color: #686c70; color: #686c70; }
+.lead-status-tabs button.active.lost { border-color: #315e9b; color: #315e9b; }
+.lead-status-tabs button.active.contact_lost { border-color: #686c70; color: #686c70; }
 .lead-status-panel { min-height: 180px; }
 .lead-summary { align-items: center; cursor: pointer; display: flex; gap: 12px; min-height: 70px; padding: 14px 0; }
 .lead-summary-main { flex: 1; min-width: 0; }

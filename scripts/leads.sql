@@ -18,10 +18,13 @@ create table if not exists public.leads (
   equipment jsonb not null default '[]'::jsonb,
   media jsonb not null default '[]'::jsonb,
   estimated_total numeric(12,2) not null default 0,
-  status text not null default 'new' check (status in ('new', 'contacted', 'proposal', 'won', 'lost')),
+  status text not null default 'new' check (status in ('new', 'contacted', 'won', 'lost', 'contact_lost')),
   notes text not null default ''
 );
 
 alter table public.leads add column if not exists updated_at timestamptz not null default now();
 alter table public.leads add column if not exists media jsonb not null default '[]'::jsonb;
+alter table public.leads drop constraint if exists leads_status_check;
+update public.leads set status = 'contacted' where status = 'proposal';
+alter table public.leads add constraint leads_status_check check (status in ('new', 'contacted', 'won', 'lost', 'contact_lost'));
 create index if not exists leads_status_created_at_idx on public.leads (status, created_at desc);

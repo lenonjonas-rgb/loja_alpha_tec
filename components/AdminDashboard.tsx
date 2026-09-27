@@ -5,7 +5,7 @@ type DashboardData = {
   periods: { week: PeriodSummary; month: PeriodSummary; year: PeriodSummary }
   convertedOrders: number
   activeCarts: number
-  leads: { total: number; technicalVisit: number; monthlyContract: number; won: number; lost: number }
+  leads: { total: number; technicalVisit: number; monthlyContract: number; won: number; lost: number; contactLost: number }
   topProducts: { name: string; units: number }[]
   monthlyTrend: { key: string; label: string; orders: number; revenue: number }[]
 }
@@ -109,6 +109,7 @@ export default function AdminDashboard() {
         <article><span>Contrato mensal</span><strong>{data.leads.monthlyContract.toLocaleString('pt-BR')}</strong></article>
         <article><span>Ganhos</span><strong>{data.leads.won.toLocaleString('pt-BR')}</strong></article>
         <article><span>Perdas</span><strong>{data.leads.lost.toLocaleString('pt-BR')}</strong></article>
+        <article><span>Contato perdido</span><strong>{data.leads.contactLost.toLocaleString('pt-BR')}</strong></article>
       </div>
     </section>
   </div>

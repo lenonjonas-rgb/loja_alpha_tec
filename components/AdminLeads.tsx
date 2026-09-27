@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 
-type Status = 'new' | 'contacted' | 'proposal' | 'won' | 'lost'
+type Status = 'new' | 'contacted' | 'won' | 'lost' | 'contact_lost'
 type LeadMedia = { name: string; type: string; url: string }
 type Lead = { id: string; created_at: string; name: string; email: string; phone: string; cep: string; city: string; state: string; service_type: string; details: string; equipment: { name: string; quantity: number }[]; media?: LeadMedia[]; estimated_total: number; status: Status; notes: string }
-const labels: Record<Status, string> = { new: 'Novo', contacted: 'Em contato', proposal: 'Proposta', won: 'Ganho', lost: 'Perda' }
-const columns: Status[] = ['new', 'contacted', 'proposal', 'won', 'lost']
+const labels: Record<Status, string> = { new: 'Novo', contacted: 'Em contato', won: 'Ganho', lost: 'Perda', contact_lost: 'Contato perdido' }
+const columns: Status[] = ['new', 'contacted', 'won', 'lost', 'contact_lost']
 type Props = { onMessage: (message: string) => void }
 
 export default function AdminLeads({ onMessage }: Props) {

@@ -3,7 +3,7 @@ import { getSupabaseServer } from '../../lib/supabase-server'
 import { isAdmin } from '../../lib/admin-auth'
 import { sendAdminPush } from '../../lib/admin-push'
 
-type LeadStatus = 'new' | 'contacted' | 'proposal' | 'won' | 'lost'
+type LeadStatus = 'new' | 'contacted' | 'won' | 'lost' | 'contact_lost'
 export const config = { api: { bodyParser: { sizeLimit: '30mb' } } }
 
 async function persistMedia(media: { name?: string; type?: string; data?: string }[], id: string) {
@@ -49,7 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
       await supabase
         .from('leads')
-        .update({ status: 'lost', updated_at: new Date().toISOString() })
+        .update({ status: 'contact_lost', updated_at: new Date().toISOString() })
         .eq('status', 'new')
         .lt('updated_at', twoDaysAgo)
 
@@ -58,7 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json(data)
     }
     const { id, status, notes } = req.body || {}
-    if (!id || !['new', 'contacted', 'proposal', 'won', 'lost'].includes(status)) return res.status(400).json({ error: 'Lead e status são obrigatórios.' })
+    if (!id || !['new', 'contacted', 'won', 'lost', 'contact_lost'].includes(status)) return res.status(400).json({ error: 'Lead e status são obrigatórios.' })
     const { data, error } = await supabase.from('leads').update({ status: status as LeadStatus, notes: typeof notes === 'string' ? notes : '', updated_at: new Date().toISOString() }).eq('id', id).select('*').single()
     if (error) throw error
     return res.status(200).json(data)

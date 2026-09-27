@@ -78,7 +78,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const staleLeadThreshold = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString()
     const { error: staleLeadsError } = await supabase
       .from('leads')
-      .update({ status: 'lost', updated_at: now.toISOString() })
+      .update({ status: 'contact_lost', updated_at: now.toISOString() })
       .eq('status', 'new')
       .lt('updated_at', staleLeadThreshold)
     if (staleLeadsError) throw staleLeadsError
@@ -128,13 +128,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const serviceTypeCounts = { technicalVisit: 0, monthlyContract: 0 }
-    const leadStatusCounts = { won: 0, lost: 0 }
+    const leadStatusCounts = { won: 0, lost: 0, contactLost: 0 }
     for (const lead of leads) {
       const normalizedType = String(lead.service_type || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
       if (normalizedType.includes('visita')) serviceTypeCounts.technicalVisit += 1
       if (normalizedType.includes('contrato') || normalizedType.includes('mensal')) serviceTypeCounts.monthlyContract += 1
       if (lead.status === 'won') leadStatusCounts.won += 1
       if (lead.status === 'lost') leadStatusCounts.lost += 1
+      if (lead.status === 'contact_lost') leadStatusCounts.contactLost += 1
     }
 
     return res.status(200).json({

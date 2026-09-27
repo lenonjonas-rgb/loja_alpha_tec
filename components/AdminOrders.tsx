@@ -3,6 +3,7 @@ import { getCarrierTrackingUrl } from '../lib/carrier-tracking'
 import { generateShippingLabels, resolveLabelAddress, type LabelAddress, type LabelCustomer } from '../lib/shipping-label'
 
 type Order = { id: string; created_at: string; status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'; payment_status: 'pending' | 'paid' | 'failed' | 'refunded'; payment_method: 'pix' | 'card' | 'boleto' | null; total: number; tracking_code: string | null; carrier: string | null; invoice_url: string | null; shipping_address: LabelAddress | null; customer_address?: LabelAddress | null; customers: LabelCustomer | null; order_items: { product_name: string; internal_code: string | null; quantity: number }[] }
+type CartOpportunity = { customer_id: string; updated_at: string; customer: { name: string | null; email: string | null; phone: string | null } | null; items: { product_name: string; internal_code: string | null; quantity: number; unit_price: number }[] }
 type Props = { onMessage: (message: string) => void }
 
 const orderStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'] as const
@@ -13,12 +14,14 @@ const paymentMethodLabel: Record<string, string> = { pix: 'Pix (Mercado Pago)', 
 
 export default function AdminOrders({ onMessage }: Props) {
   const [orders, setOrders] = useState<Order[]>([])
+  const [cartOpportunities, setCartOpportunities] = useState<CartOpportunity[]>([])
   const [activeStatus, setActiveStatus] = useState<Order['status']>('processing')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [expandedIds, setExpandedIds] = useState<string[]>([])
 
   useEffect(() => {
     fetch('/api/orders').then((response) => response.ok ? response.json() : Promise.reject()).then(setOrders).catch(() => onMessage('Não foi possível carregar os pedidos.'))
+    fetch('/api/abandoned-carts').then((response) => response.ok ? response.json() : Promise.reject()).then(setCartOpportunities).catch(() => onMessage('Não foi possível carregar os carrinhos para recuperação.'))
   }, [onMessage])
 
   async function updateOrder(order: Order, status: Order['status'], paymentStatus = order.payment_status, trackingCode = order.tracking_code || '', invoiceBase64?: string) {
@@ -125,6 +128,7 @@ export default function AdminOrders({ onMessage }: Props) {
   }
 
   const visibleOrders = orders.filter((order) => order.status === activeStatus)
+  const visibleCarts = activeStatus === 'pending' ? cartOpportunities : []
   const allSelected = visibleOrders.length > 0 && visibleOrders.every((order) => selectedIds.includes(order.id))
 
   return <div className="orders-dashboard">
@@ -140,7 +144,28 @@ export default function AdminOrders({ onMessage }: Props) {
         <label><input type="checkbox" checked={allSelected} onChange={() => toggleAll(visibleOrders)} /> Selecionar todos</label>
         <span>{visibleOrders.length} pedido(s) em {orderLabel[activeStatus].toLowerCase()}</span>
       </div>
-      {!visibleOrders.length && <p className="form-hint">Nenhum pedido nesta etapa.</p>}
+      {visibleCarts.length > 0 && <div className="cart-recovery-list">
+        <div className="cart-recovery-heading"><h3>Carrinhos para recuperar</h3><span>{visibleCarts.length} cliente(s)</span></div>
+        {visibleCarts.map((cart) => {
+          const customer = cart.customer
+          const phone = String(customer?.phone || '').replace(/\D/g, '')
+          const message = `Olá${customer?.name ? `, ${customer.name}` : ''}! Vi que você deixou alguns itens no carrinho da Alpha Tec. Posso ajudar com alguma dúvida?`
+          const total = cart.items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0)
+          return <article className="cart-recovery-card" key={cart.customer_id}>
+            <div className="cart-recovery-main">
+              <strong>{customer?.name || 'Cliente'}</strong>
+              <p>{customer?.email || 'E-mail não informado'}{customer?.phone ? ` · ${customer.phone}` : ''} · Atualizado em {new Date(cart.updated_at).toLocaleString('pt-BR')}</p>
+              <small>{cart.items.map((item) => `${item.internal_code ? `[${item.internal_code}] ` : ''}${item.product_name} x${item.quantity}`).join(' · ')}</small>
+            </div>
+            <strong className="cart-recovery-total">R$ {total.toFixed(2).replace('.', ',')}</strong>
+            <div className="cart-recovery-actions">
+              {phone && <a className="cart-contact-whatsapp" href={`https://wa.me/${phone}?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer">WhatsApp</a>}
+              {customer?.email && <a className="cart-contact-email" href={`mailto:${customer.email}?subject=${encodeURIComponent('Podemos ajudar com seu carrinho?')}`}>E-mail</a>}
+            </div>
+          </article>
+        })}
+      </div>}
+      {!visibleOrders.length && !visibleCarts.length && <p className="form-hint">Nenhum pedido nesta etapa.</p>}
       {visibleOrders.map((order) => {
         const expanded = expandedIds.includes(order.id)
         return <article className={`order-card ${expanded ? 'expanded' : ''}`} key={order.id} onClick={() => toggleExpanded(order.id)}>

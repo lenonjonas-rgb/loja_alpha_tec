@@ -19,13 +19,17 @@ export default function AdminDashboard() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    fetch('/api/admin/dashboard')
+    let cancelled = false
+    const load = () => fetch('/api/admin/dashboard')
       .then(async (response) => {
         if (!response.ok) throw new Error('Não foi possível carregar os indicadores.')
         return response.json()
       })
-      .then(setData)
-      .catch((loadError) => setError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar os indicadores.'))
+      .then((result) => { if (!cancelled) setData(result) })
+      .catch((loadError) => { if (!cancelled) setError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar os indicadores.') })
+    load()
+    const interval = setInterval(load, 15000)
+    return () => { cancelled = true; clearInterval(interval) }
   }, [])
 
   if (error) return <section className="admin-dashboard"><p className="form-status">{error}</p></section>
@@ -43,7 +47,7 @@ export default function AdminDashboard() {
   return <div className="admin-dashboard">
     <header className="admin-dashboard-header">
       <div><p className="eyebrow">DESEMPENHO DA LOJA</p><h2>Visão geral</h2></div>
-      <p>Contagens por data de criação. Faturamento e conversões consideram pedidos pagos, sem cancelamentos.</p>
+      <p><span className="dashboard-live-badge"><span className="dashboard-live-dot" /> Ao vivo · atualiza a cada 15s</span> Contagens por data de criação. Faturamento e conversões consideram pedidos pagos, sem cancelamentos.</p>
     </header>
 
     <section className="dashboard-period-grid" aria-label="Pedidos e faturamento por período">

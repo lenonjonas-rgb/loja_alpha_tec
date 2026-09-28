@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 type PeriodSummary = { count: number; revenue: number }
 type DashboardData = {
@@ -17,6 +17,8 @@ export default function AdminDashboard() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [chartMetric, setChartMetric] = useState<ChartMetric>('orders')
   const [error, setError] = useState('')
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(1)
 
   useEffect(() => {
     let cancelled = false
@@ -32,6 +34,22 @@ export default function AdminDashboard() {
     return () => { cancelled = true; clearInterval(interval) }
   }, [])
 
+  useEffect(() => {
+    function fitToScreen() {
+      const element = rootRef.current
+      if (!element) return
+      if (!document.fullscreenElement) { setScale(1); return }
+      element.style.transform = 'none'
+      const naturalHeight = element.scrollHeight
+      const available = window.innerHeight - 48
+      setScale(naturalHeight > available ? Math.max(0.45, available / naturalHeight) : 1)
+    }
+    fitToScreen()
+    window.addEventListener('resize', fitToScreen)
+    document.addEventListener('fullscreenchange', fitToScreen)
+    return () => { window.removeEventListener('resize', fitToScreen); document.removeEventListener('fullscreenchange', fitToScreen) }
+  }, [data, chartMetric])
+
   if (error) return <section className="admin-dashboard"><p className="form-status">{error}</p></section>
   if (!data) return <section className="admin-dashboard"><p className="form-hint">Carregando indicadores...</p></section>
 
@@ -44,7 +62,7 @@ export default function AdminDashboard() {
   }).join(' ')
   const maxProductUnits = Math.max(...data.topProducts.map((product) => product.units), 1)
 
-  return <div className="admin-dashboard">
+  return <div className="admin-dashboard" ref={rootRef} style={{ transform: `scale(${scale})` }}>
     <header className="admin-dashboard-header">
       <div><p className="eyebrow">DESEMPENHO DA LOJA</p><h2>Visão geral</h2></div>
       <p><span className="dashboard-live-badge"><span className="dashboard-live-dot" /> Ao vivo · atualiza a cada 15s</span> Contagens por data de criação. Faturamento e conversões consideram pedidos pagos, sem cancelamentos.</p>

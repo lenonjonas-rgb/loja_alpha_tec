@@ -1,9 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
-import { isAdmin } from '../../lib/admin-auth'
+import { requireRole } from '../../lib/admin-auth'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (!isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
+  if (!requireRole(req, res, ['master'])) return
 
   const supabase = getSupabaseServer()
   try {

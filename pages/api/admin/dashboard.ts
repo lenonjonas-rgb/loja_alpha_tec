@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { isAdmin } from '../../../lib/admin-auth'
+import { requireRole } from '../../../lib/admin-auth'
 import { getSupabaseServer } from '../../../lib/supabase-server'
 
 type OrderRow = { created_at: string; status: string; payment_status: string; total: number; order_items: { product_id: string | null; product_name: string; quantity: number }[] | null }
@@ -64,7 +64,7 @@ function hasCartItems(items: unknown) {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Método não permitido.' })
-  if (!isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
+  if (!requireRole(req, res, ['master'])) return
 
   try {
     const now = new Date()

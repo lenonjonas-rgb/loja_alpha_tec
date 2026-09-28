@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
-import { isAdmin } from '../../lib/admin-auth'
+import { requireRole } from '../../lib/admin-auth'
 
 async function readJson(response: Response) {
   const text = await response.text()
@@ -12,7 +12,7 @@ async function readJson(response: Response) {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (!isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
+  if (!requireRole(req, res, ['master'])) return
 
   try {
     if (req.method === 'GET' && req.query.cnpj) {

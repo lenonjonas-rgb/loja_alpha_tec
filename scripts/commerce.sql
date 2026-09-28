@@ -269,3 +269,16 @@ create table if not exists public.search_history (
   created_at timestamptz not null default now()
 );
 create index if not exists search_history_customer_idx on public.search_history (customer_id, created_at desc);
+
+-- Usuários da área master com níveis de acesso (logística, administrativo, master).
+-- O usuário "alpha" (ALPHA_MASTER_USER/PASSWORD) continua sendo o nível master configurado por variáveis de ambiente.
+create table if not exists public.admin_users (
+  id uuid primary key default gen_random_uuid(),
+  username text unique not null,
+  password_hash text not null,
+  password_salt text not null,
+  role text not null check (role in ('logistica', 'administrativo', 'master')),
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+create index if not exists admin_users_username_idx on public.admin_users (username);

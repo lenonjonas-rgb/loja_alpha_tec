@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
-import { isAdmin } from '../../lib/admin-auth'
+import { requireRole } from '../../lib/admin-auth'
 
 function isCouponRuleColumnError(message: string) {
   return /product_id|category|free_shipping/i.test(message)
@@ -11,7 +11,7 @@ function getCouponSchemaError() {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (!isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
+  if (!requireRole(req, res, ['administrativo', 'master'])) return
   const supabase = getSupabaseServer()
   try {
     if (req.method === 'GET') {

@@ -100,6 +100,7 @@ export default function Admin() {
               <h1>Visão geral</h1>
               <p className="form-hint">Clique para abrir em tela cheia. A sessão fica sempre logada; aperte Esc para encerrar.</p>
               <button className="primary-button" type="button" onClick={openDashboard}>Entrar em tela cheia <span>→</span></button>
+              <button className="outline-button" type="button" onClick={() => void handleLogout()} style={{ marginTop: 14 }}>Sair</button>
             </div>
           )}
         </div>
@@ -116,6 +117,7 @@ export default function Admin() {
         </div>
         <div className="admin-heading-actions">
           <AdminPushSetup />
+          <button className="outline-button" type="button" onClick={() => void handleLogout()}>Sair</button>
           <Link href="/" className="outline-button">Voltar à loja</Link>
         </div>
       </div>

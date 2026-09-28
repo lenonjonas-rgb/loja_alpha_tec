@@ -6,7 +6,7 @@ type DashboardData = {
   convertedOrders: number
   activeCarts: number
   leads: { total: number; technicalVisit: number; monthlyContract: number; won: number; lost: number; contactLost: number }
-  topProducts: { name: string; units: number }[]
+  topProducts: { name: string; quantity: number; soldAt: string }[]
   monthlyTrend: { key: string; label: string; orders: number; revenue: number }[]
 }
 type ChartMetric = 'orders' | 'revenue'
@@ -71,7 +71,6 @@ export default function AdminDashboard() {
     const y = 210 - (value / chartMaximum) * 170
     return `${x},${y}`
   }).join(' ')
-  const maxProductUnits = Math.max(...data.topProducts.map((product) => product.units), 1)
 
   return <div className="admin-dashboard" ref={rootRef} style={{ transform: `scale(${scale})` }}>
     <header className="admin-dashboard-header">
@@ -107,29 +106,33 @@ export default function AdminDashboard() {
           </div>
         </div>
         <div className="dashboard-chart-wrap">
-          <svg className="dashboard-chart" viewBox="0 0 800 240" role="img" aria-label={chartMetric === 'orders' ? 'Evolução mensal de pedidos' : 'Evolução mensal do faturamento pago'}>
+          <svg className="dashboard-chart" viewBox="0 0 800 260" role="img" aria-label={chartMetric === 'orders' ? 'Evolução mensal de pedidos' : 'Evolução mensal do faturamento pago'}>
             {[40, 82.5, 125, 167.5, 210].map((y) => <line key={y} x1="40" y1={y} x2="760" y2={y} className="dashboard-chart-gridline" />)}
             {chartValues.length > 1 && <polyline points={chartPoints} className="dashboard-chart-line" />}
             {chartValues.map((value, index) => {
               const x = chartValues.length <= 1 ? 400 : 40 + (index * 720) / (chartValues.length - 1)
               const y = 210 - (value / chartMaximum) * 170
-              const label = data.monthlyTrend[index].label
-              return <circle key={data.monthlyTrend[index].key} cx={x} cy={y} r="5" className="dashboard-chart-point"><title>{`${label}: ${chartMetric === 'orders' ? `${value} pedidos` : currency(value)}`}</title></circle>
+              const trend = data.monthlyTrend[index]
+              return <g key={trend.key}>
+                <circle cx={x} cy={y} r="5" className="dashboard-chart-point"><title>{`${trend.label}: ${trend.orders} pedidos · ${currency(trend.revenue)}`}</title></circle>
+                <text x={x} y={y - 14} textAnchor="middle" className="dashboard-chart-value-orders">{trend.orders}</text>
+                <text x={x} y={230} textAnchor="middle" className="dashboard-chart-value-revenue">{currency(trend.revenue)}</text>
+              </g>
             })}
           </svg>
           <div className="dashboard-chart-labels" style={{ gridTemplateColumns: `repeat(${data.monthlyTrend.length}, minmax(0, 1fr))` }}>
             {data.monthlyTrend.map((item) => <span key={item.key}>{item.label.replace('.', '')}</span>)}
           </div>
         </div>
-        <p className="dashboard-chart-note">{chartMetric === 'orders' ? 'Pedidos criados por mês' : 'Faturamento de pedidos pagos por mês'}</p>
+        <p className="dashboard-chart-note">Números acima da linha: pedidos do mês · números embaixo: faturamento pago do mês.</p>
       </section>
 
       <section className="dashboard-panel dashboard-products-panel">
-        <div className="dashboard-panel-heading"><div><h3>Mais vendidos</h3><p>Unidades em pedidos pagos neste ano.</p></div></div>
+        <div className="dashboard-panel-heading"><div><h3>Últimos vendidos</h3><p>Produtos das vendas pagas mais recentes.</p></div></div>
         {data.topProducts.length ? <ol className="dashboard-products-list">
           {data.topProducts.map((product, index) => <li key={`${product.name}-${index}`}>
-            <div className="dashboard-product-label"><span>{index + 1}. {product.name}</span><strong>{product.units} un.</strong></div>
-            <div className="dashboard-product-track"><span style={{ width: `${Math.max(6, (product.units / maxProductUnits) * 100)}%` }} /></div>
+            <div className="dashboard-product-label"><span>{index + 1}. {product.name}</span><strong>{product.quantity} un.</strong></div>
+            <small className="dashboard-product-date">Vendido em {new Date(product.soldAt).toLocaleDateString('pt-BR')}</small>
           </li>)}
         </ol> : <p className="form-hint">Ainda não há vendas pagas neste ano.</p>}
       </section>

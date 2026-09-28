@@ -108,7 +108,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return { key, label: new Intl.DateTimeFormat('pt-BR', { month: 'short', timeZone: 'America/Sao_Paulo' }).format(new Date(Date.UTC(year, monthIndex, 15, 12))), orders: 0, revenue: 0 }
     })
     const trendByMonth = new Map(monthlyTrend.map((item) => [item.key, item]))
-    const productUnits = new Map<string, { name: string; units: number }>()
+    const lastSoldByProduct = new Map<string, { name: string; quantity: number; soldAt: string }>()
 
     for (const order of currentYearOrders) {
       const trend = trendByMonth.get(monthKey(new Date(order.created_at)))
@@ -122,8 +122,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const quantity = Number(item.quantity) || 0
         if (!name || quantity <= 0) continue
         const key = String(item.product_id || name)
-        const existing = productUnits.get(key)
-        productUnits.set(key, { name, units: (existing?.units || 0) + quantity })
+        const existing = lastSoldByProduct.get(key)
+        if (!existing || new Date(order.created_at) > new Date(existing.soldAt)) {
+          lastSoldByProduct.set(key, { name, quantity, soldAt: order.created_at })
+        }
       }
     }
 
@@ -147,7 +149,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       convertedOrders: currentYearOrders.filter(isPaidOrder).length,
       activeCarts: carts.filter((cart) => hasCartItems(cart.items)).length,
       leads: { total: leads.length, ...serviceTypeCounts, ...leadStatusCounts },
-      topProducts: Array.from(productUnits.values()).sort((left, right) => right.units - left.units).slice(0, 5),
+      topProducts: Array.from(lastSoldByProduct.values()).sort((left, right) => new Date(right.soldAt).getTime() - new Date(left.soldAt).getTime()).slice(0, 5),
       monthlyTrend,
     })
   } catch (error) {

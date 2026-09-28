@@ -218,6 +218,8 @@ a { color: inherit; text-decoration: none; }
 .dashboard-chart-gridline { stroke: #e6e7e8; stroke-width: 1; }
 .dashboard-chart-line { fill: none; stroke: #d5322f; stroke-linecap: round; stroke-linejoin: round; stroke-width: 3; }
 .dashboard-chart-point { fill: #fff; stroke: #d5322f; stroke-width: 3; }
+.dashboard-chart-value-orders { fill: #202225; font-size: 15px; font-weight: 800; }
+.dashboard-chart-value-revenue { fill: #29834a; font-size: 12px; font-weight: 700; }
 .dashboard-chart-labels { color: #686c70; display: grid; font-size: 9px; gap: 2px; min-width: 430px; text-align: center; text-transform: uppercase; }
 .dashboard-chart-note { color: #686c70; font-size: 10px; margin: 10px 0 0; }
 .dashboard-products-list { list-style: none; margin: 18px 0 0; padding: 0; }
@@ -225,8 +227,7 @@ a { color: inherit; text-decoration: none; }
 .dashboard-product-label { align-items: baseline; display: flex; font-size: 11px; gap: 10px; justify-content: space-between; }
 .dashboard-product-label span { min-width: 0; overflow-wrap: anywhere; }
 .dashboard-product-label strong { flex: 0 0 auto; }
-.dashboard-product-track { background: #eceeef; height: 5px; margin-top: 7px; }
-.dashboard-product-track span { background: #d5322f; display: block; height: 100%; }
+.dashboard-product-date { color: #686c70; display: block; font-size: 10px; margin-top: 5px; }
 .dashboard-leads-panel { margin-top: 16px; }
 .dashboard-leads-grid { display: grid; gap: 10px; grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: 18px; }
 .dashboard-leads-grid article { background: #f5f6f7; display: grid; gap: 8px; padding: 13px; }

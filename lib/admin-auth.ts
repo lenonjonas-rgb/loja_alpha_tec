@@ -5,6 +5,7 @@ import { isAdminRole, type AdminRole } from './admin-roles'
 
 const cookieName = 'alpha_admin_session'
 const sessionMaxAge = 8 * 60 * 60
+const kioskSessionMaxAge = 60 * 60 * 24 * 365 * 10 // nível 0 fica praticamente sempre logado; só sai ao apertar Esc
 const failedLogins = new Map<string, { count: number; blockedUntil: number }>()
 const maxFailures = 5
 const blockDurationMs = 15 * 60 * 1000
@@ -70,11 +71,16 @@ export function requireRole(req: NextApiRequest, res: NextApiResponse, allowed: 
 }
 
 function issueSessionCookie(res: NextApiResponse, username: string, role: AdminRole, secret: string) {
+  const maxAge = role === 'kiosk' ? kioskSessionMaxAge : sessionMaxAge
   const encodedUser = Buffer.from(username).toString('base64url')
-  const expiresAt = Math.floor(Date.now() / 1000) + sessionMaxAge
+  const expiresAt = Math.floor(Date.now() / 1000) + maxAge
   const payload = `${encodedUser}.${role}.${expiresAt}`
   const value = `${payload}.${sign(payload, secret)}`
-  res.setHeader('Set-Cookie', `${cookieName}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${sessionMaxAge}${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`)
+  res.setHeader('Set-Cookie', `${cookieName}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`)
+}
+
+export function clearAdminSession(res: NextApiResponse) {
+  res.setHeader('Set-Cookie', `${cookieName}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`)
 }
 
 export async function adminLogin(req: NextApiRequest, res: NextApiResponse) {

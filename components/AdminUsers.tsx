@@ -4,7 +4,7 @@ import { ROLE_LABELS, type AdminRole } from '../lib/admin-roles'
 type AdminUser = { id: string; username: string; role: AdminRole; active: boolean; createdAt: string }
 type Props = { onMessage: (message: string) => void }
 
-const roleOptions: AdminRole[] = ['logistica', 'administrativo', 'master']
+const roleOptions: AdminRole[] = ['kiosk', 'logistica', 'administrativo', 'master']
 
 export default function AdminUsers({ onMessage }: Props) {
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -71,7 +71,7 @@ export default function AdminUsers({ onMessage }: Props) {
           <label>Senha<input required minLength={8} type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder="mínimo 8 caracteres" /></label>
           <label>Nível de acesso<select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as AdminRole })}>{roleOptions.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}</select></label>
         </div>
-        <p className="form-hint">Nível 1 (Logística): pedidos e leads. Nível 2 (Administrativo): tudo do nível 1 + produtos, cupons e posts promocionais. Nível 3 (Master): acesso total, incluindo gestão de usuários.</p>
+        <p className="form-hint">Nível 0 (TV/Kiosk): mostra só a Visão geral em tela cheia e fica logado permanentemente até apertar Esc. Nível 1 (Logística): pedidos e leads. Nível 2 (Administrativo): tudo do nível 1 + produtos, cupons e posts promocionais. Nível 3 (Master): acesso total, incluindo gestão de usuários.</p>
         <button className="primary-button" type="submit">Criar usuário <span>→</span></button>
       </form>
 

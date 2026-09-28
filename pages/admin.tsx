@@ -23,12 +23,23 @@ export default function Admin() {
   useEffect(() => { fetch('/api/admin/session').then((response) => response.json()).then((result) => { setAuthenticated(result.authenticated) }).finally(() => setCheckingSession(false)) }, [])
   useEffect(() => { if (authenticated) void loadProducts() }, [authenticated])
   useEffect(() => {
-    function handleFullscreenChange() { if (!document.fullscreenElement) setTab((current) => (current === 'dashboard' ? 'orders' : current)) }
+    function handleFullscreenChange() {
+      if (!document.fullscreenElement) {
+        setTab((current) => (current === 'dashboard' ? 'orders' : current))
+        const orientation = screen.orientation as ScreenOrientation & { unlock?: () => void }
+        orientation?.unlock?.()
+      }
+    }
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
   }, [])
   async function loadProducts() { const response = await fetch('/api/products?admin=1'); if (response.ok) setProducts(await response.json()) }
-  function openDashboard() { setTab('dashboard'); void contentRef.current?.requestFullscreen?.() }
+  async function openDashboard() {
+    setTab('dashboard')
+    await contentRef.current?.requestFullscreen?.()
+    const orientation = screen.orientation as ScreenOrientation & { lock?: (type: string) => Promise<void> }
+    orientation?.lock?.('landscape')?.catch(() => undefined)
+  }
   async function signIn(event: FormEvent) { event.preventDefault(); const response = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(login) }); if (!response.ok) return setMessage('Usuário ou senha inválidos.'); setAuthenticated(true) }
   if (checkingSession) return <section className="admin-page container"><p className="form-hint">Carregando central administrativa...</p></section>
   if (!authenticated) return <section className="admin-page container"><Link href="/" className="back-link">← Voltar para a loja</Link><div className="admin-login"><p className="eyebrow">ÁREA RESTRITA</p><h1>Painel Master</h1><p>Controle leads, pedidos e catálogo em um só lugar.</p><form onSubmit={signIn}><label>Usuário<input required value={login.username} onChange={(event) => setLogin({ ...login, username: event.target.value })} /></label><label>Senha<input required type="password" value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} /></label>{message && <p className="form-status">{message}</p>}<button className="primary-button" type="submit">Entrar <span>→</span></button></form></div></section>

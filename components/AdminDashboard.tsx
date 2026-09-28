@@ -44,12 +44,15 @@ export default function AdminDashboard() {
       const element = rootRef.current
       if (!element) return
       if (!document.fullscreenElement) { setScale(1); return }
+      const previousTransform = element.style.transform
       element.style.transform = 'none'
       const naturalHeight = element.scrollHeight
+      const naturalWidth = element.scrollWidth
+      element.style.transform = previousTransform
       const availableHeight = window.innerHeight - 48
       const availableWidth = window.innerWidth - 48
       const heightScale = naturalHeight > availableHeight ? availableHeight / naturalHeight : 1
-      const widthScale = element.scrollWidth > availableWidth ? availableWidth / element.scrollWidth : 1
+      const widthScale = naturalWidth > availableWidth ? availableWidth / naturalWidth : 1
       setScale(Math.max(0.4, Math.min(1, heightScale, widthScale)))
     }
     fitToScreen()
@@ -130,17 +133,17 @@ export default function AdminDashboard() {
           </li>)}
         </ol> : <p className="form-hint">Ainda não há vendas pagas neste ano.</p>}
       </section>
-
-      <section className="dashboard-panel dashboard-leads-panel">
-        <div className="dashboard-panel-heading"><div><h3>Leads de serviços</h3><p>Solicitações recebidas neste ano.</p></div></div>
-        <div className="dashboard-leads-column">
-          <article><span>Visita técnica</span><strong>{data.leads.technicalVisit.toLocaleString('pt-BR')}</strong></article>
-          <article><span>Contrato mensal</span><strong>{data.leads.monthlyContract.toLocaleString('pt-BR')}</strong></article>
-          <article><span>Ganhos</span><strong>{data.leads.won.toLocaleString('pt-BR')}</strong></article>
-          <article><span>Perdas</span><strong>{data.leads.lost.toLocaleString('pt-BR')}</strong></article>
-          <article><span>Contato perdido</span><strong>{data.leads.contactLost.toLocaleString('pt-BR')}</strong></article>
-        </div>
-      </section>
     </div>
+
+    <section className="dashboard-panel dashboard-leads-panel">
+      <div className="dashboard-panel-heading"><div><h3>Leads de serviços</h3><p>Solicitações recebidas neste ano.</p></div></div>
+      <div className="dashboard-leads-grid">
+        <article><span>Visita técnica</span><strong>{data.leads.technicalVisit.toLocaleString('pt-BR')}</strong></article>
+        <article><span>Contrato mensal</span><strong>{data.leads.monthlyContract.toLocaleString('pt-BR')}</strong></article>
+        <article><span>Ganhos</span><strong>{data.leads.won.toLocaleString('pt-BR')}</strong></article>
+        <article><span>Perdas</span><strong>{data.leads.lost.toLocaleString('pt-BR')}</strong></article>
+        <article><span>Contato perdido</span><strong>{data.leads.contactLost.toLocaleString('pt-BR')}</strong></article>
+      </div>
+    </section>
   </div>
 }

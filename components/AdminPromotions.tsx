@@ -51,6 +51,7 @@ export default function AdminPromotions({ products, onMessage }: Props) {
   const [mode, setMode] = useState<PostMode>('product')
   const [selectedId, setSelectedId] = useState(activeProducts[0]?.id || '')
   const [selectedCategory, setSelectedCategory] = useState('')
+  const [selectedCategoryProductIds, setSelectedCategoryProductIds] = useState<string[]>([])
   const [headline, setHeadline] = useState('OFERTA ESPECIAL')
   const [coupon, setCoupon] = useState('')
   const [coupons, setCoupons] = useState<Coupon[]>([])
@@ -72,9 +73,14 @@ export default function AdminPromotions({ products, onMessage }: Props) {
   const priceBeforeCoupon = hasDiscount ? finalPrice : originalPrice
   const hasCouponDiscount = Boolean(matchedCoupon && couponDiscountPercent > 0)
   const promotionalPrice = hasCouponDiscount ? priceBeforeCoupon * (1 - couponDiscountPercent / 100) : priceBeforeCoupon
-  const categoryProducts = useMemo(
-    () => (selectedCategory ? activeProducts.filter((product) => hasProductCategory(product.category, selectedCategory)) : []).slice(0, 6),
+  const maxCategoryProducts = 6
+  const categoryAvailableProducts = useMemo(
+    () => (selectedCategory ? activeProducts.filter((product) => hasProductCategory(product.category, selectedCategory)) : []),
     [activeProducts, selectedCategory]
+  )
+  const categoryProducts = useMemo(
+    () => categoryAvailableProducts.filter((product) => selectedCategoryProductIds.includes(product.id)),
+    [categoryAvailableProducts, selectedCategoryProductIds]
   )
   const getCategoryPricing = (product: Product) => {
     const original = Number(product.price || 0)
@@ -82,6 +88,16 @@ export default function AdminPromotions({ products, onMessage }: Props) {
     const afterOwnDiscount = ownDiscount > 0 ? original * (1 - ownDiscount / 100) : original
     const final = hasCouponDiscount ? afterOwnDiscount * (1 - couponDiscountPercent / 100) : afterOwnDiscount
     return { original, final, hasAnyDiscount: ownDiscount > 0 || hasCouponDiscount }
+  }
+  function toggleCategoryProduct(productId: string) {
+    setSelectedCategoryProductIds((current) => {
+      if (current.includes(productId)) return current.filter((id) => id !== productId)
+      if (current.length >= maxCategoryProducts) {
+        onMessage(`Selecione no máximo ${maxCategoryProducts} peças por post.`)
+        return current
+      }
+      return [...current, productId]
+    })
   }
   const caption = useMemo(() => {
     if (mode === 'category') {
@@ -129,6 +145,13 @@ export default function AdminPromotions({ products, onMessage }: Props) {
   useEffect(() => {
     if (!selectedCategory && categories[0]) setSelectedCategory(categories[0])
   }, [categories, selectedCategory])
+
+  useEffect(() => {
+    setSelectedCategoryProductIds((current) => {
+      const stillValid = current.filter((id) => categoryAvailableProducts.some((product) => product.id === id))
+      return stillValid.length ? stillValid : categoryAvailableProducts.slice(0, maxCategoryProducts).map((product) => product.id)
+    })
+  }, [categoryAvailableProducts])
 
   useEffect(() => {
     fetch('/api/coupons-admin')
@@ -466,9 +489,27 @@ export default function AdminPromotions({ products, onMessage }: Props) {
           {mode === 'product' ? (
             <div className="promotion-product-summary"><span>Preço para o post</span><strong>{originalPrice > 0 ? money(promotionalPrice) : 'Consulte o preço'}</strong>{(hasDiscount || hasCouponDiscount) && <small>De {money(priceBeforeCoupon)} por {money(promotionalPrice)}{hasCouponDiscount ? ` com cupom -${couponDiscountPercent}%` : ''}</small>}</div>
           ) : (
-            <div className="promotion-product-summary"><span>Peças na vitrine</span><strong>{categoryProducts.length} de {activeProducts.filter((product) => hasProductCategory(product.category, selectedCategory)).length} ativas</strong><small>Mostramos até 6 peças por post. Cadastre mais categorias para variar o conteúdo.</small></div>
+            <>
+              <fieldset className="category-checkbox-field promotion-product-picker">
+                <legend>Peças da vitrine ({categoryProducts.length}/{maxCategoryProducts})</legend>
+                {!categoryAvailableProducts.length && <p className="form-hint">Nenhuma peça ativa nessa categoria.</p>}
+                <div className="promotion-product-picker-list">
+                  {categoryAvailableProducts.map((product) => (
+                    <label key={product.id}>
+                      <input
+                        type="checkbox"
+                        checked={selectedCategoryProductIds.includes(product.id)}
+                        onChange={() => toggleCategoryProduct(product.id)}
+                      /> {product.name}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <div className="promotion-product-summary"><span>Peças na vitrine</span><strong>{categoryProducts.length} de {categoryAvailableProducts.length} ativas</strong><small>Marque até {maxCategoryProducts} peças para compor o post.</small></div>
+            </>
           )}
           <p className="form-hint">A porcentagem exibida vem do cupom salvo na aba Cupons. O post não aceita valores inventados e identifica quando o código ainda não existe.</p>
+
         </div>
         <div className="promotion-preview-panel">
           <div className="promotion-preview-toolbar"><span>Prévia do post</span><small>{selectedFormat.width} x {selectedFormat.height}px</small></div>

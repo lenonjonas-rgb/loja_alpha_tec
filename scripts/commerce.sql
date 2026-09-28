@@ -284,3 +284,12 @@ create table if not exists public.admin_users (
 create index if not exists admin_users_username_idx on public.admin_users (username);
 alter table public.admin_users drop constraint if exists admin_users_role_check;
 alter table public.admin_users add constraint admin_users_role_check check (role in ('kiosk', 'logistica', 'administrativo', 'master'));
+
+-- Pedidos criados manualmente pelo admin (venda por telefone/presencial), sem exigir conta de cliente.
+alter table public.orders alter column customer_id drop not null;
+alter table public.orders add column if not exists manual_customer_name text;
+alter table public.orders add column if not exists manual_customer_phone text;
+alter table public.orders add column if not exists manual_customer_email text;
+alter table public.orders add column if not exists source text not null default 'site';
+alter table public.orders drop constraint if exists orders_source_check;
+alter table public.orders add constraint orders_source_check check (source in ('site', 'manual'));

@@ -129,7 +129,7 @@ export default function Admin() {
       </nav>
 
       <div className="admin-tab-content" ref={contentRef}>
-        {tab === 'orders' && <AdminOrders onMessage={setMessage} />}
+        {tab === 'orders' && <AdminOrders products={products} onMessage={setMessage} />}
         {tab === 'dashboard' && <AdminDashboard />}
         {tab === 'leads' && <AdminLeads onMessage={setMessage} />}
         {tab === 'products' && <AdminProducts products={products} onSaved={(updated) => setProducts((items) => items.map((item) => item.id === updated.id ? updated : item))} onReordered={(ordered) => setProducts(ordered)} onMessage={setMessage} />}

@@ -2,22 +2,29 @@ import { ChangeEvent, useEffect, useState } from 'react'
 import { getCarrierTrackingUrl } from '../lib/carrier-tracking'
 import { generateShippingLabels, resolveLabelAddress, type LabelAddress, type LabelCustomer } from '../lib/shipping-label'
 
-type Order = { id: string; created_at: string; status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'; payment_status: 'pending' | 'paid' | 'failed' | 'refunded'; payment_method: 'pix' | 'card' | 'boleto' | null; total: number; tracking_code: string | null; carrier: string | null; invoice_url: string | null; shipping_address: LabelAddress | null; customer_address?: LabelAddress | null; customers: LabelCustomer | null; order_items: { product_name: string; internal_code: string | null; quantity: number }[] }
+type Order = { id: string; created_at: string; status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'; payment_status: 'pending' | 'paid' | 'failed' | 'refunded'; payment_method: string | null; total: number; tracking_code: string | null; carrier: string | null; invoice_url: string | null; shipping_address: LabelAddress | null; customer_address?: LabelAddress | null; customers: LabelCustomer | null; manual_customer_name?: string | null; manual_customer_phone?: string | null; manual_customer_email?: string | null; order_items: { product_name: string; internal_code: string | null; quantity: number }[] }
 type CartOpportunity = { customer_id: string; updated_at: string; customer: { name: string | null; email: string | null; phone: string | null } | null; items: { product_name: string; internal_code: string | null; quantity: number; unit_price: number }[] }
-type Props = { onMessage: (message: string) => void }
+type Product = { id: string; name: string; internalCode?: string; price: number; discountPercent?: number; active: boolean }
+type ManualItem = { productId: string; quantity: number; unitPrice: number }
+type Props = { products: Product[]; onMessage: (message: string) => void }
 
 const orderStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'] as const
 const paymentStatuses = ['pending', 'paid', 'failed', 'refunded'] as const
 const orderLabel: Record<string, string> = { pending: 'Pendente', confirmed: 'Confirmado', processing: 'Em separação', shipped: 'Enviado', delivered: 'Entregue', cancelled: 'Cancelado' }
 const paymentLabel: Record<string, string> = { pending: 'Pagamento pendente', paid: 'Pago', failed: 'Pagamento falhou', refunded: 'Estornado' }
-const paymentMethodLabel: Record<string, string> = { pix: 'Pix (Mercado Pago)', card: 'Cartão (Mercado Pago)', boleto: 'Boleto (Mercado Pago)' }
+const paymentMethodLabel: Record<string, string> = { pix: 'Pix (Mercado Pago)', card: 'Cartão (Mercado Pago)', boleto: 'Boleto (Mercado Pago)', manual: 'Venda fora do site', cash: 'Dinheiro', other: 'Outro' }
+const blankManualItem = (): ManualItem => ({ productId: '', quantity: 1, unitPrice: 0 })
 
-export default function AdminOrders({ onMessage }: Props) {
+export default function AdminOrders({ products, onMessage }: Props) {
   const [orders, setOrders] = useState<Order[]>([])
   const [cartOpportunities, setCartOpportunities] = useState<CartOpportunity[]>([])
   const [activeStatus, setActiveStatus] = useState<Order['status']>('processing')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [expandedIds, setExpandedIds] = useState<string[]>([])
+  const [showManualForm, setShowManualForm] = useState(false)
+  const [manualForm, setManualForm] = useState({ customerName: '', customerPhone: '', customerEmail: '', shipping: '0', paymentMethod: 'manual', status: 'confirmed' as Order['status'], paymentStatus: 'paid' as Order['payment_status'], carrier: '', trackingCode: '' })
+  const [manualItems, setManualItems] = useState<ManualItem[]>([blankManualItem()])
+  const activeProducts = products.filter((product) => product.active !== false)
 
   useEffect(() => {
     fetch('/api/orders').then((response) => response.ok ? response.json() : Promise.reject()).then(setOrders).catch(() => onMessage('Não foi possível carregar os pedidos.'))
@@ -100,6 +107,56 @@ export default function AdminOrders({ onMessage }: Props) {
     setExpandedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
   }
 
+  function updateManualItem(index: number, patch: Partial<ManualItem>) {
+    setManualItems((items) => items.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)))
+  }
+
+  function selectManualProduct(index: number, productId: string) {
+    const product = activeProducts.find((item) => item.id === productId)
+    const basePrice = Number(product?.price || 0)
+    const discount = Number(product?.discountPercent || 0)
+    const finalPrice = discount > 0 ? basePrice * (1 - discount / 100) : basePrice
+    updateManualItem(index, { productId, unitPrice: Number(finalPrice.toFixed(2)) })
+  }
+
+  function addManualItem() {
+    setManualItems((items) => [...items, blankManualItem()])
+  }
+
+  function removeManualItem(index: number) {
+    setManualItems((items) => (items.length > 1 ? items.filter((_, itemIndex) => itemIndex !== index) : items))
+  }
+
+  async function createManualOrder() {
+    const validItems = manualItems.filter((item) => item.productId && item.quantity > 0)
+    if (!manualForm.customerName.trim()) return onMessage('Informe o nome do cliente para o pedido manual.')
+    if (!validItems.length) return onMessage('Adicione pelo menos um item ao pedido.')
+    const payload = {
+      customerName: manualForm.customerName.trim(),
+      customerPhone: manualForm.customerPhone.trim(),
+      customerEmail: manualForm.customerEmail.trim(),
+      shipping: Number(manualForm.shipping.replace(',', '.')) || 0,
+      paymentMethod: manualForm.paymentMethod,
+      status: manualForm.status,
+      paymentStatus: manualForm.paymentStatus,
+      carrier: manualForm.carrier.trim(),
+      trackingCode: manualForm.trackingCode.trim(),
+      items: validItems.map((item) => {
+        const product = activeProducts.find((productItem) => productItem.id === item.productId)
+        return { productId: item.productId, name: product?.name || 'Item', internalCode: product?.internalCode || '', quantity: item.quantity, unitPrice: item.unitPrice }
+      }),
+    }
+    const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    const result = await response.json()
+    if (!response.ok) return onMessage(result.error || 'Não foi possível registrar o pedido manual.')
+    setOrders((items) => [result, ...items])
+    setManualForm({ customerName: '', customerPhone: '', customerEmail: '', shipping: '0', paymentMethod: 'manual', status: 'confirmed', paymentStatus: 'paid', carrier: '', trackingCode: '' })
+    setManualItems([blankManualItem()])
+    setShowManualForm(false)
+    setActiveStatus(result.status)
+    onMessage('Pedido manual registrado com sucesso.')
+  }
+
   async function printLabels(targetOrders: Order[]) {
     const prepared: Order[] = []
     for (const order of targetOrders) {
@@ -134,8 +191,38 @@ export default function AdminOrders({ onMessage }: Props) {
   return <div className="orders-dashboard">
     <div className="lead-toolbar">
       <div><h2>Pedidos do site</h2><p className="form-hint">Selecione um status para ver seus pedidos.</p></div>
-      <div className="bulk-order-actions"><button className="label-button bulk-label-button" type="button" disabled={!selectedIds.length} onClick={() => void printLabels(orders.filter((order) => selectedIds.includes(order.id)))}>Imprimir etiquetas ({selectedIds.length})</button>{activeStatus === 'cancelled' ? <button className="bulk-cancel-button" type="button" disabled={!selectedIds.length} onClick={() => void deleteSelectedCancelled()}>Excluir selecionados</button> : <button className="bulk-cancel-button" type="button" disabled={!selectedIds.length} onClick={() => void cancelSelected()}>Cancelar selecionados</button>}</div>
+      <div className="bulk-order-actions"><button className="outline-button" type="button" onClick={() => setShowManualForm((current) => !current)}>{showManualForm ? 'Cancelar' : 'Novo pedido manual'}</button><button className="label-button bulk-label-button" type="button" disabled={!selectedIds.length} onClick={() => void printLabels(orders.filter((order) => selectedIds.includes(order.id)))}>Imprimir etiquetas ({selectedIds.length})</button>{activeStatus === 'cancelled' ? <button className="bulk-cancel-button" type="button" disabled={!selectedIds.length} onClick={() => void deleteSelectedCancelled()}>Excluir selecionados</button> : <button className="bulk-cancel-button" type="button" disabled={!selectedIds.length} onClick={() => void cancelSelected()}>Cancelar selecionados</button>}</div>
     </div>
+    {showManualForm && <div className="manual-order-form">
+      <h3>Pedido feito fora do site</h3>
+      <p className="form-hint">Registre vendas por telefone, WhatsApp ou presenciais. O cliente não precisa ter cadastro no site.</p>
+      <div className="form-grid">
+        <label>Nome do cliente<input required value={manualForm.customerName} onChange={(event) => setManualForm({ ...manualForm, customerName: event.target.value })} placeholder="Ex.: João da Silva" /></label>
+        <label>Telefone<input value={manualForm.customerPhone} onChange={(event) => setManualForm({ ...manualForm, customerPhone: event.target.value })} placeholder="(11) 99999-9999" /></label>
+        <label>E-mail<input type="email" value={manualForm.customerEmail} onChange={(event) => setManualForm({ ...manualForm, customerEmail: event.target.value })} placeholder="opcional" /></label>
+      </div>
+      <div className="manual-order-items">
+        {manualItems.map((item, index) => <div className="manual-order-item-row" key={index}>
+          <select value={item.productId} onChange={(event) => selectManualProduct(index, event.target.value)}>
+            <option value="">Selecione um produto</option>
+            {activeProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+          </select>
+          <input type="number" min="1" value={item.quantity} onChange={(event) => updateManualItem(index, { quantity: Math.max(1, Number(event.target.value) || 1) })} />
+          <input type="number" min="0" step="0.01" value={item.unitPrice} onChange={(event) => updateManualItem(index, { unitPrice: Number(event.target.value) || 0 })} />
+          <button type="button" className="bulk-remove-button" onClick={() => removeManualItem(index)} aria-label="Remover item">×</button>
+        </div>)}
+        <button className="outline-button" type="button" onClick={addManualItem}>Adicionar item</button>
+      </div>
+      <div className="form-grid">
+        <label>Frete (R$)<input type="number" min="0" step="0.01" value={manualForm.shipping} onChange={(event) => setManualForm({ ...manualForm, shipping: event.target.value })} /></label>
+        <label>Forma de pagamento<select value={manualForm.paymentMethod} onChange={(event) => setManualForm({ ...manualForm, paymentMethod: event.target.value })}>{Object.entries(paymentMethodLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label>Status do pedido<select value={manualForm.status} onChange={(event) => setManualForm({ ...manualForm, status: event.target.value as Order['status'] })}>{orderStatuses.map((status) => <option key={status} value={status}>{orderLabel[status]}</option>)}</select></label>
+        <label>Status do pagamento<select value={manualForm.paymentStatus} onChange={(event) => setManualForm({ ...manualForm, paymentStatus: event.target.value as Order['payment_status'] })}>{paymentStatuses.map((paymentStatus) => <option key={paymentStatus} value={paymentStatus}>{paymentLabel[paymentStatus]}</option>)}</select></label>
+        <label>Transportadora<input value={manualForm.carrier} onChange={(event) => setManualForm({ ...manualForm, carrier: event.target.value })} placeholder="opcional" /></label>
+        <label>Código de rastreio<input value={manualForm.trackingCode} onChange={(event) => setManualForm({ ...manualForm, trackingCode: event.target.value })} placeholder="opcional" /></label>
+      </div>
+      <button className="primary-button" type="button" onClick={() => void createManualOrder()}>Registrar pedido <span>→</span></button>
+    </div>}
     <nav className="order-status-tabs" aria-label="Status dos pedidos">
       {orderStatuses.map((status) => <button key={status} type="button" className={activeStatus === status ? `active ${status}` : ''} onClick={() => { setActiveStatus(status); setSelectedIds([]) }}><span>{orderLabel[status]}</span><strong>{orders.filter((order) => order.status === status).length}</strong></button>)}
     </nav>
@@ -171,12 +258,13 @@ export default function AdminOrders({ onMessage }: Props) {
         return <article className={`order-card ${expanded ? 'expanded' : ''}`} key={order.id} onClick={() => toggleExpanded(order.id)}>
           <div className="order-summary">
             <div className="order-select" onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(order.id)} onChange={() => toggleSelection(order.id)} aria-label={`Selecionar pedido ${order.id.slice(0, 8)}`} /></div>
-            <div className="order-summary-main"><h3>Pedido #{order.id.slice(0, 8)}</h3><p>{order.customers?.name || 'Cliente'} · {order.customers?.email || 'E-mail não informado'} · {new Date(order.created_at).toLocaleString('pt-BR')}</p><small>{order.order_items.map((item) => `${item.internal_code ? `[${item.internal_code}] ` : ''}${item.product_name} x${item.quantity}`).join(' · ')}</small></div>
+            <div className="order-summary-main"><h3>Pedido #{order.id.slice(0, 8)}</h3><p>{order.customers?.name || order.manual_customer_name || 'Cliente'} · {order.customers?.email || order.manual_customer_email || 'E-mail não informado'} · {new Date(order.created_at).toLocaleString('pt-BR')}</p><small>{order.order_items.map((item) => `${item.internal_code ? `[${item.internal_code}] ` : ''}${item.product_name} x${item.quantity}`).join(' · ')}</small></div>
             <strong>R$ {Number(order.total).toFixed(2).replace('.', ',')}</strong>
             <span className="order-expand-icon" aria-hidden="true">{expanded ? '−' : '+'}</span>
           </div>
           {expanded && <div className="order-details" onClick={(event) => event.stopPropagation()}>
-            <p className="order-payment-method">Pagamento: <strong>{order.payment_method ? paymentMethodLabel[order.payment_method] : 'Não informado'}</strong></p>
+            <p className="order-payment-method">Pagamento: <strong>{order.payment_method ? (paymentMethodLabel[order.payment_method] || order.payment_method) : 'Não informado'}</strong></p>
+            {!order.customers && (order.manual_customer_phone || order.manual_customer_email) && <p className="form-hint">Pedido manual · {order.manual_customer_phone || 'sem telefone'}{order.manual_customer_email ? ` · ${order.manual_customer_email}` : ''}</p>}
             <p className="order-invoice-status">{order.invoice_url ? <a href={order.invoice_url} target="_blank" rel="noreferrer">Ver nota fiscal anexada</a> : 'Sem nota fiscal anexada'}</p>
             <div className="lead-actions"><select value={order.payment_status} onChange={(event) => void updateOrder(order, order.status, event.target.value as Order['payment_status'])}>{paymentStatuses.map((paymentStatus) => <option key={paymentStatus} value={paymentStatus}>{paymentLabel[paymentStatus]}</option>)}</select><select value={order.status} onChange={(event) => void updateOrder(order, event.target.value as Order['status'])}>{orderStatuses.map((status) => <option key={status} value={status}>{orderLabel[status]}</option>)}</select></div>
             <p className="order-carrier">{order.carrier ? <>{order.carrier} {order.tracking_code && <a href={getCarrierTrackingUrl(order.carrier, order.tracking_code) || '#'} target="_blank" rel="noreferrer">{order.tracking_code}</a>}</> : 'Transportadora não definida'}</p>

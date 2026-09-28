@@ -106,7 +106,7 @@ export default function AdminDashboard() {
           </div>
         </div>
         <div className="dashboard-chart-wrap">
-          <svg className="dashboard-chart" viewBox="0 0 800 260" role="img" aria-label={chartMetric === 'orders' ? 'Evolução mensal de pedidos' : 'Evolução mensal do faturamento pago'}>
+          <svg className="dashboard-chart" viewBox="0 0 800 240" role="img" aria-label={chartMetric === 'orders' ? 'Evolução mensal de pedidos' : 'Evolução mensal do faturamento pago'}>
             {[40, 82.5, 125, 167.5, 210].map((y) => <line key={y} x1="40" y1={y} x2="760" y2={y} className="dashboard-chart-gridline" />)}
             {chartValues.length > 1 && <polyline points={chartPoints} className="dashboard-chart-line" />}
             {chartValues.map((value, index) => {
@@ -115,8 +115,7 @@ export default function AdminDashboard() {
               const trend = data.monthlyTrend[index]
               return <g key={trend.key}>
                 <circle cx={x} cy={y} r="5" className="dashboard-chart-point"><title>{`${trend.label}: ${trend.orders} pedidos · ${currency(trend.revenue)}`}</title></circle>
-                <text x={x} y={y - 14} textAnchor="middle" className="dashboard-chart-value-orders">{trend.orders}</text>
-                <text x={x} y={230} textAnchor="middle" className="dashboard-chart-value-revenue">{currency(trend.revenue)}</text>
+                <text x={x} y={y - 14} textAnchor="middle" className="dashboard-chart-value">{chartMetric === 'orders' ? trend.orders : currency(trend.revenue)}</text>
               </g>
             })}
           </svg>
@@ -124,7 +123,7 @@ export default function AdminDashboard() {
             {data.monthlyTrend.map((item) => <span key={item.key}>{item.label.replace('.', '')}</span>)}
           </div>
         </div>
-        <p className="dashboard-chart-note">Números acima da linha: pedidos do mês · números embaixo: faturamento pago do mês.</p>
+        <p className="dashboard-chart-note">{chartMetric === 'orders' ? 'Pedidos criados por mês' : 'Faturamento de pedidos pagos por mês'}</p>
       </section>
 
       <section className="dashboard-panel dashboard-products-panel">

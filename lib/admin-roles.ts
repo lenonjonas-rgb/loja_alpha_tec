@@ -19,7 +19,7 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
 export const ROLE_TABS: Record<AdminRole, AdminTab[]> = {
   kiosk: ['dashboard'],
   logistica: ['orders', 'leads'],
-  administrativo: ['orders', 'leads', 'products', 'bulk', 'coupons', 'promotions'],
+  administrativo: ['orders', 'leads', 'products', 'bulk', 'coupons', 'questions', 'promotions'],
   master: ['orders', 'dashboard', 'leads', 'products', 'bulk', 'coupons', 'promotions', 'questions', 'store', 'users'],
 }
 

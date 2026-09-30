@@ -3,7 +3,7 @@ import { getSupabaseServer } from '../../lib/supabase-server'
 import { requireRole } from '../../lib/admin-auth'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (!requireRole(req, res, ['master'])) return
+  if (!requireRole(req, res, ['administrativo', 'master'])) return
 
   const supabase = getSupabaseServer()
   try {

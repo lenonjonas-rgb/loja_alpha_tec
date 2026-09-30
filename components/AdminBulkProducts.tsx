@@ -93,7 +93,6 @@ export default function AdminBulkProducts({ onMessage }: Props) {
       (row) =>
         row.name.trim() &&
         row.brand.trim() &&
-        row.compatibleEquipment.trim() &&
         row.price.trim() &&
         row.image.trim() &&
         row.description.trim() &&

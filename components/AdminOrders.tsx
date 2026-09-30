@@ -207,8 +207,8 @@ export default function AdminOrders({ products, onMessage }: Props) {
             <option value="">Selecione um produto</option>
             {activeProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
           </select>
-          <input type="number" min="1" value={item.quantity} onChange={(event) => updateManualItem(index, { quantity: Math.max(1, Number(event.target.value) || 1) })} />
-          <input type="number" min="0" step="0.01" value={item.unitPrice} onChange={(event) => updateManualItem(index, { unitPrice: Number(event.target.value) || 0 })} />
+          <label className="manual-order-item-field">Quantidade<input type="number" min="1" value={item.quantity} onChange={(event) => updateManualItem(index, { quantity: Math.max(1, Number(event.target.value) || 1) })} /></label>
+          <label className="manual-order-item-field">Preço (R$)<input type="number" min="0" step="0.01" value={item.unitPrice} onChange={(event) => updateManualItem(index, { unitPrice: Number(event.target.value) || 0 })} /></label>
           <button type="button" className="bulk-remove-button" onClick={() => removeManualItem(index)} aria-label="Remover item">×</button>
         </div>)}
         <button className="outline-button" type="button" onClick={addManualItem}>Adicionar item</button>

@@ -322,7 +322,8 @@ a { color: inherit; text-decoration: none; }
 .manual-order-form { background: #f6f7f8; border: 1px solid #e2e3e4; margin-bottom: 20px; padding: 22px; }
 .manual-order-form h3 { font-family: 'Barlow Condensed'; font-size: 22px; margin: 0 0 5px; text-transform: uppercase; }
 .manual-order-items { display: grid; gap: 10px; margin: 18px 0; }
-.manual-order-item-row { align-items: center; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) 90px 130px 40px; }
+.manual-order-item-row { align-items: end; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) 90px 130px 40px; }
+.manual-order-item-field { display: grid; gap: 4px; min-width: 0; font-size: 11px; line-height: 1.2; }
 .manual-order-item-row select, .manual-order-item-row input { border: 1px solid #d9dbdd; box-sizing: border-box; font: inherit; font-size: 12px; height: 44px; padding: 10px; width: 100%; }
 .bulk-cancel-button { background: #d5322f; border: 0; color: #fff; cursor: pointer; font-family: inherit; font-size: 11px; font-weight: 800; letter-spacing: .06em; padding: 11px 14px; text-transform: uppercase; }
 .bulk-cancel-button:disabled { cursor: not-allowed; opacity: .45; }

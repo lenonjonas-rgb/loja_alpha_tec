@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
 import { POINTS_FOR_REVIEW, POINTS_PHOTO_BONUS, POINTS_EXPIRATION_DAYS } from '../../lib/loyalty'
+import { sendAdminPush } from '../../lib/admin-push'
 
 export const config = { api: { bodyParser: { sizeLimit: '12mb' } } }
 
@@ -129,6 +130,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       expires_at: expiresAt,
     })
     if (pointsError) throw pointsError
+
+    try {
+      await sendAdminPush({ title: 'Nova avaliação', body: `Um cliente avaliou um pedido com ${ratingNumber}/5 estrelas.` })
+    } catch (pushError) {
+      console.error('Falha ao notificar uma nova avaliação:', pushError)
+    }
 
     return res.status(201).json({ reviewId: review.id, pointsAwarded, expiresAt })
   } catch (error) {

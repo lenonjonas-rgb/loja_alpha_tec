@@ -226,6 +226,16 @@ export default function AdminProducts({ products, onSaved, onReordered, onMessag
     }
   }
 
+  function editProduct(product: Product) {
+    setSelected({
+      ...product,
+      weightKg: product.weightKg || CORREIOS_PACKAGE_DEFAULTS.weightKg,
+      heightCm: product.heightCm || CORREIOS_PACKAGE_DEFAULTS.heightCm,
+      widthCm: product.widthCm || CORREIOS_PACKAGE_DEFAULTS.widthCm,
+      lengthCm: product.lengthCm || CORREIOS_PACKAGE_DEFAULTS.lengthCm
+    })
+  }
+
   if (selected) {
     return (
       <form className="admin-form" onSubmit={save}>
@@ -247,6 +257,9 @@ export default function AdminProducts({ products, onSaved, onReordered, onMessag
           <label>Preço<input required type="number" min="0" step="0.01" value={selected.price} onChange={(event) => setSelected({ ...selected, price: Number(event.target.value) })} /></label>
           <label>Estoque disponível<input required type="number" min="0" value={selected.stock ?? 0} onChange={(event) => setSelected({ ...selected, stock: Number(event.target.value) })} /></label>
           <label>Desconto (%)<input type="number" min="0" max="100" value={selected.discountPercent ?? 0} onChange={(event) => setSelected({ ...selected, discountPercent: Number(event.target.value) })} /></label>
+          <label className="active-toggle"><input type="checkbox" checked={Boolean(selected.flashSale)} onChange={(event) => setSelected({ ...selected, flashSale: event.target.checked })} /> Oferta</label>
+          <label className="active-toggle"><input type="checkbox" checked={Boolean(selected.showInBanner)} onChange={(event) => setSelected({ ...selected, showInBanner: event.target.checked })} /> Banner</label>
+          <label className="active-toggle"><input type="checkbox" checked={Boolean(selected.showInFeatured)} onChange={(event) => setSelected({ ...selected, showInFeatured: event.target.checked })} /> Destaque</label>
           <label>Peso (kg)<input required type="number" min={CORREIOS_PACKAGE_DEFAULTS.weightKg} step="0.001" value={selected.weightKg ?? ''} onChange={(event) => setSelected({ ...selected, weightKg: event.target.value === '' ? undefined : Number(event.target.value) })} /></label>
           <label>Altura (cm)<input required type="number" min={CORREIOS_PACKAGE_DEFAULTS.heightCm} step="0.1" value={selected.heightCm ?? ''} onChange={(event) => setSelected({ ...selected, heightCm: event.target.value === '' ? undefined : Number(event.target.value) })} /></label>
           <label>Largura (cm)<input required type="number" min={CORREIOS_PACKAGE_DEFAULTS.widthCm} step="0.1" value={selected.widthCm ?? ''} onChange={(event) => setSelected({ ...selected, widthCm: event.target.value === '' ? undefined : Number(event.target.value) })} /></label>
@@ -292,25 +305,21 @@ export default function AdminProducts({ products, onSaved, onReordered, onMessag
         return (
           <div className={`product-admin-row ${draggedId === product.id ? 'is-dragging' : ''}`} key={product.id} draggable onDragStart={() => setDraggedId(product.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => void reorderProducts(product.id)} onDragEnd={() => setDraggedId(null)}>
             <button className="product-drag-handle" type="button" draggable={false} aria-label={`Arrastar ${product.name}`} title="Arrastar para reordenar">::</button>
-            <span>
-              <strong>{product.name}</strong>
-              <small>{product.internalCode ? `Cód. ${product.internalCode} · ` : ''}{product.brand} · {getProductCategories(product.category).join(' / ')}</small>
-            </span>
+            <button className="product-admin-open" type="button" onClick={() => editProduct(draft)} aria-label={`Editar ${product.name}`}>
+              {product.image && <img src={product.image} alt="" />}
+              <span className="product-admin-open-copy">
+                <strong>{product.name}</strong>
+                <small>{product.internalCode ? `Cód. ${product.internalCode} · ` : ''}{product.brand} · {getProductCategories(product.category).join(' / ')}</small>
+                <small className="product-admin-open-stock">Estoque: {draft.stock || 0} · Desconto: {draft.discountPercent ?? 0}%</small>
+              </span>
+              <span className="product-admin-open-arrow" aria-hidden="true">›</span>
+            </button>
             <label>Estoque<input type="number" min="0" value={draft.stock || 0} onChange={(event) => updateDraft(product, { stock: Number(event.target.value) })} /></label>
             <label>Desconto %<input type="number" min="0" max="100" value={draft.discountPercent ?? 0} onChange={(event) => updateDraft(product, { discountPercent: Number(event.target.value) })} /></label>
             <label className="active-toggle"><input type="checkbox" checked={Boolean(draft.flashSale)} onChange={(event) => updateDraft(product, { flashSale: event.target.checked })} /> Oferta</label>
             <label className="active-toggle"><input type="checkbox" checked={Boolean(draft.showInBanner)} onChange={(event) => updateDraft(product, { showInBanner: event.target.checked })} /> Banner</label>
               <label className="active-toggle"><input type="checkbox" checked={Boolean(draft.showInFeatured)} onChange={(event) => updateDraft(product, { showInFeatured: event.target.checked })} /> Destaque</label>
-            <button
-              type="button"
-              onClick={() => setSelected({
-                ...draft,
-                weightKg: draft.weightKg || CORREIOS_PACKAGE_DEFAULTS.weightKg,
-                heightCm: draft.heightCm || CORREIOS_PACKAGE_DEFAULTS.heightCm,
-                widthCm: draft.widthCm || CORREIOS_PACKAGE_DEFAULTS.widthCm,
-                lengthCm: draft.lengthCm || CORREIOS_PACKAGE_DEFAULTS.lengthCm
-              })}
-            >Editar dados</button>
+            <button type="button" onClick={() => editProduct(draft)}>Editar dados</button>
           </div>
         )
       })}

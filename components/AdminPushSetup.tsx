@@ -1,4 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
+declare global {
+  interface Window {
+    ReactNativeWebView?: { postMessage: (message: string) => void }
+    __alphaTecReceiveNativePushToken?: (token: string) => void
+    __alphaTecReceiveNativePushError?: (message: string) => void
+  }
+}
+
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+}
 
 function base64UrlToUint8Array(value: string) {
   const padded = `${value}${'='.repeat((4 - value.length % 4) % 4)}`.replace(/-/g, '+').replace(/_/g, '/')
@@ -9,6 +22,11 @@ function base64UrlToUint8Array(value: string) {
 export default function AdminPushSetup() {
   const [status, setStatus] = useState('')
   const [enabled, setEnabled] = useState(false)
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
+  const [isAndroid, setIsAndroid] = useState(false)
+  const [isStandalone, setIsStandalone] = useState(false)
+  const [isNativeApp, setIsNativeApp] = useState(false)
+  const registeredNativeToken = useRef('')
 
   async function saveSubscription(subscription: PushSubscription) {
     const response = await fetch('/api/admin/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(subscription) })
@@ -16,14 +34,62 @@ export default function AdminPushSetup() {
   }
 
   useEffect(() => {
-    if (!('serviceWorker' in navigator)) return
-    navigator.serviceWorker.register('/sw.js').catch(() => setStatus('Não foi possível preparar o aplicativo neste navegador.'))
-    navigator.serviceWorker.ready.then(async (registration) => {
-      const subscription = await registration.pushManager.getSubscription()
-      setEnabled(Boolean(subscription))
-      if (subscription) await saveSubscription(subscription)
-    }).catch(() => setStatus('Não foi possível sincronizar os alertas deste celular.'))
+    setIsAndroid(/android/i.test(navigator.userAgent))
+    setIsStandalone(window.matchMedia('(display-mode: standalone)').matches)
+    function handleInstallPrompt(event: Event) {
+      event.preventDefault()
+      setInstallPrompt(event as InstallPromptEvent)
+    }
+    function handleAppInstalled() {
+      setInstallPrompt(null)
+      setIsStandalone(true)
+      setStatus('Alpha Tec Admin instalado neste aparelho.')
+    }
+    const nativeBridge = window.ReactNativeWebView
+    const receiveNativePushToken = (token: string) => {
+      if (!token || token === registeredNativeToken.current) return
+      void fetch('/api/admin/push/expo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ token })
+      }).then(async (response) => {
+        if (!response.ok) throw new Error((await response.json()).error || 'Não foi possível ativar as notificações do app.')
+        registeredNativeToken.current = token
+        setStatus('Notificações do app ativadas.')
+      }).catch((error) => setStatus(error instanceof Error ? error.message : 'Não foi possível ativar as notificações do app.'))
+    }
+    const receiveNativePushError = (message: string) => setStatus(message)
+    if (nativeBridge) {
+      setIsNativeApp(true)
+      window.__alphaTecReceiveNativePushToken = receiveNativePushToken
+      window.__alphaTecReceiveNativePushError = receiveNativePushError
+      nativeBridge.postMessage(JSON.stringify({ type: 'request-admin-push-token' }))
+    }
+    window.addEventListener('beforeinstallprompt', handleInstallPrompt)
+    window.addEventListener('appinstalled', handleAppInstalled)
+    if (!nativeBridge && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => setStatus('Não foi possível preparar o aplicativo neste navegador.'))
+      navigator.serviceWorker.ready.then(async (registration) => {
+        const subscription = await registration.pushManager.getSubscription()
+        setEnabled(Boolean(subscription))
+        if (subscription) await saveSubscription(subscription)
+      }).catch(() => setStatus('Não foi possível sincronizar os alertas deste celular.'))
+    }
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleInstallPrompt)
+      window.removeEventListener('appinstalled', handleAppInstalled)
+      if (window.__alphaTecReceiveNativePushToken === receiveNativePushToken) delete window.__alphaTecReceiveNativePushToken
+      if (window.__alphaTecReceiveNativePushError === receiveNativePushError) delete window.__alphaTecReceiveNativePushError
+    }
   }, [])
+
+  async function installApp() {
+    if (!installPrompt) return setStatus('No Chrome para Android, abra o menu ⋮ e escolha "Instalar app".')
+    await installPrompt.prompt()
+    const choice = await installPrompt.userChoice
+    if (choice.outcome === 'accepted') setInstallPrompt(null)
+  }
 
   async function enableNotifications() {
     if (!('Notification' in window) || !('serviceWorker' in navigator)) return setStatus('Este navegador não oferece notificações para aplicativos.')
@@ -51,5 +117,5 @@ export default function AdminPushSetup() {
     setStatus('Alerta de teste enviado.')
   }
 
-  return <><button className={`admin-push-toggle ${enabled ? 'enabled' : ''}`} type="button" title={enabled ? 'Enviar alerta de teste' : 'Ativar alertas'} aria-label={enabled ? 'Enviar alerta de teste' : 'Ativar alertas'} onClick={() => void (enabled ? testNotifications() : enableNotifications())}><span className="bell-icon" aria-hidden="true" /></button>{status && <p className="admin-push-status" role="status">{status}</p>}</>
+  return <>{!isNativeApp && (installPrompt || (isAndroid && !isStandalone)) && <button className="admin-install-button" type="button" onClick={() => void installApp()}>Instalar app</button>}{!isNativeApp && <button className={`admin-push-toggle ${enabled ? 'enabled' : ''}`} type="button" title={enabled ? 'Enviar alerta de teste' : 'Ativar alertas'} aria-label={enabled ? 'Enviar alerta de teste' : 'Ativar alertas'} onClick={() => void (enabled ? testNotifications() : enableNotifications())}><span className="bell-icon" aria-hidden="true" /></button>}{status && <p className="admin-push-status" role="status">{status}</p>}</>
 }

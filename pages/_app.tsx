@@ -15,7 +15,18 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <ErrorBoundary>
       {isAdminRoute ? <>
-        <Head><title>Painel Master | Alpha Tec</title><meta name="robots" content="noindex,nofollow" /></Head>
+        <Head>
+          <title>Painel Master | Alpha Tec</title>
+          <meta name="robots" content="noindex,nofollow" />
+          <meta name="theme-color" content="#202225" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <meta name="mobile-web-app-capable" content="yes" />
+          <meta name="apple-mobile-web-app-capable" content="yes" />
+          <meta name="apple-mobile-web-app-title" content="Alpha Admin" />
+          <link rel="manifest" href="/manifest.webmanifest" />
+          <link rel="icon" href="/pwa-192.png" type="image/png" sizes="192x192" />
+          <link rel="apple-touch-icon" href="/pwa-192.png" />
+        </Head>
         <Component {...pageProps} />
       </> : <CustomerProvider>
         <CartProvider>

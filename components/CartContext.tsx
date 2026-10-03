@@ -28,6 +28,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const { customer } = useCustomer()
   const [items, setItems] = useState<CartItem[]>([])
   const [hydrated, setHydrated] = useState(false)
+  const guestCartNotified = useRef(false)
   // guarda o id do cliente já sincronizado com o servidor, para não repetir a mescla a cada render
   const syncedCustomerId = useRef<string | null>(null)
 
@@ -57,6 +58,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       console.error('Erro ao salvar carrinho no localStorage:', e)
     }
   }, [items, hydrated])
+
+  useEffect(() => {
+    if (hydrated && items.length === 0) guestCartNotified.current = false
+  }, [items.length, hydrated])
 
   // carrinho fica atrelado à conta: ao logar, busca o carrinho salvo no servidor e mescla com o que estava no dispositivo
   useEffect(() => {
@@ -105,6 +110,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   function addItem(product: Product) {
     if (!product || !product.id) return
+    if (!customer?.id && items.length === 0 && !guestCartNotified.current) {
+      guestCartNotified.current = true
+      void fetch('/api/guest-cart-event', { method: 'POST' }).catch(() => undefined)
+    }
     setItems((current) => {
       const cartKey = getCartKey(product)
       const existing = current.find((item) => getCartKey(item) === cartKey)

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "692719502318",
+    "project_id": "alpha-tec-301dd",
+    "storage_bucket": "alpha-tec-301dd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:692719502318:android:a861e1422da87cc71444ff",
+        "android_client_info": {
+          "package_name": "br.com.lojaalphatec.admin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB-UUqKP4IO3K18NffVLbLlA4-UIvrWRps"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

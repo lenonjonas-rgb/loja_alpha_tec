@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../../lib/supabase-server'
+import { sendAdminPush } from '../../../lib/admin-push'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido.' })
@@ -47,6 +48,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .insert({ customer_id: user.id, cep: customer.cep, street: customer.address, number: customer.number, complement: customer.complement || '', city: city || '', state: state || '' })
 
     if (addressError) throw addressError
+    try {
+      await sendAdminPush({ title: 'Novo cliente', body: 'Um cliente criou uma conta na loja.' })
+    } catch (pushError) {
+      console.error('Falha ao notificar um novo cadastro:', pushError)
+    }
     return res.status(201).json(savedCustomer)
   } catch (error) {
     return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível criar seu cadastro.' })

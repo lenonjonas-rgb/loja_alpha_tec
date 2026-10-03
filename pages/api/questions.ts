@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
+import { sendAdminPush } from '../../lib/admin-push'
 
 const MAX_QUESTION_LENGTH = 500
 
@@ -69,6 +70,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .select('id')
         .single()
       if (error) throw error
+
+      const { data: product } = await supabase.from('products').select('name').eq('id', String(productId)).maybeSingle()
+      try {
+        await sendAdminPush({ title: 'Nova pergunta', body: `Um cliente perguntou sobre ${product?.name || 'um produto'}.` })
+      } catch (pushError) {
+        console.error('Falha ao notificar uma nova pergunta:', pushError)
+      }
 
       return res.status(201).json({ id: data.id })
     }

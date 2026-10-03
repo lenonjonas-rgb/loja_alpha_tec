@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
+import { sendAdminPush } from '../../lib/admin-push'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET' && req.method !== 'PUT') return res.status(405).json({ error: 'Método não permitido.' })
@@ -18,7 +19,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const { items } = req.body || {}
   if (!Array.isArray(items)) return res.status(400).json({ error: 'items deve ser uma lista.' })
+  const { data: previousCart, error: previousCartError } = await supabase.from('carts').select('items').eq('customer_id', user.id).maybeSingle()
+  if (previousCartError) return res.status(500).json({ error: previousCartError.message })
+  const cartWasNotEmpty = Array.isArray(previousCart?.items) && previousCart.items.length > 0
   const { error } = await supabase.from('carts').upsert({ customer_id: user.id, items, updated_at: new Date().toISOString() }, { onConflict: 'customer_id' })
   if (error) return res.status(500).json({ error: error.message })
+  if (!cartWasNotEmpty && items.length > 0) {
+    try {
+      await sendAdminPush({ title: 'Novo carrinho', body: 'Um cliente adicionou produtos ao carrinho.' })
+    } catch (pushError) {
+      console.error('Falha ao notificar o novo carrinho:', pushError)
+    }
+  }
   return res.status(200).json({ items })
 }

@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react'
 import { CORREIOS_PACKAGE_DEFAULTS } from '../lib/shipping-limits'
 import { getProductCategories } from '../lib/products'
 
@@ -43,11 +43,72 @@ export default function AdminProducts({ products, onSaved, onReordered, onMessag
   const [orderedProducts, setOrderedProducts] = useState<Product[]>(products)
   const [drafts, setDrafts] = useState<Record<string, Product>>(() => Object.fromEntries(products.map((product) => [product.id, product])))
   const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [imageEditorSource, setImageEditorSource] = useState('')
+  const [imageEditorOpen, setImageEditorOpen] = useState(false)
+  const [imageEditorZoom, setImageEditorZoom] = useState(1)
+  const [imageEditorReady, setImageEditorReady] = useState(false)
+  const imageEditorCanvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     setOrderedProducts(products)
     setDrafts(Object.fromEntries(products.map((product) => [product.id, product])))
   }, [products])
+
+  useEffect(() => {
+    const canvas = imageEditorCanvasRef.current
+    if (!imageEditorOpen || !imageEditorSource || !canvas) return
+    canvas.width = 1200
+    canvas.height = 1200
+    setImageEditorReady(false)
+    const context = canvas.getContext('2d')
+    if (!context) return
+    let cancelled = false
+    const image = new Image()
+    image.crossOrigin = 'anonymous'
+    image.onload = () => {
+      if (cancelled) return
+      context.fillStyle = '#e8eaec'
+      context.fillRect(0, 0, 1200, 1200)
+      context.fillStyle = '#d9dcdf'
+      context.fillRect(0, 0, 1200, 14)
+      context.fillStyle = '#34383c'
+      context.fillRect(0, 1182, 1200, 18)
+      context.fillStyle = '#8d2529'
+      context.fillRect(1170, 14, 8, 118)
+      context.strokeStyle = 'rgba(52,56,60,.16)'
+      context.lineWidth = 2
+      context.beginPath()
+      context.moveTo(70, 80)
+      context.lineTo(250, 80)
+      context.moveTo(950, 1120)
+      context.lineTo(1130, 1120)
+      context.stroke()
+
+      const scale = Math.min(900 / image.naturalWidth, 900 / image.naturalHeight) * imageEditorZoom
+      const drawWidth = image.naturalWidth * scale
+      const drawHeight = image.naturalHeight * scale
+      const shadow = context.createRadialGradient(600, 990, 15, 600, 990, 320)
+      shadow.addColorStop(0, 'rgba(32,36,40,.2)')
+      shadow.addColorStop(1, 'rgba(32,36,40,0)')
+      context.fillStyle = shadow
+      context.beginPath()
+      context.ellipse(600, 990, Math.min(drawWidth * .34, 330), 28, 0, 0, Math.PI * 2)
+      context.fill()
+
+      context.save()
+      context.beginPath()
+      context.rect(90, 90, 1020, 1020)
+      context.clip()
+      context.drawImage(image, (1200 - drawWidth) / 2, (1200 - drawHeight) / 2, drawWidth, drawHeight)
+      context.restore()
+      setImageEditorReady(true)
+    }
+    image.onerror = () => {
+      if (!cancelled) setImageEditorReady(false)
+    }
+    image.src = imageEditorSource
+    return () => { cancelled = true }
+  }, [imageEditorOpen, imageEditorSource, imageEditorZoom])
 
   async function reorderProducts(targetId: string) {
     if (!draggedId || draggedId === targetId) return
@@ -130,16 +191,39 @@ export default function AdminProducts({ products, onSaved, onReordered, onMessag
     if (!response.ok) return onMessage(result.error || 'Não foi possível atualizar o produto.')
     onSaved(result)
     setSelected(null)
+    setImageEditorOpen(false)
+    setImageEditorSource('')
     onMessage('Produto atualizado.')
   }
 
   function image(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file || !selected) return
+    if (!file.type.startsWith('image/')) return onMessage('Selecione um arquivo de imagem válido.')
 
     const reader = new FileReader()
-    reader.onload = () => setSelected({ ...selected, image: String(reader.result) })
+    reader.onload = () => {
+      const source = String(reader.result || '')
+      if (!source) return onMessage('Não foi possível carregar a imagem selecionada.')
+      setImageEditorSource(source)
+      setImageEditorZoom(1)
+      setImageEditorOpen(true)
+    }
+    reader.onerror = () => onMessage('Não foi possível ler o arquivo de imagem.')
     reader.readAsDataURL(file)
+  }
+
+  function applySiteImage() {
+    const canvas = imageEditorCanvasRef.current
+    if (!canvas || !imageEditorReady || !selected) return onMessage('Aguarde a prévia da imagem terminar de carregar.')
+    try {
+      setSelected({ ...selected, image: canvas.toDataURL('image/jpeg', 0.95) })
+      setImageEditorOpen(false)
+      setImageEditorSource('')
+      onMessage('Imagem preparada no padrão quadrado para o site. Salve o produto para confirmar.')
+    } catch {
+      onMessage('Não foi possível preparar a imagem. Tente usar um arquivo local em JPG ou PNG.')
+    }
   }
 
   if (selected) {
@@ -147,7 +231,7 @@ export default function AdminProducts({ products, onSaved, onReordered, onMessag
       <form className="admin-form" onSubmit={save}>
         <div className="admin-heading">
           <h2>Editar produto</h2>
-          <button className="outline-button" type="button" onClick={() => setSelected(null)}>Voltar à lista</button>
+          <button className="outline-button" type="button" onClick={() => { setSelected(null); setImageEditorOpen(false); setImageEditorSource('') }}>Voltar à lista</button>
         </div>
 
         <div className="form-grid">
@@ -171,7 +255,19 @@ export default function AdminProducts({ products, onSaved, onReordered, onMessag
           <label>Descrição<textarea required value={selected.description} onChange={(event) => setSelected({ ...selected, description: event.target.value })} /></label>
           <label>Especificações<textarea required value={selected.specifications || ''} onChange={(event) => setSelected({ ...selected, specifications: event.target.value })} placeholder={'Tensão: 220V\nPotência: 2,2HP'} /></label>
           <label>Imagem<input type="file" accept="image/*" onChange={image} /></label>
-          {selected.image && <img className="admin-image-preview" src={selected.image} alt="Pré-visualização do produto" />}
+          {selected.image && <div className="admin-image-edit-actions"><img className="admin-image-preview" src={selected.image} alt="Pré-visualização do produto" /><button className="outline-button" type="button" onClick={() => { setImageEditorSource(selected.image); setImageEditorZoom(1); setImageEditorOpen(true) }}>Editar para site</button></div>}
+          {imageEditorOpen && <div className="admin-site-image-editor">
+            <canvas ref={imageEditorCanvasRef} className="admin-site-image-canvas" aria-label="Prévia quadrada da imagem editada para site" />
+            <div className="admin-site-image-controls">
+              <strong>Prévia para e-commerce · 1200 × 1200</strong>
+              <label>Enquadramento<input type="range" min="0.7" max="1.12" step="0.01" value={imageEditorZoom} onChange={(event) => setImageEditorZoom(Number(event.target.value))} /><small>Ampliação {Math.round(imageEditorZoom * 100)}% · mantenha a peça dentro da margem de segurança.</small></label>
+              <p className="form-hint">O produto é preservado sem deformação. O fundo da foto original não é removido automaticamente.</p>
+              <div className="admin-site-image-actions">
+                <button className="primary-button" type="button" disabled={!imageEditorReady} onClick={applySiteImage}>Usar imagem editada</button>
+                <button className="outline-button" type="button" onClick={() => { setImageEditorOpen(false); setImageEditorSource('') }}>Cancelar</button>
+              </div>
+            </div>
+          </div>}
         </div>
 
         <div className="active-field">

@@ -21,6 +21,7 @@ export default function App() {
   const appStateRef = useRef(AppState.currentState)
   const expoPushTokenRef = useRef('')
   const expoPushErrorRef = useRef('')
+  const filePickerPendingRef = useRef(false)
   const [canGoBack, setCanGoBack] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -38,7 +39,13 @@ export default function App() {
     const subscription = AppState.addEventListener('change', (nextState) => {
       const wasInactive = appStateRef.current === 'background' || appStateRef.current === 'inactive'
       appStateRef.current = nextState
-      if (wasInactive && nextState === 'active') webViewRef.current?.reload()
+      if (wasInactive && nextState === 'active') {
+        if (filePickerPendingRef.current) {
+          filePickerPendingRef.current = false
+          return
+        }
+        webViewRef.current?.reload()
+      }
     })
     return () => subscription.remove()
   }, [])
@@ -113,7 +120,9 @@ export default function App() {
   function handleWebViewMessage(message: string) {
     try {
       const payload = JSON.parse(message)
-      if (payload.type === 'request-admin-push-token' && expoPushTokenRef.current) {
+      if (payload.type === 'admin-file-picker-opened') {
+        filePickerPendingRef.current = true
+      } else if (payload.type === 'request-admin-push-token' && expoPushTokenRef.current) {
         sendPushTokenToAdminPage(expoPushTokenRef.current)
       } else if (payload.type === 'request-admin-push-token' && expoPushErrorRef.current) {
         sendPushErrorToAdminPage(expoPushErrorRef.current)
@@ -144,6 +153,7 @@ export default function App() {
           thirdPartyCookiesEnabled
           pullToRefreshEnabled={Platform.OS === 'android'}
           overScrollMode="never"
+          injectedJavaScriptBeforeContentLoaded={`(function(){document.addEventListener('click',function(event){var target=event.target;var label=target instanceof Element?target.closest('label'):null;var fileInput=target instanceof HTMLInputElement&&target.type==='file'?target:label&&label.querySelector('input[type="file"]');if(fileInput&&window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify({type:'admin-file-picker-opened'}));}},true);})();true;`}
           onMessage={(event) => handleWebViewMessage(event.nativeEvent.data)}
           onShouldStartLoadWithRequest={handleNavigationRequest}
           onNavigationStateChange={(navigation) => setCanGoBack(navigation.canGoBack)}

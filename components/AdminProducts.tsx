@@ -26,7 +26,7 @@ type Product = {
   lengthCm?: number
 }
 
-type Props = { products: Product[]; onSaved: (product: Product) => void; onReordered: (products: Product[]) => void; onMessage: (message: string) => void }
+type Props = { products: Product[]; onSaved: (product: Product) => void; onDeleted: (productId: string) => void; onReordered: (products: Product[]) => void; onMessage: (message: string) => void }
 
 const categories = ['Esteiras', 'Musculação', 'Bicicletas', 'Elípticos', 'Acessórios', 'Peças diversas']
 
@@ -38,7 +38,7 @@ function toggleCategory(value: string, category: string) {
   return [...selectedCategories, category].join(', ')
 }
 
-export default function AdminProducts({ products, onSaved, onReordered, onMessage }: Props) {
+export default function AdminProducts({ products, onSaved, onDeleted, onReordered, onMessage }: Props) {
   const [selected, setSelected] = useState<Product | null>(null)
   const [orderedProducts, setOrderedProducts] = useState<Product[]>(products)
   const [drafts, setDrafts] = useState<Record<string, Product>>(() => Object.fromEntries(products.map((product) => [product.id, product])))
@@ -196,6 +196,21 @@ export default function AdminProducts({ products, onSaved, onReordered, onMessag
     onMessage('Produto atualizado.')
   }
 
+  async function deleteSelectedProduct() {
+    if (!selected) return
+    if (!window.confirm(`Excluir definitivamente "${selected.name}"? Pedidos anteriores mantêm a descrição e o valor registrados.`)) return
+    const response = await fetch(`/api/products?id=${encodeURIComponent(selected.id)}`, { method: 'DELETE' })
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}))
+      return onMessage(result.error || 'Não foi possível excluir o produto.')
+    }
+    onDeleted(selected.id)
+    setSelected(null)
+    setImageEditorOpen(false)
+    setImageEditorSource('')
+    onMessage('Produto excluído.')
+  }
+
   function image(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file || !selected) return
@@ -289,6 +304,7 @@ export default function AdminProducts({ products, onSaved, onReordered, onMessag
         </div>
 
         <button className="primary-button" type="submit">Salvar alterações <span>→</span></button>
+        <button className="product-delete-button" type="button" onClick={() => void deleteSelectedProduct()}>Excluir produto</button>
       </form>
     )
   }

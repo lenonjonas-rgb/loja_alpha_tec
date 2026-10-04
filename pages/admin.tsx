@@ -132,7 +132,7 @@ export default function Admin() {
         {tab === 'orders' && <AdminOrders products={products} onMessage={setMessage} />}
         {tab === 'dashboard' && <AdminDashboard />}
         {tab === 'leads' && <AdminLeads onMessage={setMessage} />}
-        {tab === 'products' && <AdminProducts products={products} onSaved={(updated) => setProducts((items) => items.map((item) => item.id === updated.id ? updated : item))} onReordered={(ordered) => setProducts(ordered)} onMessage={setMessage} />}
+        {tab === 'products' && <AdminProducts products={products} onSaved={(updated) => setProducts((items) => items.map((item) => item.id === updated.id ? updated : item))} onDeleted={(deletedId) => setProducts((items) => items.filter((item) => item.id !== deletedId))} onReordered={(ordered) => setProducts(ordered)} onMessage={setMessage} />}
         {tab === 'bulk' && <AdminBulkProducts onMessage={setMessage} />}
         {tab === 'promotions' && <AdminPromotions products={products} onMessage={setMessage} />}
         {tab === 'coupons' && <AdminCouponsPage />}

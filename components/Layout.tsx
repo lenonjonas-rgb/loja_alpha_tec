@@ -8,6 +8,7 @@ import { useCart } from './CartContext'
 import { useCustomer } from './CustomerContext'
 import { getWhatsAppUrl, storeConfig } from '../lib/store-config'
 import PaymentMethods from './PaymentMethods'
+import FooterSecurity from './FooterSecurity'
 
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://lojaalphatec.com.br').replace(/\/$/, '')
 const siteTitle = 'Alpha Tec | Peças para Esteira, Bicicleta, Elíptico e Musculação'
@@ -99,9 +100,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </header>
       <main>
         <CheckoutAddressSelector />
-        {(router.pathname === '/cart' || router.pathname === '/checkout') && (
-          <div className="container checkout-payment-note"><PaymentMethods /></div>
-        )}
         {children}
       </main>
       <footer className="site-footer">
@@ -109,7 +107,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="footer-brand">
             <strong>ALPHA TEC</strong>
             <span>Peças e assistência técnica para equipamentos fitness.</span>
+            <nav className="footer-links" aria-label="Links institucionais">
+              <Link href="/account">Minha conta</Link>
+              <Link href="/maintenance">Assistência técnica</Link>
+              <Link href="/privacidade">Privacidade</Link>
+              <Link href={supportHref} target={whatsappUrl ? '_blank' : undefined} rel={whatsappUrl ? 'noopener noreferrer' : undefined}>{whatsappUrl ? 'WhatsApp técnico' : 'Suporte técnico'}</Link>
+            </nav>
           </div>
+          <nav className="footer-categories" aria-label="Categorias no rodapé">
+            <h3>Peças por equipamento</h3>
+            <Link href="/products?category=esteiras">Esteiras</Link>
+            <Link href="/products?category=musculacao">Musculação</Link>
+            <Link href="/products?category=bicicletas">Bicicletas</Link>
+            <Link href="/products?category=elipticos">Elípticos</Link>
+            <Link href="/products?category=acessorios">Acessórios</Link>
+            <Link href="/products">Todas as peças</Link>
+          </nav>
+          <div className="footer-payment"><PaymentMethods /></div>
+          <FooterSecurity https={siteUrl.startsWith('https://')} />
+        </div>
+        <div className="container footer-company">
           <div className="footer-legal">
             <strong>{storeConfig.legalName}</strong>
             <span>CNPJ: {storeConfig.document}</span>
@@ -118,11 +135,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               {storeConfig.address.city}/{storeConfig.address.state} · CEP {storeConfig.address.cep}
             </address>
           </div>
-          <div className="footer-payment"><PaymentMethods compact /></div>
-          <nav className="footer-links" aria-label="Links institucionais">
-            <Link href="/privacidade">Privacidade</Link>
-            <Link href={supportHref} target={whatsappUrl ? '_blank' : undefined} rel={whatsappUrl ? 'noopener noreferrer' : undefined}>{whatsappUrl ? 'WhatsApp técnico' : 'Suporte técnico'}</Link>
-          </nav>
         </div>
       </footer>
     </div>

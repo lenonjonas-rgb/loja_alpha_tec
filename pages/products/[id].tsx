@@ -8,7 +8,6 @@ import { useCustomer } from '../../components/CustomerContext'
 import { supabase } from '../../lib/supabase'
 import { getWhatsAppUrl } from '../../lib/store-config'
 import { partTypes } from '../../lib/product-taxonomy'
-import PaymentMethods from '../../components/PaymentMethods'
 import ProductImage from '../../components/ProductImage'
 
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://lojaalphatec.com.br').replace(/\/$/, '')
@@ -320,7 +319,6 @@ export default function ProductPage() {
               )}
             </>
           )}
-          <div className="detail-payment-methods"><PaymentMethods compact /></div>
         </div>
       </div>
 

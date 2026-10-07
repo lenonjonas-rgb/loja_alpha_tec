@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import type { Product } from '../lib/products'
 import { getWhatsAppUrl } from '../lib/store-config'
 import { partTypes } from '../lib/product-taxonomy'
-import PaymentMethods from '../components/PaymentMethods'
 import StoreReviews from '../components/StoreReviews'
 import HeroBanner from '../components/HeroBanner'
 import ProductCard from '../components/ProductCard'
@@ -124,7 +123,6 @@ export default function Home() {
           )}
         </div>
       </section>
-      <div className="container home-payment-section"><PaymentMethods /></div>
       <section className="container service-callout" aria-labelledby="maintenance-callout-title">
         <div>
           <p className="eyebrow">ATENDIMENTO TÉCNICO</p>

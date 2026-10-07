@@ -36,7 +36,48 @@ function loadSource(relativePath) {
 const presentation = loadSource(path.join('lib', 'product-presentation.ts'))
 const ProductCard = loadSource(path.join('components', 'ProductCard.tsx')).default
 const HeroBanner = loadSource(path.join('components', 'HeroBanner.tsx')).default
+const PaymentMethods = loadSource(path.join('components', 'PaymentMethods.tsx')).default
+const FooterSecurity = loadSource(path.join('components', 'FooterSecurity.tsx')).default
 const base = { id: 'piece', name: 'Correia de teste', category: 'Esteiras', price: 120, image: '', stock: 3, description: '', active: true }
+
+test('divulgação dos pagamentos permanece somente no rodapé compartilhado', () => {
+  const layout = fs.readFileSync(path.join(root, 'components', 'Layout.tsx'), 'utf8')
+  assert.equal((layout.match(/<PaymentMethods\b/g) || []).length, 1)
+  assert.match(layout, /<footer[\s\S]*<PaymentMethods \/>[\s\S]*<\/footer>/)
+  assert.doesNotMatch(layout, /<main>[\s\S]*<PaymentMethods[\s\S]*<\/main>/)
+  for (const file of ['index.tsx', path.join('products', '[id].tsx')]) {
+    const page = fs.readFileSync(path.join(root, 'pages', file), 'utf8')
+    assert.doesNotMatch(page, /PaymentMethods|home-payment-section|detail-payment-methods/)
+  }
+})
+
+test('rodapé apresenta as quatro bandeiras verificadas e Pix sem boleto ou promessas de aprovação', () => {
+  const html = renderToStaticMarkup(React.createElement(PaymentMethods))
+  for (const name of ['Visa', 'Mastercard', 'Elo', 'American Express']) {
+    assert.ok(html.includes(`alt="${name}"`))
+  }
+  assert.match(html, /Pix/)
+  assert.match(html, /condições do checkout/)
+  assert.doesNotMatch(html, /Boleto|Google|aprovação garantida/i)
+})
+
+test('indicadores próprios não alegam certificação externa e HTTPS depende da URL oficial', () => {
+  const https = renderToStaticMarkup(React.createElement(FooterSecurity, { https: true }))
+  assert.match(https, /Conexão HTTPS/)
+  assert.match(https, /Mercado Pago/)
+  assert.match(https, /não selos de certificação externa/)
+  assert.doesNotMatch(https, /Google|Safe Browsing|compra garantida/i)
+  const http = renderToStaticMarkup(React.createElement(FooterSecurity, { https: false }))
+  assert.doesNotMatch(http, /Conexão HTTPS/)
+})
+
+test('logotipos de bandeiras são arquivos PNG locais válidos', async () => {
+  for (const brand of ['visa', 'mastercard', 'elo', 'amex']) {
+    const metadata = await sharp(path.join(root, 'public', 'payment-brands', `${brand}.png`)).metadata()
+    assert.equal(metadata.format, 'png')
+    assert.ok(metadata.width > 0 && metadata.height > 0)
+  }
+})
 
 test('preço e desconto preservam o valor do catálogo e usam moeda brasileira', () => {
   assert.equal(presentation.getProductSalePrice({ ...base, discountPercent: 25 }), 90)

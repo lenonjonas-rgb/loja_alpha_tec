@@ -62,7 +62,11 @@ O cadastro e o login usam código de uso único (OTP). No Supabase, configure um
 
 ### Pagamentos e avaliações na vitrine
 
-A página inicial apresenta Pix e cartão de crédito depois das peças em destaque. Os meios de pagamento também aparecem junto à compra na página do produto, no carrinho, no checkout e em uma coluna própria do rodapé. São as opções atuais do checkout, sem prometer aprovação, bandeiras ou certificações não verificadas.
+A divulgação de Pix e cartão de crédito aparece somente em uma coluna própria do rodapé, sem blocos adicionais na página inicial, no produto, no carrinho ou no checkout. A seleção efetiva do pagamento no checkout permanece inalterada, sem prometer aprovação, bandeiras ou certificações não verificadas.
+
+O rodapé organiza atendimento, categorias, pagamentos e segurança em colunas, com os dados legais da empresa abaixo. Visa, Mastercard, Elo e American Express foram verificadas como ativas pela consulta autenticada de leitura a `GET https://api.mercadopago.com/v1/payment_methods`; o formulário de cartão não exclui essas bandeiras. A disponibilidade final e a aprovação dependem do checkout. Os logotipos locais em `public/payment-brands/` foram obtidos dos links `secure_thumbnail` retornados pelo Mercado Pago, sem redesenhar as marcas. Reconfirme as bandeiras se o gateway ou sua configuração mudar; boleto não é divulgado porque não está disponível como opção na interface atual.
+
+Os indicadores de segurança são desenhos próprios, não certificados de terceiros: conexão HTTPS (apresentada quando a URL oficial usa HTTPS) e processamento de Pix/cartão pelo Mercado Pago. Não há selo Google Safe Browsing, garantia de compra ou alegação de certificação externa.
 
 O banner usa somente os produtos marcados como **Banner** no admin, com navegação manual acessível (sem troca automática). A mensagem de suporte permanece visível ao lado; sem produtos selecionados, o banner explica como identificar a peça. Os destaques continuam respeitando a seleção **Destaque** no admin. Vitrine e catálogo compartilham cards com foto inteira sobre fundo branco, preço, estoque, referência do fabricante quando cadastrada e resumo de compatibilidade. Falhas de carregamento exibem erro e nova tentativa; fotos ausentes ou quebradas não são substituídas pelo logotipo como se fosse uma peça.
 

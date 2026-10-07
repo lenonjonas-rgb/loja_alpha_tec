@@ -490,20 +490,10 @@ a { color: inherit; text-decoration: none; }
   .category-card { min-height: 170px; }
 }
 
-.home-payment-section { padding-top: 28px; }
-.payment-trust { align-items: center; background: #fff; border: 1px solid #e1e3e5; border-radius: 8px; display: flex; flex-wrap: wrap; gap: 14px 24px; padding: 22px 24px; }
-.payment-trust-copy { flex: 1; min-width: 200px; }
-.payment-trust-copy h3 { font-size: 14px; font-weight: 800; margin: 0; }
-.payment-trust-copy p { color: #686c70; font-size: 12px; line-height: 1.6; margin: 6px 0 0; }
 .payment-trust-methods { display: flex; flex-wrap: wrap; gap: 10px; list-style: none; margin: 0; padding: 0; }
 .payment-trust-methods li { align-items: center; background: #f5f6f7; border: 1px solid #e1e3e5; border-radius: 6px; color: #202225; display: flex; font-size: 12px; font-weight: 800; gap: 8px; padding: 11px 14px; }
 .payment-trust-methods svg { height: 24px; width: 24px; }
 .payment-trust-methods li:first-child svg { color: #19796c; }
-.payment-trust > small { color: #686c70; flex-basis: 100%; font-size: 10px; line-height: 1.6; }
-.checkout-payment-note { padding-top: 24px; }
-.footer-payment .payment-trust-compact { background: transparent; border: 0; display: block; padding: 0; }
-.footer-payment .payment-trust-copy { min-width: 0; }
-.footer-payment .payment-trust-copy h3 { color: #c2c5c8; font-size: 11px; }
 .footer-payment .payment-trust-methods { gap: 8px; margin-top: 10px; }
 .footer-payment .payment-trust-methods li { background: #2b2e31; border-color: #414346; padding: 8px 10px; }
 .footer-payment .payment-trust-methods span { color: #fff; font-size: 10px; }
@@ -529,8 +519,6 @@ a { color: inherit; text-decoration: none; }
   .store-reviews-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 760px) {
-  .payment-trust { align-items: start; flex-direction: column; padding: 20px; }
-  .payment-trust > small { flex-basis: auto; }
   .store-reviews-section .section-heading { align-items: start; flex-direction: column; gap: 16px; }
   .store-reviews-section .section-heading h2 { font-size: 30px; line-height: 1.1; }
   .store-reviews-grid { grid-template-columns: 1fr; }
@@ -614,12 +602,6 @@ a { color: inherit; text-decoration: none; }
 .store-catalog-status p { margin-bottom: 12px; }
 .store-catalog-status a { color: #a52b27; text-decoration: underline; }
 .store-catalog-status button { background: #202225; border: 0; border-radius: 4px; color: #fff; cursor: pointer; padding: 10px 16px; }
-.detail-payment-methods { margin-top: 20px; }
-.detail-payment-methods .payment-trust { background: #f9fafb; gap: 10px; padding: 14px; }
-.detail-payment-methods .payment-trust-copy { flex-basis: 100%; min-width: 0; }
-.detail-payment-methods .payment-trust-copy h3 { font-size: 11px; }
-.detail-payment-methods .payment-trust-methods li { font-size: 10px; padding: 7px 10px; }
-.detail-payment-methods .payment-trust-methods svg { height: 20px; width: 20px; }
 .site-footer .footer-content { grid-template-columns: minmax(140px, .8fr) minmax(250px, 1.3fr) minmax(210px, 1fr) auto; gap: 24px; }
 .store-hero a:focus-visible, .technical-banner button:focus-visible, .store-product-card a:focus-visible, .store-catalog-filters a:focus-visible, .store-catalog-status button:focus-visible, .category-card:focus-visible { outline: 2px solid #c9322d; outline-offset: 3px; }
 @media (max-width: 1000px) {
@@ -668,4 +650,38 @@ a { color: inherit; text-decoration: none; }
 @media (prefers-reduced-motion: reduce) {
   .store-product-card, .equipment-section .category-card { transition: none; }
   .equipment-section .category-card:hover { transform: none; }
+}
+
+.site-footer .footer-content { display: grid; gap: 32px; grid-template-columns: minmax(0, 1fr) minmax(0, .85fr) minmax(0, 1.2fr) minmax(0, 1.15fr); }
+.site-footer .footer-content > * { min-width: 0; }
+.footer-payment h3, .footer-security h3, .footer-categories h3 { border-bottom: 1px solid #414346; color: #fff; font-size: 13px; font-weight: 800; margin: 0 0 18px; padding-bottom: 14px; text-transform: uppercase; }
+.footer-brand .footer-links { align-items: start; display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.footer-categories { display: flex; flex-direction: column; gap: 12px; }
+.footer-categories h3 { margin-bottom: 6px; }
+.footer-categories a, .footer-brand .footer-links a { color: #c2c5c8; font-size: 11px; text-transform: none; }
+.footer-categories a:hover, .footer-brand .footer-links a:hover { color: #fff; text-decoration: underline; }
+.footer-payment-label { color: #c2c5c8; font-size: 11px; margin: 0 0 10px; }
+.footer-card-brands { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0 0 14px; padding: 0; }
+.footer-card-brands li { align-items: center; background: #fff; border: 1px solid #e1e3e5; border-radius: 4px; display: flex; height: 40px; justify-content: center; padding: 5px 7px; width: 64px; }
+.footer-card-brands img { display: block; height: 100%; object-fit: contain; width: 100%; }
+.footer-payment .payment-trust-methods { margin: 0 0 14px; }
+.footer-payment .payment-trust-methods li { background: #fff; border-color: #e1e3e5; padding: 8px 12px; }
+.footer-payment .payment-trust-methods span { color: #202225; font-size: 12px; }
+.footer-payment .payment-trust-methods svg { color: #19796c; height: 22px; width: 22px; }
+.footer-payment small, .footer-security p { color: #c2c5c8; display: block; font-size: 10px; line-height: 1.7; margin: 0; }
+.footer-security-badges { display: grid; gap: 10px; margin-bottom: 12px; }
+.footer-security-badge { align-items: center; background: #fff; border-radius: 6px; color: #202225; display: flex; gap: 10px; padding: 12px; }
+.footer-security-badge svg { color: #246b4a; flex: 0 0 30px; height: 30px; width: 30px; }
+.footer-security-badge strong { display: block; font-size: 12px; }
+.footer-security-badge span { color: #585d62; display: block; font-size: 9px; line-height: 1.5; margin-top: 3px; }
+.site-footer .footer-company { border-top: 1px solid #414346; display: block; margin-top: 30px; padding-top: 22px; }
+.footer-company .footer-legal { align-items: center; gap: 5px; text-align: center; }
+.footer-categories a:focus-visible, .footer-brand .footer-links a:focus-visible { outline: 2px solid #ff6f68; outline-offset: 3px; }
+@media (max-width: 1000px) {
+  .site-footer .footer-content { gap: 30px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .site-footer .footer-content { grid-template-columns: minmax(0, 1fr); }
+  .footer-security-badges { max-width: 340px; }
+  .footer-company .footer-legal { align-items: start; text-align: left; }
 }

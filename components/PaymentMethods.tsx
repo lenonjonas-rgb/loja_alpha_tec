@@ -1,10 +1,20 @@
-export default function PaymentMethods({ compact = false }: { compact?: boolean }) {
+const cardBrands = [
+  { name: 'Visa', image: 'visa' },
+  { name: 'Mastercard', image: 'mastercard' },
+  { name: 'Elo', image: 'elo' },
+  { name: 'American Express', image: 'amex' },
+]
+
+export default function PaymentMethods() {
   return (
-    <div className={`payment-trust${compact ? ' payment-trust-compact' : ''}`}>
-      <div className="payment-trust-copy">
-        <h3>Formas de pagamento</h3>
-        {!compact && <p>Escolha Pix ou cartão de crédito ao finalizar seu pedido.</p>}
-      </div>
+    <div className="footer-payment-methods">
+      <h3>Pague com</h3>
+      <p className="footer-payment-label">Cartões de crédito</p>
+      <ul className="footer-card-brands" aria-label="Bandeiras de cartão disponíveis no checkout">
+        {cardBrands.map((brand) => (
+          <li key={brand.image}><img src={`/payment-brands/${brand.image}.png`} alt={brand.name} width={64} height={40} loading="lazy" /></li>
+        ))}
+      </ul>
       <ul className="payment-trust-methods" aria-label="Formas de pagamento disponíveis no checkout">
         <li>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
@@ -13,15 +23,8 @@ export default function PaymentMethods({ compact = false }: { compact?: boolean 
           </svg>
           <span>Pix</span>
         </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-            <rect x="2" y="5" width="20" height="14" rx="3" />
-            <path d="M2 10h20M6 15h4" />
-          </svg>
-          <span>Cartão de crédito</span>
-        </li>
       </ul>
-      {!compact && <small>A aprovação e as condições de pagamento são informadas no checkout. O pedido é confirmado após a aprovação.</small>}
+      <small>Disponibilidade, parcelamento e aprovação sujeitos às condições do checkout.</small>
     </div>
   )
 }

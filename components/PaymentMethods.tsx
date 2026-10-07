@@ -24,7 +24,6 @@ export default function PaymentMethods() {
           <span>Pix</span>
         </li>
       </ul>
-      <small>Disponibilidade, parcelamento e aprovação sujeitos às condições do checkout.</small>
     </div>
   )
 }

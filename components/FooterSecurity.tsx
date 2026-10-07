@@ -21,7 +21,6 @@ export default function FooterSecurity({ https }: { https: boolean }) {
           <div><strong>Mercado Pago</strong><span>Processamento de Pix e cartão</span></div>
         </div>
       </div>
-      <p>Indicadores informativos da loja, não selos de certificação externa.</p>
     </section>
   )
 }

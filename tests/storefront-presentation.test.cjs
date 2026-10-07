@@ -57,7 +57,7 @@ test('rodapé apresenta as quatro bandeiras verificadas e Pix sem boleto ou prom
     assert.ok(html.includes(`alt="${name}"`))
   }
   assert.match(html, /Pix/)
-  assert.match(html, /condições do checkout/)
+  assert.doesNotMatch(html, /Disponibilidade, parcelamento e aprovação|condições do checkout/)
   assert.doesNotMatch(html, /Boleto|Google|aprovação garantida/i)
 })
 
@@ -65,7 +65,7 @@ test('indicadores próprios não alegam certificação externa e HTTPS depende d
   const https = renderToStaticMarkup(React.createElement(FooterSecurity, { https: true }))
   assert.match(https, /Conexão HTTPS/)
   assert.match(https, /Mercado Pago/)
-  assert.match(https, /não selos de certificação externa/)
+  assert.doesNotMatch(https, /Indicadores informativos da loja|selos de certificação externa/)
   assert.doesNotMatch(https, /Google|Safe Browsing|compra garantida/i)
   const http = renderToStaticMarkup(React.createElement(FooterSecurity, { https: false }))
   assert.doesNotMatch(http, /Conexão HTTPS/)

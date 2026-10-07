@@ -6,6 +6,11 @@ const publicDir = path.join(__dirname, '..', 'public')
 const source = path.join(publicDir, 'brand-mark.svg')
 
 async function generate() {
+  await sharp(path.join(publicDir, 'brand-logo.svg'))
+    .resize(1280, 240)
+    .flatten({ background: '#18191b' })
+    .jpeg({ quality: 95, chromaSubsampling: '4:4:4' })
+    .toFile(path.join(publicDir, 'logo-header-uniform.jpg'))
   for (const size of [48, 96, 192, 512]) {
     await sharp(source).resize(size, size).png().toFile(path.join(publicDir, `favicon-${size}.png`))
   }
@@ -28,7 +33,7 @@ async function generate() {
     offset += image.length
   })
   await fs.writeFile(path.join(publicDir, 'favicon.ico'), Buffer.concat([header, ...images]))
-  console.log('Favicons PNG, ICO e apple-touch-icon gerados a partir de brand-mark.svg.')
+  console.log('Logo JPG gerado de brand-logo.svg; favicons PNG, ICO e apple-touch-icon gerados de brand-mark.svg.')
 }
 
 generate().catch((error) => {

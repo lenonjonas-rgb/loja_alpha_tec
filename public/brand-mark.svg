@@ -1,5 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
-  <rect width="192" height="192" rx="32" fill="#202225"/>
-  <path d="M40 145 84 43h24l44 102h-27L96 72l-29 73Z" fill="#f5f6f7"/>
-  <path d="m96 99 19 46H77Z" fill="#e23d37"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-labelledby="title">
+  <title id="title">Alpha Tec — símbolo A</title>
+  <defs>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fbfcfd"/><stop offset=".32" stop-color="#e0e3e7"/><stop offset=".54" stop-color="#aeb5be"/><stop offset=".78" stop-color="#d1d6dd"/><stop offset="1" stop-color="#9ea7b2"/></linearGradient>
+    <linearGradient id="red" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ef4548"/><stop offset="1" stop-color="#b32230"/></linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="24" fill="#18191b"/>
+  <g transform="translate(22.2 30) scale(1.2)">
+    <path d="M0 110 53 9Q60-4 67 9l56 101H95L60 43 25 110Z" fill="url(#metal)"/>
+    <path d="m45 110 15-28 15 28Z" fill="url(#red)"/>
+  </g>
 </svg>

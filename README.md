@@ -82,7 +82,7 @@ Antes do primeiro deploy, substitua as imagens externas por imagens reais em `pu
 
 ### Favicon e ícone da loja
 
-O símbolo simplificado está em `public/brand-mark.svg`. Execute `npm run icons:generate` após alterar esse desenho para regenerar PNGs de 48, 96, 192 e 512 px, o Apple Touch Icon de 180 px e o ICO com imagens de 16, 32 e 48 px. A vitrine declara o PNG de 192 px como favicon; o logotipo completo permanece no cabeçalho. Os ícones do aplicativo administrativo são independentes e não foram alterados.
+A assinatura horizontal está em `public/brand-logo.svg`: ALPHA TEC em uma linha, com o primeiro A em escala 2× e sua base alinhada às demais letras, sem símbolo separado à direita. O A mantém o triângulo vermelho, sem chave de boca. O símbolo isolado em `public/brand-mark.svg` usa a mesma geometria do A e os mesmos gradientes sobre fundo escuro. Execute `npm run icons:generate` após alterar esses desenhos para regenerar PNGs de 48, 96, 192 e 512 px, o Apple Touch Icon de 180 px, o ICO com imagens de 16, 32 e 48 px e `public/logo-header-uniform.jpg`. O cabeçalho usa o SVG; o JPG conserva compatibilidade com compartilhamento social, pagamentos e documentos de assistência/expedição. A vitrine declara o PNG de 192 px como favicon. Os ícones do aplicativo administrativo são independentes e não foram alterados.
 
 Após publicar, solicite nova indexação da página inicial no Google Search Console, tanto para o domínio raiz quanto para `www` se ambos forem usados. O arquivo do favicon deve continuar acessível ao Googlebot-Image, com URL estável. A atualização no Google pode levar dias ou semanas e não é garantida imediatamente. Referência: https://developers.google.com/search/docs/appearance/favicon-in-search.
 

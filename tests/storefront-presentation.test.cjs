@@ -153,3 +153,29 @@ test('ICO contém quadros válidos de 16, 32 e 48 px', async () => {
     assert.equal(metadata.height, size)
   }
 })
+
+test('marca e favicon usam o mesmo A com triângulo e sem chave de boca', async () => {
+  const logo = fs.readFileSync(path.join(root, 'public', 'brand-logo.svg'), 'utf8')
+  const mark = fs.readFileSync(path.join(root, 'public', 'brand-mark.svg'), 'utf8')
+  const a = logo.match(/<path id="letter-a" d="([^"]+)"/)[1]
+  assert.ok(mark.includes(`d="${a}"`))
+  assert.match(logo, /translate\(24 13\) scale\(1\.9\)/)
+  assert.match(logo, /translate\(134 117\.5\) scale\(\.95\)/)
+  assert.equal(1.9 / .95, 2)
+  assert.equal(13 + 110 * 1.9, 117.5 + 110 * .95)
+  assert.equal((logo.match(/<use href="#letter-a"/g) || []).length, 2)
+  for (const svg of [logo, mark]) {
+    assert.match(svg, /m45 110 15-28 15 28Z/)
+    assert.doesNotMatch(svg, /chave|ferramentas/i)
+  }
+  const layout = fs.readFileSync(path.join(root, 'components', 'Layout.tsx'), 'utf8')
+  assert.match(layout, /<img src="\/brand-logo\.svg"/)
+  const jpg = await sharp(path.join(root, 'public', 'logo-header-uniform.jpg')).metadata()
+  assert.equal(jpg.width, 1280)
+  assert.equal(jpg.height, 240)
+  for (const [file, size] of [['favicon-192.png', 192], ['apple-touch-icon.png', 180]]) {
+    const expected = await sharp(Buffer.from(mark)).resize(size, size).raw().toBuffer()
+    const actual = await sharp(path.join(root, 'public', file)).raw().toBuffer()
+    assert.deepEqual(actual, expected)
+  }
+})

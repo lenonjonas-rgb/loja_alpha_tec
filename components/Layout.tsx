@@ -70,7 +70,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <header className="site-header">
         <div className="header-main container">
           <Link href="/" className="brand" aria-label="Alpha Tec página inicial">
-            <img src="/logo-header-uniform.jpg" alt="Alpha Tec - Peças e acessórios" />
+            <img src="/brand-logo.svg" alt="Alpha Tec - Peças e assistência técnica" width={1280} height={240} />
           </Link>
           <form className="search-box" action="/products">
             <input name="q" placeholder="Peça, código, marca ou modelo" aria-label="Buscar por nome, código, marca ou modelo do equipamento" />

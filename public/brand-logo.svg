@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 240" role="img" aria-labelledby="title desc">
+  <title id="title">Alpha Tec — A inicial em tamanho duplo</title>
+  <desc id="desc">Somente o nome Alpha Tec, com primeiro A ampliado duas vezes e sem símbolo separado à direita.</desc>
+  <defs>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#fbfcfd"/><stop offset=".32" stop-color="#e0e3e7"/><stop offset=".54" stop-color="#aeb5be"/><stop offset=".78" stop-color="#d1d6dd"/><stop offset="1" stop-color="#9ea7b2"/>
+    </linearGradient>
+    <linearGradient id="red" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ef4548"/><stop offset="1" stop-color="#b32230"/></linearGradient>
+    <path id="letter-a" d="M0 110 53 9Q60-4 67 9l56 101H95L60 43 25 110Z"/>
+  </defs>
+  <g transform="translate(24 13) scale(1.9)">
+    <use href="#letter-a" fill="url(#metal)"/>
+    <path d="m45 110 15-28 15 28Z" fill="url(#red)"/>
+  </g>
+  <g transform="translate(134 117.5) scale(.95)" fill="url(#metal)">
+    <path d="M150 3h25v84h83l-14 23h-94Z"/>
+    <path d="M279 3h76q42 0 42 37t-42 37h-49v33h-27V54h72q20 0 20-14t-20-14h-87Z"/>
+    <path d="M421 3h26v40h60V3h26v107h-26V68h-60v42h-26Z"/>
+    <use href="#letter-a" transform="translate(557 0)"/>
+    <path d="m602 110 15-28 15 28Z" fill="url(#red)"/>
+  </g>
+  <g transform="translate(827 120.5) scale(.70) skewX(-9)" fill="url(#metal)">
+    <path d="M0 0h166l-13 31h-57v114H60V31H-13Z"/>
+    <path d="M198 0h155l-12 31H186Zm-12 56h139l-12 30H218v28h121l-13 31H180V56Z"/>
+    <path d="M534 0h-75q-76 0-76 73 0 72 76 72h67l-13-31h-53q-40 0-40-42 0-41 40-41h60Z"/>
+    <path d="M546 0h29l-13 31h-29Zm-16 114h32l-13 31h-32Z" fill="url(#red)"/>
+  </g>
+</svg>

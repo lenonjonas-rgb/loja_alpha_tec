@@ -2,15 +2,19 @@ import Link from 'next/link'
 import Head from 'next/head'
 import { useEffect, useState } from 'react'
 import type { Product } from '../lib/products'
+import { getWhatsAppUrl } from '../lib/store-config'
+import { partTypes } from '../lib/product-taxonomy'
+import PaymentMethods from '../components/PaymentMethods'
+import StoreReviews from '../components/StoreReviews'
 
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://lojaalphatec.com.br').replace(/\/$/, '')
 
 const categories = [
-  { title: 'Esteiras', detail: 'Correias, roletes e placas', slug: 'esteiras', image: 'https://www.movement.com.br/wp-content/uploads/2025/04/iTouch-Cinza-2.png', video: 'https://assets.mixkit.co/videos/47879/47879-360.mp4' },
-  { title: 'Musculação', detail: 'Cabos, polias e estruturas', slug: 'musculacao', image: 'https://images.unsplash.com/photo-1646656130630-07af3a262a9b?auto=format&fit=crop&w=800&q=80', video: 'https://assets.mixkit.co/videos/44433/44433-360.mp4' },
-  { title: 'Bicicletas', detail: 'Pedais, correias e sensores', slug: 'bicicletas', image: 'https://images.unsplash.com/photo-1707985287164-c84627ad6eba?auto=format&fit=crop&w=800&q=80', video: 'https://assets.mixkit.co/videos/50982/50982-360.mp4' },
-  { title: 'Elípticos', detail: 'Pedaleiras, correias e sensores', slug: 'elipticos', image: 'https://www.movement.com.br/wp-content/uploads/2025/08/categ-elipticos-2025.png', video: '/videos/Preciso_que_o_video_foque_mais.mp4' },
-  { title: 'Acessórios', detail: 'Manoplas, parafusos e mais', slug: 'acessorios', image: 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=800&q=80', video: 'https://assets.mixkit.co/videos/52099/52099-360.mp4' },
+  { title: 'Esteiras', detail: 'Correias, roletes e placas', slug: 'esteiras' },
+  { title: 'Musculação', detail: 'Cabos, polias e estruturas', slug: 'musculacao' },
+  { title: 'Bicicletas', detail: 'Pedais, correias e sensores', slug: 'bicicletas' },
+  { title: 'Elípticos', detail: 'Pedaleiras, correias e sensores', slug: 'elipticos' },
+  { title: 'Acessórios', detail: 'Manoplas, parafusos e mais', slug: 'acessorios' },
 ]
 
 const formatPrice = (price: any) => {
@@ -19,40 +23,14 @@ const formatPrice = (price: any) => {
 }
 
 function CategoryCard({ category }: { category: (typeof categories)[number] }) {
-  const handleVideoTimeUpdate = (event: React.SyntheticEvent<HTMLVideoElement>) => {
-    const video = event.currentTarget
-    if (video.currentTime >= 4) {
-      video.currentTime = 0
-      void video.play().catch(() => undefined)
-    }
-  }
-
-  const handleCardEnter = (event: React.MouseEvent<HTMLAnchorElement>) => {
-    const video = event.currentTarget.querySelector('video')
-    if (!video) return
-    video.currentTime = 0
-    void video.play().catch(() => undefined)
-  }
-
-  const handleCardLeave = (event: React.MouseEvent<HTMLAnchorElement>) => {
-    const video = event.currentTarget.querySelector('video')
-    if (!video) return
-    video.pause()
-    video.currentTime = 0
-  }
-
   return (
-    <Link
-      className="category-card"
-      href={`/products?category=${category.slug}`}
-      onMouseEnter={handleCardEnter}
-      onMouseLeave={handleCardLeave}
-    >
-      <img src={category.image} alt="" />
-      <video className="category-card-video" muted playsInline preload="metadata" onTimeUpdate={handleVideoTimeUpdate} aria-hidden="true">
-        <source src={category.video} type="video/mp4" />
-      </video>
-      <div><h3>{category.title}</h3><p>{category.detail}</p><span>Ver peças →</span></div>
+    <Link className="category-card" href={`/products?category=${category.slug}`}>
+      <span className="category-card-mark" aria-hidden="true">{category.title.slice(0, 1)}</span>
+      <div>
+        <h3>{category.title}</h3>
+        <p>{category.detail}</p>
+        <span>Ver peças →</span>
+      </div>
     </Link>
   )
 }
@@ -90,8 +68,12 @@ function HeroBanner({ products }: { products: Product[] }) {
   if (offerProducts.length === 0 || !currentSlide || currentSlide.type === 'default' || !currentSlide.product) {
     return (
       <div className="hero-banner-single">
+        <div className="hero-assurance">
+          <strong>Suporte para<br />escolher a peça certa</strong>
+          <span>Pesquise por nome, código ou modelo.</span>
+        </div>
         <span className="hero-label">
-          PERFORMANCE<br /><b>EM CADA DETALHE</b>
+          PEÇAS TÉCNICAS<br /><b>SUPORTE ESPECIALIZADO</b>
         </span>
       </div>
     )
@@ -193,6 +175,7 @@ function HeroBanner({ products }: { products: Product[] }) {
 
 export default function Home() {
   const [allProducts, setAllProducts] = useState<Product[]>([])
+  const whatsappUrl = getWhatsAppUrl('Olá, preciso de ajuda para identificar uma peça ou confirmar a compatibilidade com meu equipamento.')
 
   useEffect(() => {
     fetch('/api/products')
@@ -223,15 +206,18 @@ export default function Home() {
       </Head>
       <section className="hero container">
         <div className="hero-copy">
-          <p className="eyebrow">PEÇAS E ACESSÓRIOS PARA ACADEMIA</p>
+          <p className="eyebrow">PEÇAS TÉCNICAS E ASSISTÊNCIA FITNESS</p>
           <h1>
-            Peças para esteira,<br />
-            <em>bicicleta, elíptico e musculação.</em>
+            Peças para<br />
+            <em>equipamentos fitness.</em>
           </h1>
-          <p>Peças, inversor Movement e acessórios para manter sua academia sempre pronta para o próximo treino.</p>
+          <p>Encontre componentes e assistência técnica. Nossa equipe ajuda a conferir a compatibilidade antes da compra.</p>
           <Link href="/products" className="primary-button">
-            Explorar peças <span>→</span>
+            Encontrar minha peça <span>→</span>
           </Link>
+          <a className="hero-support-link" href={whatsappUrl || '/maintenance'} target={whatsappUrl ? '_blank' : undefined} rel={whatsappUrl ? 'noopener noreferrer' : undefined}>
+            {whatsappUrl ? 'Tirar dúvida pelo WhatsApp' : 'Tirar dúvida com um técnico'}
+          </a>
         </div>
         <div className="hero-image">
           <HeroBanner products={allProducts} />
@@ -239,12 +225,13 @@ export default function Home() {
       </section>
       <section className="trust-bar">
         <div className="container trust-grid">
-          <div><b>Entrega para todo Brasil</b><span>Envio rápido e seguro</span></div>
-          <div><b>Compra protegida</b><span>Seus dados sempre seguros</span></div>
-          <div><b>Suporte especializado</b><span>Fale com quem entende</span></div>
-          <div><b>Peças de qualidade</b><span>Para você treinar tranquilo</span></div>
+          <div><b>Peças para equipamentos fitness</b><span>Esteiras, bicicletas, elípticos e musculação</span></div>
+          <div><b>Ajuda com compatibilidade</b><span>Consulte nossa equipe antes da compra</span></div>
+          <div><b>Envio para todo o Brasil</b><span>Consulte prazo e frete no checkout</span></div>
+          <div><b>Assistência técnica</b><span>Atendimento para equipamentos fitness</span></div>
         </div>
       </section>
+      <div className="container home-payment-section"><PaymentMethods /></div>
       <section className="container service-callout" aria-labelledby="maintenance-callout-title">
         <div>
           <p className="eyebrow">ATENDIMENTO TÉCNICO</p>
@@ -262,6 +249,15 @@ export default function Home() {
           {categories.map((category) => (
             <CategoryCard category={category} key={category.title} />
           ))}
+        </div>
+        <div className="part-type-section">
+          <h3>Ou encontre pelo tipo de peça</h3>
+          <div className="part-type-links">
+            {partTypes.filter((partType) => partType.value !== 'outras-pecas').map((partType) => (
+              <Link key={partType.value} href={`/products?partType=${partType.value}`}>{partType.label}</Link>
+            ))}
+          </div>
+          <p>Pesquise também pelo código, marca ou modelo do equipamento.</p>
         </div>
       </section>
       <section className="featured-band">
@@ -295,6 +291,7 @@ export default function Home() {
           </div>
         </div>
       </section>
+      <StoreReviews />
     </>
   )
 }

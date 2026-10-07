@@ -1,12 +1,15 @@
 import { ChangeEvent, useState } from 'react'
 import { CORREIOS_PACKAGE_DEFAULTS } from '../lib/shipping-limits'
 import { getProductCategories } from '../lib/products'
+import { equipmentCategories, partTypes } from '../lib/product-taxonomy'
 
 type ProductRow = {
   name: string
   internalCode: string
+  manufacturerPartNumber: string
   brand: string
   category: string
+  partType: string
   compatibleEquipment: string
   price: string
   image: string
@@ -20,8 +23,6 @@ type ProductRow = {
 
 type Props = { onMessage: (message: string) => void }
 
-const categories = ['Esteiras', 'Musculação', 'Bicicletas', 'Elípticos', 'Acessórios', 'Peças diversas']
-
 function toggleCategory(value: string, category: string) {
   const selectedCategories = getProductCategories(value)
   if (selectedCategories.includes(category)) {
@@ -33,8 +34,10 @@ function toggleCategory(value: string, category: string) {
 const blank = (): ProductRow => ({
   name: '',
   internalCode: '',
+  manufacturerPartNumber: '',
   brand: '',
-  category: categories[0],
+  category: equipmentCategories[0],
+  partType: '',
   compatibleEquipment: '',
   price: '',
   image: '',
@@ -91,6 +94,7 @@ export default function AdminBulkProducts({ onMessage }: Props) {
       (row) =>
         row.name.trim() &&
         row.brand.trim() &&
+        row.partType.trim() &&
         row.price.trim() &&
         row.image.trim() &&
         row.description.trim() &&
@@ -144,8 +148,10 @@ export default function AdminBulkProducts({ onMessage }: Props) {
         <div className="bulk-head">
           <span>Nome</span>
           <span>Código interno</span>
+          <span>Part Number fabricante</span>
           <span>Marca</span>
-          <span>Categoria</span>
+          <span>Equipamento</span>
+          <span>Tipo de peça</span>
           <span>Modelos compatíveis</span>
           <span>Preço</span>
           <span>Peso (kg)</span>
@@ -162,10 +168,15 @@ export default function AdminBulkProducts({ onMessage }: Props) {
           <div className="bulk-row" key={index}>
             <input value={row.name} onChange={(event) => update(index, 'name', event.target.value)} placeholder="Inversor" />
             <input value={row.internalCode} onChange={(event) => update(index, 'internalCode', event.target.value)} placeholder="AT-EST-001" />
+            <input value={row.manufacturerPartNumber} onChange={(event) => update(index, 'manufacturerPartNumber', event.target.value)} placeholder="Código do fabricante" />
             <input value={row.brand} onChange={(event) => update(index, 'brand', event.target.value)} placeholder="Movement" />
             <div className="bulk-category-checkboxes">
-              {categories.map((category) => <label key={category}><input type="checkbox" checked={getProductCategories(row.category).includes(category)} onChange={() => update(index, 'category', toggleCategory(row.category, category))} /> {category}</label>)}
+              {equipmentCategories.map((category) => <label key={category}><input type="checkbox" checked={getProductCategories(row.category).includes(category)} onChange={() => update(index, 'category', toggleCategory(row.category, category))} /> {category}</label>)}
             </div>
+            <select required value={row.partType} onChange={(event) => update(index, 'partType', event.target.value)}>
+              <option value="" disabled>Tipo de peça</option>
+              {partTypes.map((partType) => <option key={partType.value} value={partType.value}>{partType.label}</option>)}
+            </select>
             <textarea className="bulk-description-input" value={row.compatibleEquipment} onChange={(event) => update(index, 'compatibleEquipment', event.target.value)} placeholder={'Um modelo por linha'} />
             <input type="number" min="0.001" step="0.001" value={row.price} onChange={(event) => update(index, 'price', event.target.value)} placeholder="0,00" />
             <input type="number" min={CORREIOS_PACKAGE_DEFAULTS.weightKg} step="0.001" value={row.weightKg} onChange={(event) => update(index, 'weightKg', event.target.value)} />

@@ -3,6 +3,8 @@ export type Product = {
   displayOrder?: number
   name: string
   internalCode?: string
+  manufacturerPartNumber?: string
+  partType?: string
   brand?: string
   category: string
   description: string

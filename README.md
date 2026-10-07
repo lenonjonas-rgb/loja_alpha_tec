@@ -29,7 +29,7 @@ Depois do primeiro deploy:
 5. Em **Authentication > SMTP Settings**, configure um SMTP autorizado pelo domínio. Use o mesmo remetente em `SMTP_FROM` e publique no DNS os registros SPF, DKIM e DMARC fornecidos pelo provedor de e-mail.
 6. No Mercado Pago, configure a URL de notificações como `https://www.seudominio.com.br/api/mercadopago-webhook` e mantenha `MP_ACCESS_TOKEN` apenas nas variáveis da Vercel. Se o painel fornecer uma assinatura de webhook, salve-a em `MP_WEBHOOK_SECRET`.
 7. No Stripe, se ele estiver habilitado, configure o endpoint `https://www.seudominio.com.br/api/stripe-webhook`, habilite os eventos usados pelo checkout e salve o segredo de assinatura em `STRIPE_WEBHOOK_SECRET`.
-8. Execute `scripts/commerce.sql` e `scripts/leads.sql` no SQL Editor do projeto Supabase antes de testar cadastro, carrinho, pedidos, cupons, avaliações e leads.
+8. Execute `scripts/commerce.sql` e `scripts/leads.sql` no SQL Editor do projeto Supabase antes de testar cadastro, carrinho, pedidos, cupons, avaliações e leads. Se a loja já estiver em produção, execute novamente o `scripts/commerce.sql` atualizado para adicionar os campos de tipo de peça e Part Number do fabricante ao catálogo. Classifique os produtos já cadastrados na edição de cada produto; os novos campos não alteram a classificação automaticamente.
 9. Se for usar etiquetas, preencha as credenciais de produção dos Correios e confirme a autenticação em `https://www.seudominio.com.br/api/correios-status` usando uma sessão administrativa.
 
 #### Variáveis mínimas
@@ -59,6 +59,12 @@ O acesso do cliente usa e-mail e senha pelo Supabase. A recuperação de senha e
 O cadastro e o login usam código de uso único (OTP). No Supabase, configure um SMTP em `Project Settings > Authentication > SMTP Settings` e confirme que o remetente está autorizado. Depois abra `Authentication > Emails > Email Templates > Magic Link` e mantenha `{{ .Token }}` no corpo do e-mail, por exemplo: `Seu código Alpha Tec é {{ .Token }}`. Sem `{{ .Token }}`, o Supabase pode enviar somente o link e a tela não terá um código numérico para confirmar. Verifique também spam/lixo eletrônico e o limite de envio em `Authentication > Rate Limits`.
 
 ## Fluxo de compra
+
+### Pagamentos e avaliações na vitrine
+
+A página inicial, o carrinho e o checkout destacam Pix e cartão de crédito, que são as opções atuais do checkout. O rodapé repete os meios de pagamento sem prometer aprovação, bandeiras ou certificações não verificadas.
+
+A página inicial consulta `/api/reviews?scope=store` e mostra até seis avaliações recentes de pedidos entregues, incluindo as fotos enviadas pelos compradores. O total inclui todos os pedidos entregues avaliados, sem selecionar apenas notas positivas. Os nomes são abreviados e não são publicados IDs de pedidos nem contatos dos clientes. Se não houver avaliações, a loja informa isso e convida compradores a avaliar; em caso de erro, exibe uma mensagem com opção de tentar novamente.
 
 O cliente pode abrir um produto, adicionar ao carrinho, informar o CEP para cotar o frete, revisar o pedido e preencher o checkout em `/checkout`. O fluxo de pagamento agora inclui uma opção Stripe para cartão, com fallback para PIX e cartão em modo de teste caso o gateway não esteja habilitado. Para levar a compra para produção, configure `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` e `NEXT_PUBLIC_APP_URL` na Vercel e valide o checkout em ambiente real.
 

@@ -3,6 +3,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
 import { POINTS_FOR_REVIEW, POINTS_PHOTO_BONUS, POINTS_EXPIRATION_DAYS } from '../../lib/loyalty'
 import { sendAdminPush } from '../../lib/admin-push'
+import type { StoreReviewsResponse } from '../../lib/store-reviews'
 
 export const config = { api: { bodyParser: { sizeLimit: '12mb' } } }
 
@@ -22,6 +23,42 @@ function maskName(name: string) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
   if (!parts.length) return 'Cliente'
   return parts.length === 1 ? parts[0] : `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`
+}
+
+async function listStoreReviews(res: NextApiResponse<StoreReviewsResponse>) {
+  const supabase = getSupabaseServer()
+  const { data: reviews, count, error: reviewsError } = await supabase
+    .from('product_reviews')
+    .select('id,customer_id,rating,comment,photos,created_at,orders!inner(status)', { count: 'exact' })
+    .eq('orders.status', 'delivered')
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(6)
+  if (reviewsError) throw reviewsError
+  if (count === null) throw new Error('Não foi possível consultar o total de avaliações.')
+  const list = reviews || []
+  const customerIds = Array.from(new Set(list.map((review) => review.customer_id)))
+  const nameById = new Map<string, string>()
+  if (customerIds.length) {
+    const { data: customers, error: customersError } = await supabase
+      .from('customers')
+      .select('id,name')
+      .in('id', customerIds)
+    if (customersError) throw customersError
+    for (const customer of customers || []) nameById.set(String(customer.id), customer.name)
+  }
+
+  return res.status(200).json({
+    total: count,
+    reviews: list.map((review) => ({
+      id: review.id,
+      rating: Number(review.rating),
+      comment: review.comment || '',
+      photos: Array.isArray(review.photos) ? review.photos.filter((photo): photo is string => typeof photo === 'string' && /^https:\/\//i.test(photo)) : [],
+      createdAt: review.created_at,
+      customerName: maskName(nameById.get(String(review.customer_id)) || ''),
+    })),
+  })
 }
 
 // as avaliações são vinculadas ao pedido, então chega-se ao produto passando pelos itens do pedido
@@ -70,6 +107,14 @@ async function listProductReviews(res: NextApiResponse, productId: string) {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
+    if (req.query.scope === 'store') {
+      try {
+        return await listStoreReviews(res)
+      } catch (error) {
+        console.error('Falha ao carregar avaliações da loja:', error)
+        return res.status(500).json({ error: 'Não foi possível carregar as avaliações da loja.' })
+      }
+    }
     const productId = String(req.query.productId || '')
     if (!productId) return res.status(400).json({ error: 'Produto não informado.' })
     try {

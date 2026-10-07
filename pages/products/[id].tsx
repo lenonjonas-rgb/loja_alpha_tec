@@ -6,6 +6,8 @@ import { getCompatibleModels, products } from '../../lib/products'
 import { useCart } from '../../components/CartContext'
 import { useCustomer } from '../../components/CustomerContext'
 import { supabase } from '../../lib/supabase'
+import { getWhatsAppUrl } from '../../lib/store-config'
+import { partTypes } from '../../lib/product-taxonomy'
 
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://lojaalphatec.com.br').replace(/\/$/, '')
 
@@ -173,6 +175,9 @@ export default function ProductPage() {
     .split(/\n|\r\n|\;\s*/)
     .map((line: string) => line.trim())
     .filter(Boolean)
+  const productSupportUrl = getWhatsAppUrl(
+    `Olá, preciso confirmar a compatibilidade desta peça: ${product.name}${product.manufacturerPartNumber ? ` (Part Number ${product.manufacturerPartNumber})` : ''}.`
+  )
 
   return (
     <>
@@ -196,9 +201,20 @@ export default function ProductPage() {
           <img src={product.image || '/logo-header-uniform.jpg'} alt={product.name || 'Produto'} />
         </div>
         <div className="detail-copy">
-          <p className="eyebrow">PEÇA ORIGINAL {product.brand || 'ALPHA TEC'}</p>
+          <p className="eyebrow">{partTypes.find((partType) => partType.value === product.partType)?.label || 'PEÇA PARA EQUIPAMENTO FITNESS'}</p>
           <h1>{product.name}</h1>
-          <p className="detail-code">Código do produto: AT-{productId || '001'}</p>
+          {product.brand && <p className="detail-brand">Marca: {product.brand}</p>}
+          <p className="detail-code">
+            {product.manufacturerPartNumber
+              ? <>Part Number do fabricante: <strong>{product.manufacturerPartNumber}</strong></>
+              : 'Part Number do fabricante não informado'}
+          </p>
+          {reviewSummary.total > 0 && (
+            <a className="product-review-link" href="#product-reviews">
+              <span className="review-stars">{stars(Math.round(reviewSummary.average))}</span>
+              {' '}{reviewSummary.average.toFixed(1).replace('.', ',')} · {reviewSummary.total} {reviewSummary.total === 1 ? 'avaliação' : 'avaliações'} de compradores
+            </a>
+          )}
 
           <div className="detail-tabs" aria-label="Detalhes do produto">
             <button
@@ -263,6 +279,14 @@ export default function ProductPage() {
             </label>
           )}
           {modelError && <p className="product-model-error">{modelError}</p>}
+          <a
+            className="compatibility-help-link"
+            href={productSupportUrl || '/maintenance'}
+            target={productSupportUrl ? '_blank' : undefined}
+            rel={productSupportUrl ? 'noopener noreferrer' : undefined}
+          >
+            {productSupportUrl ? 'Confirmar compatibilidade pelo WhatsApp →' : 'Confirmar compatibilidade com a equipe →'}
+          </a>
 
           {discountNum > 0 && (
             <del className="detail-old-price">{formatPrice(priceNum)}</del>
@@ -297,7 +321,7 @@ export default function ProductPage() {
         </div>
       </div>
 
-      <div className="product-reviews">
+      <div className="product-reviews" id="product-reviews">
         <h2>Avaliações de quem comprou</h2>
         {reviewSummary.total > 0 ? (
           <>

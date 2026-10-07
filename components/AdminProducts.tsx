@@ -1,12 +1,15 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
 import { CORREIOS_PACKAGE_DEFAULTS } from '../lib/shipping-limits'
 import { getProductCategories } from '../lib/products'
+import { equipmentCategories, partTypes } from '../lib/product-taxonomy'
 
 type Product = {
   id: string
   displayOrder?: number
   name: string
   internalCode?: string
+  manufacturerPartNumber?: string
+  partType: string
   brand: string
   category: string
   compatibleEquipment: string
@@ -27,8 +30,6 @@ type Product = {
 }
 
 type Props = { products: Product[]; onSaved: (product: Product) => void; onDeleted: (productId: string) => void; onReordered: (products: Product[]) => void; onMessage: (message: string) => void }
-
-const categories = ['Esteiras', 'Musculação', 'Bicicletas', 'Elípticos', 'Acessórios', 'Peças diversas']
 
 function toggleCategory(value: string, category: string) {
   const selectedCategories = getProductCategories(value)
@@ -178,13 +179,18 @@ export default function AdminProducts({ products, onSaved, onDeleted, onReordere
         <div className="form-grid">
           <label>Nome<input required value={selected.name} onChange={(event) => setSelected({ ...selected, name: event.target.value })} /></label>
           <label>Código interno<input value={selected.internalCode || ''} onChange={(event) => setSelected({ ...selected, internalCode: event.target.value })} placeholder="Ex.: AT-EST-001" /></label>
+          <label>Part Number do fabricante<input value={selected.manufacturerPartNumber || ''} onChange={(event) => setSelected({ ...selected, manufacturerPartNumber: event.target.value })} placeholder="Código impresso pelo fabricante" /></label>
           <label>Marca<input required value={selected.brand} onChange={(event) => setSelected({ ...selected, brand: event.target.value })} /></label>
           <fieldset className="category-checkbox-field">
-            <legend>Categorias</legend>
+            <legend>Equipamento compatível</legend>
             <div className="category-checkboxes">
-              {categories.map((category) => <label key={category}><input type="checkbox" checked={getProductCategories(selected.category).includes(category)} onChange={() => setSelected({ ...selected, category: toggleCategory(selected.category, category) })} /> {category}</label>)}
+              {equipmentCategories.map((category) => <label key={category}><input type="checkbox" checked={getProductCategories(selected.category).includes(category)} onChange={() => setSelected({ ...selected, category: toggleCategory(selected.category, category) })} /> {category}</label>)}
             </div>
           </fieldset>
+            <label>Tipo de peça (atalhos da loja)<select required value={selected.partType || ''} onChange={(event) => setSelected({ ...selected, partType: event.target.value })}>
+            <option value="" disabled>Selecione o tipo de peça</option>
+            {partTypes.map((partType) => <option key={partType.value} value={partType.value}>{partType.label}</option>)}
+          </select></label>
           <label>Preço<input required type="number" min="0" step="0.01" value={selected.price} onChange={(event) => setSelected({ ...selected, price: Number(event.target.value) })} /></label>
           <label>Estoque disponível<input required type="number" min="0" value={selected.stock ?? 0} onChange={(event) => setSelected({ ...selected, stock: Number(event.target.value) })} /></label>
           <label>Desconto (%)<input type="number" min="0" max="100" value={selected.discountPercent ?? 0} onChange={(event) => setSelected({ ...selected, discountPercent: Number(event.target.value) })} /></label>
@@ -229,7 +235,7 @@ export default function AdminProducts({ products, onSaved, onDeleted, onReordere
               {product.image && <img src={product.image} alt="" />}
               <span className="product-admin-open-copy">
                 <strong>{product.name}</strong>
-                <small>{product.internalCode ? `Cód. ${product.internalCode} · ` : ''}{product.brand} · {getProductCategories(product.category).join(' / ')}</small>
+                <small>{product.internalCode ? `Cód. ${product.internalCode} · ` : ''}{product.brand} · {partTypes.find((partType) => partType.value === product.partType)?.label || 'Tipo não classificado'} · {getProductCategories(product.category).join(' / ')}</small>
                 <small className="product-admin-open-stock">Estoque: {draft.stock || 0} · Desconto: {draft.discountPercent ?? 0}%</small>
               </span>
               <span className="product-admin-open-arrow" aria-hidden="true">›</span>

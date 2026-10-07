@@ -6,15 +6,20 @@ import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { useCart } from './CartContext'
 import { useCustomer } from './CustomerContext'
+import { getWhatsAppUrl, storeConfig } from '../lib/store-config'
+import PaymentMethods from './PaymentMethods'
 
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://lojaalphatec.com.br').replace(/\/$/, '')
 const siteTitle = 'Alpha Tec | Peças para Esteira, Bicicleta, Elíptico e Musculação'
 const siteDescription = 'Alpha Tec oferece peças, inversor Movement, acessórios e manutenção para esteiras, bicicletas, elipticos, musculação e equipamentos fitness com entrega para todo o Brasil.'
+const supportMessage = 'Olá, preciso de ajuda para encontrar uma peça para meu equipamento fitness.'
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const { count } = useCart()
   const { customer } = useCustomer()
+  const whatsappUrl = getWhatsAppUrl(supportMessage)
+  const supportHref = whatsappUrl || '/maintenance'
   const activeCategory = router.pathname === '/products' ? String(router.query.category || '') : ''
   const categoryClass = (category: string) => activeCategory === category ? 'active-category' : ''
   const categoryCurrent = (category: string) => activeCategory === category ? 'page' as const : undefined
@@ -67,7 +72,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <img src="/logo-header-uniform.jpg" alt="Alpha Tec - Peças e acessórios" />
           </Link>
           <form className="search-box" action="/products">
-            <input name="q" placeholder="Busque por peça, modelo ou categoria" aria-label="Buscar produtos" />
+            <input name="q" placeholder="Peça, código, marca ou modelo" aria-label="Buscar por nome, código, marca ou modelo do equipamento" />
             <button type="submit" aria-label="Buscar">Buscar</button>
           </form>
           <div className="header-actions">
@@ -83,17 +88,43 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Link href="/products?category=elipticos" className={categoryClass('elipticos')} aria-current={categoryCurrent('elipticos')}>Elípticos</Link>
             <Link href="/products?category=acessorios" className={categoryClass('acessorios')} aria-current={categoryCurrent('acessorios')}>Acessórios</Link>
             <Link href="/products?category=ofertas" className={`sale-link ${categoryClass('ofertas')}`} aria-current={categoryCurrent('ofertas')}>Ofertas</Link>
-            <Link href="/maintenance" className="nav-service-callout">
-              <span>Precisa de ajuda?</span>
-              <strong>Manutenção para o seu equipamento?</strong>
-              <b>Quero manutenção <i>→</i></b>
+            <Link href={supportHref} target={whatsappUrl ? '_blank' : undefined} rel={whatsappUrl ? 'noopener noreferrer' : undefined} className="nav-service-callout">
+              <span>Suporte técnico</span>
+              <strong>Ajuda para encontrar sua peça?</strong>
+              <b>{whatsappUrl ? 'Fale pelo WhatsApp' : 'Solicitar atendimento'} <i>→</i></b>
             </Link>
-            <Link href="/maintenance" className="mobile-maintenance-link">Manutenção <span>→</span></Link>
+            <Link href={supportHref} target={whatsappUrl ? '_blank' : undefined} rel={whatsappUrl ? 'noopener noreferrer' : undefined} className="mobile-maintenance-link">{whatsappUrl ? 'WhatsApp técnico' : 'Suporte técnico'} <span>→</span></Link>
           </div>
         </nav>
       </header>
-      <main><CheckoutAddressSelector />{children}</main>
-      <footer className="site-footer"><div className="container"><strong>ALPHA TEC</strong><span>Peças que mantêm seu treino em movimento.</span><nav className="footer-links" aria-label="Links institucionais"><Link href="/privacidade">Privacidade</Link><Link href="/admin" target="_blank" rel="noopener noreferrer">Acesso administrativo</Link></nav></div></footer>
+      <main>
+        <CheckoutAddressSelector />
+        {(router.pathname === '/cart' || router.pathname === '/checkout') && (
+          <div className="container checkout-payment-note"><PaymentMethods /></div>
+        )}
+        {children}
+      </main>
+      <footer className="site-footer">
+        <div className="container footer-content">
+          <div className="footer-brand">
+            <strong>ALPHA TEC</strong>
+            <span>Peças e assistência técnica para equipamentos fitness.</span>
+            <PaymentMethods compact />
+          </div>
+          <div className="footer-legal">
+            <strong>{storeConfig.legalName}</strong>
+            <span>CNPJ: {storeConfig.document}</span>
+            <address>
+              {storeConfig.address.street}, {storeConfig.address.number} · {storeConfig.address.neighborhood}<br />
+              {storeConfig.address.city}/{storeConfig.address.state} · CEP {storeConfig.address.cep}
+            </address>
+          </div>
+          <nav className="footer-links" aria-label="Links institucionais">
+            <Link href="/privacidade">Privacidade</Link>
+            <Link href={supportHref} target={whatsappUrl ? '_blank' : undefined} rel={whatsappUrl ? 'noopener noreferrer' : undefined}>{whatsappUrl ? 'WhatsApp técnico' : 'Suporte técnico'}</Link>
+          </nav>
+        </div>
+      </footer>
     </div>
   )
 }

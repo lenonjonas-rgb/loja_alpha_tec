@@ -9,6 +9,8 @@ alter table public.products add column if not exists height_cm numeric(10,2) not
 alter table public.products add column if not exists width_cm numeric(10,2) not null default 0;
 alter table public.products add column if not exists length_cm numeric(10,2) not null default 0;
 alter table public.products add column if not exists internal_code text;
+alter table public.products add column if not exists manufacturer_part_number text;
+alter table public.products add column if not exists part_type text;
 alter table public.products add column if not exists display_order integer;
 with ordered_products as (
   select id, row_number() over (order by created_at desc, id) - 1 as position

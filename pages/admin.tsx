@@ -13,7 +13,7 @@ import AdminCouponsPage from './admin/coupons'
 import AdminPushSetup from '../components/AdminPushSetup'
 import { ROLE_LABELS, ROLE_TABS, type AdminRole, type AdminTab } from '../lib/admin-roles'
 
-type Product = { id: string; name: string; internalCode?: string; displayOrder?: number; brand: string; category: string; compatibleEquipment: string; description: string; specifications: string; image: string; price: number; active: boolean; stock: number; discountPercent: number; flashSale: boolean; showInBanner: boolean; showInFeatured: boolean; weightKg?: number; heightCm?: number; widthCm?: number; lengthCm?: number }
+type Product = { id: string; name: string; internalCode?: string; manufacturerPartNumber?: string; partType: string; displayOrder?: number; brand: string; category: string; compatibleEquipment: string; description: string; specifications: string; image: string; price: number; active: boolean; stock: number; discountPercent: number; flashSale: boolean; showInBanner: boolean; showInFeatured: boolean; weightKg?: number; heightCm?: number; widthCm?: number; lengthCm?: number }
 
 const tabItems: { key: AdminTab; label: string }[] = [
   { key: 'orders', label: 'Pedidos' },

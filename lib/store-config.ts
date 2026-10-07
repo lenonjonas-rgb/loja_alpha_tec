@@ -17,3 +17,10 @@ export const storeConfig = {
     longitude: -48.6045,
   },
 }
+
+export function getWhatsAppUrl(message: string): string | null {
+  const number = (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '5548988392308').replace(/\D/g, '')
+  if (!number) return null
+
+  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`
+}

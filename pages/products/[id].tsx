@@ -8,6 +8,8 @@ import { useCustomer } from '../../components/CustomerContext'
 import { supabase } from '../../lib/supabase'
 import { getWhatsAppUrl } from '../../lib/store-config'
 import { partTypes } from '../../lib/product-taxonomy'
+import PaymentMethods from '../../components/PaymentMethods'
+import ProductImage from '../../components/ProductImage'
 
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://lojaalphatec.com.br').replace(/\/$/, '')
 
@@ -198,7 +200,7 @@ export default function ProductPage() {
         </Link>
       <div className="detail-layout">
         <div className="detail-image">
-          <img src={product.image || '/logo-header-uniform.jpg'} alt={product.name || 'Produto'} />
+          <ProductImage src={product.image} name={product.name || 'Produto'} eager />
         </div>
         <div className="detail-copy">
           <p className="eyebrow">{partTypes.find((partType) => partType.value === product.partType)?.label || 'PEÇA PARA EQUIPAMENTO FITNESS'}</p>
@@ -318,6 +320,7 @@ export default function ProductPage() {
               )}
             </>
           )}
+          <div className="detail-payment-methods"><PaymentMethods compact /></div>
         </div>
       </div>
 

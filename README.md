@@ -62,7 +62,11 @@ O cadastro e o login usam código de uso único (OTP). No Supabase, configure um
 
 ### Pagamentos e avaliações na vitrine
 
-A página inicial, o carrinho e o checkout destacam Pix e cartão de crédito, que são as opções atuais do checkout. O rodapé repete os meios de pagamento sem prometer aprovação, bandeiras ou certificações não verificadas.
+A página inicial apresenta Pix e cartão de crédito depois das peças em destaque. Os meios de pagamento também aparecem junto à compra na página do produto, no carrinho, no checkout e em uma coluna própria do rodapé. São as opções atuais do checkout, sem prometer aprovação, bandeiras ou certificações não verificadas.
+
+O banner usa somente os produtos marcados como **Banner** no admin, com navegação manual acessível (sem troca automática). A mensagem de suporte permanece visível ao lado; sem produtos selecionados, o banner explica como identificar a peça. Os destaques continuam respeitando a seleção **Destaque** no admin. Vitrine e catálogo compartilham cards com foto inteira sobre fundo branco, preço, estoque, referência do fabricante quando cadastrada e resumo de compatibilidade. Falhas de carregamento exibem erro e nova tentativa; fotos ausentes ou quebradas não são substituídas pelo logotipo como se fosse uma peça.
+
+Os filtros de equipamento e tipo de peça no catálogo podem ser combinados com a busca. A classificação continua dependendo dos campos cadastrados no admin; não é inferida pelo nome da peça.
 
 A página inicial consulta `/api/reviews?scope=store` e mostra até seis avaliações recentes de pedidos entregues, incluindo as fotos enviadas pelos compradores. O total inclui todos os pedidos entregues avaliados, sem selecionar apenas notas positivas. Os nomes são abreviados e não são publicados IDs de pedidos nem contatos dos clientes. Se não houver avaliações, a loja informa isso e convida compradores a avaliar; em caso de erro, exibe uma mensagem com opção de tentar novamente.
 
@@ -71,6 +75,12 @@ O cliente pode abrir um produto, adicionar ao carrinho, informar o CEP para cota
 Antes do primeiro deploy, substitua as imagens externas por imagens reais em `public/` e confirme as coordenadas de atendimento em `lib/store-config.ts`. O domínio próprio precisa ser comprado e conectado na Vercel; ele não pode ser criado automaticamente pelo projeto.
 
 ## Imagens de produtos
+
+### Favicon e ícone da loja
+
+O símbolo simplificado está em `public/brand-mark.svg`. Execute `npm run icons:generate` após alterar esse desenho para regenerar PNGs de 48, 96, 192 e 512 px, o Apple Touch Icon de 180 px e o ICO com imagens de 16, 32 e 48 px. A vitrine declara o PNG de 192 px como favicon; o logotipo completo permanece no cabeçalho. Os ícones do aplicativo administrativo são independentes e não foram alterados.
+
+Após publicar, solicite nova indexação da página inicial no Google Search Console, tanto para o domínio raiz quanto para `www` se ambos forem usados. O arquivo do favicon deve continuar acessível ao Googlebot-Image, com URL estável. A atualização no Google pode levar dias ou semanas e não é garantida imediatamente. Referência: https://developers.google.com/search/docs/appearance/favicon-in-search.
 
 Coloque as imagens originais em `images-inbox/`. Formatos aceitos: JPG, JPEG, PNG e WEBP.
 

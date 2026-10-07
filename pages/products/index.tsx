@@ -2,22 +2,12 @@ import Link from 'next/link'
 import Head from 'next/head'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { getProductCategories, hasProductCategory, products } from '../../lib/products'
-import { partTypes } from '../../lib/product-taxonomy'
+import { hasProductCategory, products, type Product } from '../../lib/products'
+import { equipmentCategories, partTypes } from '../../lib/product-taxonomy'
 import { supabase } from '../../lib/supabase'
+import ProductCard from '../../components/ProductCard'
 
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://lojaalphatec.com.br').replace(/\/$/, '')
-
-const formatPrice = (price: any) => {
-  const num = Number(price)
-  return !isNaN(num) && num > 0 ? `R$ ${num.toFixed(2).replace('.', ',')}` : 'Consulte o preço'
-}
-
-const salePrice = (product: any) => {
-  const numPrice = Number(product?.price || 0)
-  const discount = Number(product?.discountPercent || 0)
-  return discount > 0 ? numPrice * (1 - discount / 100) : numPrice
-}
 
 const normalizeSearchText = (value: unknown) =>
   String(value || '')
@@ -25,7 +15,7 @@ const normalizeSearchText = (value: unknown) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
 
-function filterCatalog(items: any[], category: string, selectedPartType: string, query: string) {
+function filterCatalog(items: Product[], category: string, selectedPartType: string, query: string) {
   let filtered = items
   if (category === 'ofertas') {
     filtered = items.filter((product) => Boolean(product.flashSale) || Number(product.discountPercent || 0) > 0)
@@ -59,17 +49,27 @@ function filterCatalog(items: any[], category: string, selectedPartType: string,
 
 export default function Products() {
   const router = useRouter()
-  const [catalog, setCatalog] = useState<any[]>(Array.isArray(products) ? products : [])
+  const [catalog, setCatalog] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [catalogError, setCatalogError] = useState('')
+  const [attempt, setAttempt] = useState(0)
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   useEffect(() => {
-    fetch('/api/products')
-      .then((response) => (response.ok ? response.json() : []))
-      .then((databaseProducts) => {
-        const dbItems = Array.isArray(databaseProducts) ? databaseProducts : []
+    const controller = new AbortController()
+    setLoading(true)
+    setCatalogError('')
+    setCatalog([])
+    fetch('/api/products', { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Catálogo: HTTP ${response.status}`)
+        const databaseProducts: Product[] = await response.json()
+        if (!Array.isArray(databaseProducts)) throw new Error('Resposta inválida do catálogo')
+        const dbItems = databaseProducts
         const fallbackItems = Array.isArray(products) ? products : []
         const allProducts = [
           ...dbItems,
-          ...fallbackItems.filter((fallback) => fallback && !dbItems.some((item: any) => item && item.id === fallback.id)),
+          ...fallbackItems.filter((fallback) => fallback && !dbItems.some((item) => item && item.id === fallback.id)),
         ].filter((p) => p && typeof p === 'object' && p.active !== false)
 
         setCatalog(filterCatalog(
@@ -79,13 +79,16 @@ export default function Products() {
           String(router.query.q || '')
         ))
       })
-      .catch(() => setCatalog(filterCatalog(
-        (Array.isArray(products) ? products : []).filter((product) => product && product.active !== false),
-        String(router.query.category || ''),
-        String(router.query.partType || ''),
-        String(router.query.q || '')
-      )))
-  }, [router.query.category, router.query.partType, router.query.q])
+      .catch((failure: unknown) => {
+        if (controller.signal.aborted) return
+        console.error('Não foi possível carregar o catálogo', failure)
+        setCatalogError('Não foi possível carregar as peças. Tente novamente para consultar preços e disponibilidade.')
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false)
+      })
+    return () => controller.abort()
+  }, [router.query.category, router.query.partType, router.query.q, attempt])
 
   useEffect(() => {
     const term = String(router.query.q || '').trim()
@@ -138,6 +141,12 @@ export default function Products() {
   const catalogHeading = selectedPartTypeLabel
     ? `${selectedPartTypeLabel} para equipamentos fitness`
     : 'Peças para Esteira, Bicicleta, Elíptico e Musculação'
+  const filterHref = (key: 'category' | 'partType', value: string) => {
+    const params = new URLSearchParams(queryParams)
+    if (value) params.set(key, value)
+    else params.delete(key)
+    return `/products${params.size ? `?${params.toString()}` : ''}`
+  }
 
   return (
     <>
@@ -153,42 +162,46 @@ export default function Products() {
         <h1>{catalogHeading}</h1>
         <p>Encontre peças, acessórios e reposição para seu equipamento de academia e fitness com qualidade e compatibilidade.</p>
       </div>
-      {safeCatalog.length ? (
-        <div className="catalog-grid">
-          {safeCatalog.map((product) => {
-            const isOutOfStock = product.stock === 0
-            const hasDiscount = Number(product.discountPercent || 0) > 0
-            return (
-              <article className="catalog-card" key={product.id || Math.random()}>
-                <Link href={`/products/${product.id || ''}`} className="catalog-card-image">
-                  <img src={product.image || '/logo-header-uniform.jpg'} alt={product.name || 'Produto'} />
-                  {product.flashSale && <b>OFERTA RELÂMPAGO</b>}
-                  {!product.flashSale && hasDiscount && <b>OFERTA -{Number(product.discountPercent)}%</b>}
-                </Link>
-                <div className="catalog-card-body">
-                  <small>{product.brand || 'Alpha Tec'} · {partTypes.find((partType) => partType.value === product.partType)?.label || 'Peça'} · {getProductCategories(product.category).join(' / ') || 'Geral'}</small>
-                  <h2>{product.name || 'Produto'}</h2>
-                  <p>{product.description || ''}</p>
-                  {isOutOfStock ? (
-                    <strong className="out-of-stock">Indisponível</strong>
-                  ) : (
-                    <>
-                      {hasDiscount ? <del>{formatPrice(product.price)}</del> : null}
-                      <strong>{formatPrice(salePrice(product))}</strong>
-                      {typeof product.stock === 'number' && <small>{product.stock} em estoque</small>}
-                    </>
-                  )}
-                  <Link href={`/products/${product.id || ''}`} className="product-button">
-                    Ver detalhes
-                  </Link>
-                </div>
-              </article>
-            )
-          })}
+      <div className="store-catalog-layout">
+        <aside className="store-catalog-filters" aria-label="Filtros de peças">
+          <h2>Encontre sua peça</h2>
+          <button type="button" className="store-filter-toggle" aria-expanded={filtersOpen} aria-controls="catalog-filter-options" onClick={() => setFiltersOpen((value) => !value)}>
+            Filtrar por equipamento e peça <span>{filtersOpen ? '−' : '+'}</span>
+          </button>
+          <div id="catalog-filter-options" className={`store-filter-options${filtersOpen ? ' is-open' : ''}`}>
+          <nav aria-label="Filtrar por equipamento">
+            <h3>Equipamento</h3>
+            <Link href={filterHref('category', '')} aria-current={!category ? 'true' : undefined}>Todos os equipamentos</Link>
+            {equipmentCategories.map((item) => {
+              const value = normalizeSearchText(item)
+              return <Link href={filterHref('category', value)} key={value} aria-current={category === value ? 'true' : undefined}>{item}</Link>
+            })}
+            <Link href={filterHref('category', 'ofertas')} aria-current={category === 'ofertas' ? 'true' : undefined}>Ofertas</Link>
+          </nav>
+          <nav aria-label="Filtrar por tipo de peça">
+            <h3>Tipo de peça</h3>
+            <Link href={filterHref('partType', '')} aria-current={!selectedPartType ? 'true' : undefined}>Todos os tipos</Link>
+            {partTypes.map((item) => <Link href={filterHref('partType', item.value)} key={item.value} aria-current={selectedPartType === item.value ? 'true' : undefined}>{item.label}</Link>)}
+          </nav>
+          {(category || selectedPartType || searchTerm) && <Link className="store-clear-filters" href="/products">Limpar filtros e busca</Link>}
+          </div>
+        </aside>
+        <div className="store-catalog-results">
+          <div className="store-catalog-summary">
+            <span>{loading ? 'Carregando peças…' : catalogError ? 'Catálogo indisponível' : `${safeCatalog.length} ${safeCatalog.length === 1 ? 'peça encontrada' : 'peças encontradas'}`}</span>
+            {searchTerm && <span>Busca: “{searchTerm}”</span>}
+          </div>
+          {catalogError ? (
+            <div className="store-catalog-status" role="alert"><p>{catalogError}</p><button type="button" onClick={() => setAttempt((value) => value + 1)}>Tentar novamente</button></div>
+          ) : loading ? (
+            <p className="store-catalog-status" role="status">Consultando preços e disponibilidade…</p>
+          ) : safeCatalog.length ? (
+            <div className="store-product-grid">{safeCatalog.map((product) => <ProductCard product={product} key={product.id} />)}</div>
+          ) : (
+            <div className="store-catalog-status"><p>Nenhuma peça encontrada com estes filtros.</p><Link href="/products">Ver catálogo completo</Link></div>
+          )}
         </div>
-      ) : (
-        <p className="empty-catalog">Nenhuma peça cadastrada nesta categoria.</p>
-      )}
+      </div>
     </section>
     </>
   )

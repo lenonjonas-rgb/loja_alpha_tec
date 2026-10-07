@@ -30,9 +30,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <meta name="description" content={siteDescription} />
         <meta name="robots" content="index, follow" />
         <meta name="keywords" content="inversor Movement, inversor para esteira Movement, comprar inversor Movement, peças para esteira, peças para bicicleta, peças para academia, peças para eliptico, acessorios para academia, reposição de peças fitness, manutenção de esteira, manutenção de bike, rolete para esteira, correia para esteira, polia para musculação, peças e acessorios fitness, Alpha Tec" />
-        <link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48" />
+        <link rel="icon" href="/favicon-192.png" type="image/png" sizes="192x192" />
         <link rel="alternate icon" href="/favicon.ico" type="image/x-icon" />
-        <link rel="apple-touch-icon" href="/logo-header-uniform.jpg" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
         <meta name="theme-color" content="#202225" />
         <link rel="canonical" href={siteUrl} />
         <meta property="og:type" content="website" />
@@ -109,7 +109,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="footer-brand">
             <strong>ALPHA TEC</strong>
             <span>Peças e assistência técnica para equipamentos fitness.</span>
-            <PaymentMethods compact />
           </div>
           <div className="footer-legal">
             <strong>{storeConfig.legalName}</strong>
@@ -119,6 +118,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               {storeConfig.address.city}/{storeConfig.address.state} · CEP {storeConfig.address.cep}
             </address>
           </div>
+          <div className="footer-payment"><PaymentMethods compact /></div>
           <nav className="footer-links" aria-label="Links institucionais">
             <Link href="/privacidade">Privacidade</Link>
             <Link href={supportHref} target={whatsappUrl ? '_blank' : undefined} rel={whatsappUrl ? 'noopener noreferrer' : undefined}>{whatsappUrl ? 'WhatsApp técnico' : 'Suporte técnico'}</Link>

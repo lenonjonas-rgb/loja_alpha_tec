@@ -1,0 +1,114 @@
+const test = require('node:test')
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+const { createRequire } = require('node:module')
+const ts = require('typescript')
+const sharp = require('sharp')
+const React = require('react')
+const { renderToStaticMarkup } = require('react-dom/server')
+
+const root = path.join(__dirname, '..')
+const cache = new Map()
+
+function loadSource(relativePath) {
+  const filename = path.join(root, relativePath)
+  if (cache.has(filename)) return cache.get(filename)
+  const module = { exports: {} }
+  const requireFromFile = createRequire(filename)
+  const output = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
+  }).outputText
+  const localRequire = (name) => {
+    if (name.startsWith('.')) {
+      for (const extension of ['.ts', '.tsx']) {
+        const target = path.resolve(path.dirname(filename), name + extension)
+        if (fs.existsSync(target)) return loadSource(path.relative(root, target))
+      }
+    }
+    return requireFromFile(name)
+  }
+  new Function('module', 'exports', 'require', output)(module, module.exports, localRequire)
+  cache.set(filename, module.exports)
+  return module.exports
+}
+
+const presentation = loadSource(path.join('lib', 'product-presentation.ts'))
+const ProductCard = loadSource(path.join('components', 'ProductCard.tsx')).default
+const HeroBanner = loadSource(path.join('components', 'HeroBanner.tsx')).default
+const base = { id: 'piece', name: 'Correia de teste', category: 'Esteiras', price: 120, image: '', stock: 3, description: '', active: true }
+
+test('preço e desconto preservam o valor do catálogo e usam moeda brasileira', () => {
+  assert.equal(presentation.getProductSalePrice({ ...base, discountPercent: 25 }), 90)
+  assert.equal(presentation.getProductSalePrice({ ...base, discountPercent: -10 }), 120)
+  assert.equal(presentation.getProductSalePrice({ ...base, discountPercent: 120 }), 0)
+  assert.match(presentation.formatProductPrice(1234.5), /1\.234,50/)
+  assert.equal(presentation.formatProductPrice(0), 'Consulte o preço')
+  assert.equal(presentation.formatProductPrice(NaN), 'Consulte o preço')
+})
+
+test('compatibilidade resume modelos reais, deduplica e informa os adicionais', () => {
+  assert.equal(presentation.getProductCompatibilityLabel({ ...base, compatibleEquipment: 'LX; RT;LX;\nAria' }), 'LX / RT + 1 modelo')
+  assert.equal(presentation.getProductCompatibilityLabel(base), 'Confirme a compatibilidade com nossa equipe.')
+})
+
+test('card mostra referência pública, estoque e consulta sem expor código interno', () => {
+  const html = renderToStaticMarkup(React.createElement(ProductCard, { product: { ...base, manufacturerPartNumber: 'PN-123', internalCode: 'PRIVATE-CODE' } }))
+  assert.match(html, /PN-123/)
+  assert.match(html, /3 em estoque/)
+  assert.match(html, /Foto indisponível/)
+  assert.match(html, /Ver peça e compatibilidade/)
+  assert.doesNotMatch(html, /PRIVATE-CODE|logo-header|Compra verificada/)
+})
+
+test('card indisponível não anuncia desconto ou disponibilidade', () => {
+  const html = renderToStaticMarkup(React.createElement(ProductCard, { product: { ...base, stock: 0, discountPercent: 10 } }))
+  assert.match(html, /Indisponível/)
+  assert.match(html, /Consulte disponibilidade/)
+  assert.doesNotMatch(html, /OFF|em estoque|<del>/)
+})
+
+test('banner respeita seleção administrativa e não inventa promoção', () => {
+  const html = renderToStaticMarkup(React.createElement(HeroBanner, {
+    products: [{ ...base, showInBanner: true }, { ...base, id: 'hidden', name: 'Não selecionada', showInBanner: false }, { ...base, id: 'inactive', name: 'Inativa', active: false, showInBanner: true }],
+    loading: false, error: '',
+  }))
+  assert.match(html, /Correia de teste/)
+  assert.doesNotMatch(html, /Não selecionada|Inativa|DESTAQUE DA SEMANA|OFF|Próxima peça/)
+})
+
+test('banner sem seleção explica identificação; com várias peças oferece controles', () => {
+  const empty = renderToStaticMarkup(React.createElement(HeroBanner, { products: [], loading: false, error: '' }))
+  assert.match(empty, /modelo certo/)
+  const multiple = renderToStaticMarkup(React.createElement(HeroBanner, { products: [{ ...base, showInBanner: true }, { ...base, id: 'second', showInBanner: true }], loading: false, error: '' }))
+  assert.match(multiple, /Peça anterior/)
+  assert.match(multiple, /Próxima peça/)
+  assert.match(multiple, /aria-pressed="true"/)
+})
+
+test('PNGs e ícone Apple têm dimensões quadradas reais sem ampliação de raster', async () => {
+  for (const [file, size] of [['favicon-48.png', 48], ['favicon-96.png', 96], ['favicon-192.png', 192], ['favicon-512.png', 512], ['apple-touch-icon.png', 180]]) {
+    const metadata = await sharp(path.join(root, 'public', file)).metadata()
+    assert.equal(metadata.format, 'png')
+    assert.equal(metadata.width, size)
+    assert.equal(metadata.height, size)
+  }
+})
+
+test('ICO contém quadros válidos de 16, 32 e 48 px', async () => {
+  const ico = fs.readFileSync(path.join(root, 'public', 'favicon.ico'))
+  assert.equal(ico.readUInt16LE(0), 0)
+  assert.equal(ico.readUInt16LE(2), 1)
+  assert.equal(ico.readUInt16LE(4), 3)
+  for (const [index, size] of [16, 32, 48].entries()) {
+    const entry = 6 + index * 16
+    assert.equal(ico[entry], size)
+    assert.equal(ico[entry + 1], size)
+    const length = ico.readUInt32LE(entry + 8)
+    const offset = ico.readUInt32LE(entry + 12)
+    assert.ok(offset + length <= ico.length)
+    const metadata = await sharp(ico.subarray(offset, offset + length)).metadata()
+    assert.equal(metadata.width, size)
+    assert.equal(metadata.height, size)
+  }
+})

@@ -11,6 +11,12 @@ npm run dev
 
 Se `npx`/`create-next-app` não estiver disponível no ambiente, este scaffold já fornece os arquivos principais; instale dependências localmente.
 
+## Posts para Instagram
+
+Para produto único, o modelo padrão “Foto ampliada + logo + site” mostra a foto preenchendo um quadro quadrado, a logo e a chamada para a loja. Quando um cupom cadastrado e ativo é informado, a arte e a legenda incluem “Use o cupom” com o código, o benefício e o limite de clientes cadastrado; o quadro da foto reserva espaço para essa chamada. Sem cupom válido, o modelo permanece limpo. A foto mantém as proporções; bordas de imagens não quadradas podem ser recortadas para preencher o quadro. Uma imagem válida é obrigatória para exportar esse modelo. O modelo “Produto com informações técnicas” continua disponível no seletor.
+
+As artes de feed do painel administrativo usam a logo de `public/brand-logo.svg` nos formatos 1080×1350 e 1080×1080. Posts de produto e de categoria não exibem preços na arte nem na legenda gerada; a chamada “Confira no site” direciona para www.lojaalphatec.com.br. Cupons cadastrados continuam disponíveis. A geração aguarda o carregamento da logo, e falhas são informadas no painel. Reels e vídeos para o site mantêm seu comportamento.
+
 ## Publicação na Vercel
 
 1. Envie este projeto para um repositório no GitHub.

@@ -5,6 +5,7 @@ import type { Product } from '../lib/products'
 type Props = { products: Product[]; onMessage: (message: string) => void }
 type PostFormat = 'portrait' | 'square'
 type PostMode = 'product' | 'category'
+type ProductPostLayout = 'photo' | 'details'
 type PromotionContent = 'feed' | 'reel'
 type ReelSource = 'photo' | 'video'
 type ReelDestination = 'instagram' | 'site'
@@ -98,13 +99,17 @@ export default function AdminPromotions({ products, onMessage }: Props) {
     () => categoryAvailableProducts.filter((product) => selectedCategoryProductIds.includes(product.id)),
     [categoryAvailableProducts, selectedCategoryProductIds]
   )
-  const getCategoryPricing = (product: Product) => {
-    const original = Number(product.price || 0)
-    const ownDiscount = showDiscount ? Number(product.discountPercent || 0) : 0
-    const afterOwnDiscount = ownDiscount > 0 ? original * (1 - ownDiscount / 100) : original
-    const final = hasCouponDiscount ? afterOwnDiscount * (1 - couponDiscountPercent / 100) : afterOwnDiscount
-    return { original, final, hasAnyDiscount: ownDiscount > 0 || hasCouponDiscount }
-  }
+  const [brandLogo, setBrandLogo] = useState<HTMLImageElement | null>(null)
+  const [productPostLayout, setProductPostLayout] = useState<ProductPostLayout>('photo')
+  const photoPost = contentType === 'feed' && mode === 'product' && productPostLayout === 'photo'
+  useEffect(() => {
+    let cancelled = false
+    const image = new Image()
+    image.onload = () => { if (!cancelled) setBrandLogo(image) }
+    image.onerror = () => { if (!cancelled) onMessage('Não foi possível carregar a logo dos posts. Recarregue a página para tentar novamente.') }
+    image.src = '/brand-logo.svg'
+    return () => { cancelled = true }
+  }, [onMessage])
   function toggleCategoryProduct(productId: string) {
     setSelectedCategoryProductIds((current) => {
       if (current.includes(productId)) return current.filter((id) => id !== productId)
@@ -130,14 +135,21 @@ export default function AdminPromotions({ products, onMessage }: Props) {
       lines.push('', `${reelCta.trim() || 'ACESSE LOJAALPHATEC.COM.BR'}.`, 'Peça também pelo Direct.', '', '#AlphaTec #PecasFitness #Academia #EquipamentosFitness')
       return lines.join('\n')
     }
+    if (photoPost) {
+      const lines = ['Confira os detalhes e encontre sua peça no site:', 'www.lojaalphatec.com.br']
+      if (matchedCoupon) {
+        lines.push('', `Use o cupom ${normalizedCoupon} no site${couponBenefit ? ` e aproveite ${couponBenefit}` : ' e confira as condições'}.`)
+        if (couponUsageLimit) lines.push(`Válido para os primeiros ${couponUsageLimit} clientes.`)
+      }
+      lines.push('', '#AlphaTec #PecasFitness #EquipamentosFitness')
+      return lines.join('\n')
+    }
     if (mode === 'category') {
       if (!selectedCategory || !categoryProducts.length) return ''
       const tagline = categoryTaglines[categories.indexOf(selectedCategory) % categoryTaglines.length]
       const lines = ['🛒 ACESSE AGORA: www.lojaalphatec.com.br', '', `🔥 ${headline.trim().toUpperCase() || 'VITRINE DA SEMANA'}: linha completa de ${selectedCategory}!`, '', tagline, '']
       categoryProducts.forEach((product) => {
-        const { original, final, hasAnyDiscount } = getCategoryPricing(product)
-        const priceText = original > 0 ? (hasAnyDiscount ? `de ${money(original)} por ${money(final)}` : money(final)) : 'consulte o preço'
-        lines.push(`✅ ${product.name} — ${priceText}`)
+        lines.push(`✅ ${product.name}`)
       })
       lines.push('')
       if (matchedCoupon) {
@@ -152,21 +164,15 @@ export default function AdminPromotions({ products, onMessage }: Props) {
     if (!selectedProduct) return ''
     const lines = ['🛒 ACESSE AGORA: www.lojaalphatec.com.br', '', `🔥 ${headline.trim().toUpperCase() || 'OFERTA ESPECIAL'}: ${selectedProduct.name}!`, '']
     if (selectedProduct.description) lines.push(selectedProduct.description.trim(), '')
-    if (hasDiscount) {
-      lines.push(`💥 De ${money(originalPrice)} por ${money(priceBeforeCoupon)}: ${discountPercent}% de desconto no produto.`)
-    } else if (hasCouponDiscount) {
-      lines.push(`💥 De ${money(originalPrice)} por ${money(promotionalPrice)} usando o cupom ${normalizedCoupon}: ${couponDiscountPercent}% de desconto.`)
-    } else if (originalPrice > 0) lines.push(`💥 Garanta o seu por ${money(promotionalPrice)}.`)
     if (matchedCoupon) {
       if (matchedCoupon.free_shipping) lines.push(`🚚 Use o cupom ${normalizedCoupon} e ganhe FRETE GRÁTIS.`)
-      else if (couponDiscountPercent > 0 && hasDiscount) lines.push(`🎯 Com o cupom ${normalizedCoupon}, ganhe mais ${couponDiscountPercent}% e pague apenas ${money(promotionalPrice)}.`)
       else if (couponDiscountPercent > 0) lines.push(`🎁 Use o cupom ${normalizedCoupon} e ganhe ${couponDiscountPercent}% de desconto.`)
       else lines.push(`🎁 Use o cupom ${normalizedCoupon} e aproveite essa condição especial.`)
       if (couponUsageLimit) lines.push(`⏳ Cupom válido para os primeiros ${couponUsageLimit} clientes.`)
     }
-    lines.push('', 'Garanta sua peça e mantenha seu treino em movimento.', '', '#AlphaTec #PecasFitness #Academia #EquipamentosFitness')
+    lines.push('', 'Confira os detalhes e encontre sua peça em www.lojaalphatec.com.br.', '', '#AlphaTec #PecasFitness #Academia #EquipamentosFitness')
     return lines.join('\n')
-  }, [contentType, reelHook, reelCta, mode, selectedCategory, categoryProducts, categories, couponDiscountPercent, couponUsageLimit, discountPercent, hasCouponDiscount, hasDiscount, headline, matchedCoupon, normalizedCoupon, originalPrice, priceBeforeCoupon, promotionalPrice, selectedProduct, showDiscount])
+  }, [photoPost, contentType, reelHook, reelCta, mode, selectedCategory, categoryProducts, categories, couponBenefit, couponDiscountPercent, couponUsageLimit, hasCouponDiscount, hasDiscount, headline, matchedCoupon, normalizedCoupon, originalPrice, priceBeforeCoupon, promotionalPrice, selectedProduct])
 
   useEffect(() => {
     if (!selectedProduct && activeProducts[0]) setSelectedId(activeProducts[0].id)
@@ -370,6 +376,19 @@ export default function AdminPromotions({ products, onMessage }: Props) {
     setCanvasReady(false)
     const context = canvas.getContext('2d')
     if (!context) return
+    if (!brandLogo) return
+    let cancelled = false
+    const drawBrand = () => drawImageContain(context, brandLogo, 72, 30, 400, 75)
+    const drawSiteCallout = () => {
+      context.fillStyle = '#d83232'
+      context.fillRect(72, height - 100, width - 144, 4)
+      context.fillStyle = '#ffffff'
+      context.font = '800 30px Arial, sans-serif'
+      context.fillText('CONFIRA NO SITE', 72, height - 60)
+      context.fillStyle = '#f6c548'
+      context.font = '700 26px Arial, sans-serif'
+      context.fillText('www.lojaalphatec.com.br', 72, height - 24)
+    }
 
     if (mode === 'category') {
       const loadImage = (src?: string) => new Promise<HTMLImageElement | undefined>((resolve) => {
@@ -382,18 +401,14 @@ export default function AdminPromotions({ products, onMessage }: Props) {
       })
 
       Promise.all(categoryProducts.map((product) => loadImage(product.image))).then((images) => {
+        if (cancelled) return
         const squareLayout = format === 'square'
         context.clearRect(0, 0, width, height)
         context.fillStyle = '#090a0c'
         context.fillRect(0, 0, width, height)
         context.fillStyle = '#d83232'
         context.fillRect(0, 0, width, 16)
-        context.fillStyle = '#ffffff'
-        context.font = '800 30px Arial, sans-serif'
-        context.fillText('ALPHA TEC', 72, 72)
-        context.fillStyle = '#7f858b'
-        context.font = '700 18px Arial, sans-serif'
-        context.fillText('PEÇAS E ACESSÓRIOS FITNESS', 72, 105)
+        drawBrand()
 
         const accent = categoryAccentColors[categories.indexOf(selectedCategory) % categoryAccentColors.length]
         const tagline = categoryTaglines[categories.indexOf(selectedCategory) % categoryTaglines.length]
@@ -418,7 +433,7 @@ export default function AdminPromotions({ products, onMessage }: Props) {
         context.font = `500 ${squareLayout ? 17 : 19}px Arial, sans-serif`
         context.fillText(tagline, 72, titleY + 36)
 
-        const footerY = height - (normalizedCoupon ? 210 : 96)
+        const footerY = height - (normalizedCoupon ? 252 : 120)
         const gridTop = titleY + 64
         const gap = 24
         const columns = 2
@@ -461,20 +476,6 @@ export default function AdminPromotions({ products, onMessage }: Props) {
           context.font = `800 ${squareLayout ? 17 : 19}px Arial, sans-serif`
           wrapText(context, product.name.toUpperCase(), textWidth).slice(0, 3).forEach((line, lineIndex) => context.fillText(line, textX, cardY + 30 + lineIndex * 24))
 
-          const { original, final, hasAnyDiscount } = getCategoryPricing(product)
-          const priceY = cardY + cardHeight - 22
-          if (hasAnyDiscount && original > 0) {
-            context.fillStyle = '#7f858b'
-            context.font = '500 15px Arial, sans-serif'
-            context.fillText(`de ${money(original)}`, textX, priceY - 22)
-            context.fillStyle = '#f6c548'
-            context.font = `800 ${squareLayout ? 20 : 22}px Arial, sans-serif`
-            context.fillText(money(final), textX, priceY)
-          } else {
-            context.fillStyle = '#ffffff'
-            context.font = `800 ${squareLayout ? 20 : 22}px Arial, sans-serif`
-            context.fillText(original > 0 ? money(final) : 'CONSULTE', textX, priceY)
-          }
         })
 
         if (normalizedCoupon) {
@@ -490,32 +491,60 @@ export default function AdminPromotions({ products, onMessage }: Props) {
             context.fillText(`VÁLIDO PARA OS PRIMEIROS ${couponUsageLimit} CLIENTES`, 96, footerY + 96)
           }
         }
-        context.fillStyle = '#d83232'
-        context.fillRect(72, height - 32, 120, 4)
-        context.fillStyle = '#f6c548'
-        context.font = '800 23px Arial, sans-serif'
-        context.fillText('ACESSE www.lojaalphatec.com.br', 216, height - 18)
+        drawSiteCallout()
         setCanvasReady(true)
       })
-      return
+      return () => { cancelled = true }
     }
 
     if (!selectedProduct) return
 
     const draw = (image?: HTMLImageElement) => {
+      if (cancelled) return
       context.clearRect(0, 0, width, height)
       context.fillStyle = '#090a0c'
       context.fillRect(0, 0, width, height)
       context.fillStyle = '#d83232'
       context.fillRect(0, 0, width, 16)
-      context.fillStyle = '#ffffff'
-      context.font = '800 30px Arial, sans-serif'
-      context.fillText('ALPHA TEC', 72, 72)
-      context.fillStyle = '#7f858b'
-      context.font = '700 18px Arial, sans-serif'
-      context.fillText('PEÇAS E ACESSÓRIOS FITNESS', 72, 105)
+      drawBrand()
 
       const squareLayout = format === 'square'
+      if (photoPost) {
+        if (!image) {
+          onMessage('Este modelo precisa de uma foto da peça. Cadastre uma imagem válida antes de gerar o post.')
+          return
+        }
+        const couponHeight = matchedCoupon ? 144 : 0
+        const side = Math.min(width - 84, height - 264 - couponHeight)
+        const x = (width - side) / 2
+        const y = 132
+        const scale = Math.max(side / image.naturalWidth, side / image.naturalHeight)
+        const drawWidth = image.naturalWidth * scale
+        const drawHeight = image.naturalHeight * scale
+        context.save()
+        context.beginPath()
+        context.rect(x, y, side, side)
+        context.clip()
+        context.drawImage(image, x + (side - drawWidth) / 2, y + (side - drawHeight) / 2, drawWidth, drawHeight)
+        context.restore()
+        if (matchedCoupon) {
+          const couponY = height - 252
+          context.fillStyle = '#d83232'
+          context.fillRect(72, couponY, width - 144, 132)
+          context.fillStyle = '#ffffff'
+          context.font = '800 30px Arial, sans-serif'
+          context.fillText(`USE O CUPOM ${normalizedCoupon} NO SITE`, 96, couponY + 38)
+          context.font = '700 26px Arial, sans-serif'
+          context.fillText(couponBenefit ? `APROVEITE ${couponBenefit}` : 'CONFIRA AS CONDIÇÕES NO SITE', 96, couponY + 76)
+          if (couponUsageLimit) {
+            context.font = '700 20px Arial, sans-serif'
+            context.fillText(`VÁLIDO PARA OS PRIMEIROS ${couponUsageLimit} CLIENTES`, 96, couponY + 110)
+          }
+        }
+        drawSiteCallout()
+        setCanvasReady(true)
+        return
+      }
       const nameX = 72
       let nameY = squareLayout ? 140 : 174
       context.fillStyle = '#ffffff'
@@ -537,9 +566,9 @@ export default function AdminPromotions({ products, onMessage }: Props) {
       const categoryY = nameY + (squareLayout ? 30 : 42)
       if (!squareLayout) context.fillText(category.toUpperCase(), nameX, categoryY)
 
-      const footerY = squareLayout ? height - 188 : height - 190
+      const footerY = height - (normalizedCoupon ? 274 : 120)
       const imageY = squareLayout ? nameY + 20 : categoryY + 33
-      const imageBox = { x: 42, y: imageY, width: width - 84, height: squareLayout ? Math.max(260, footerY - imageY - 64) : 470 }
+      const imageBox = { x: 42, y: imageY, width: width - 84, height: squareLayout ? Math.max(180, footerY - imageY - 42) : Math.min(470, Math.max(180, footerY - imageY - 200)) }
       context.fillStyle = '#111316'
       context.fillRect(imageBox.x, imageBox.y, imageBox.width, imageBox.height)
       context.strokeStyle = '#33373b'
@@ -572,31 +601,12 @@ export default function AdminPromotions({ products, onMessage }: Props) {
         let cursor = detailsTextY
         context.fillStyle = '#b7bcc1'
         context.font = '500 19px Arial, sans-serif'
-        wrapText(context, specificationText, detailsWidth).slice(0, 5).forEach((line) => { context.fillText(line, 72, cursor); cursor += 27 })
+        const detailsLines = Math.max(0, Math.min(5, Math.floor((footerY - detailsTextY) / 27)))
+        wrapText(context, specificationText, detailsWidth).slice(0, detailsLines).forEach((line) => { context.fillText(line, 72, cursor); cursor += 27 })
         context.font = '500 18px Arial, sans-serif'
-        wrapText(context, usageText, width - detailsX - 72).slice(0, 5).forEach((line, index) => context.fillText(`• ${line}`, detailsX, detailsTextY + index * 26))
+        wrapText(context, usageText, width - detailsX - 72).slice(0, detailsLines).forEach((line, index) => context.fillText(`• ${line}`, detailsX, detailsTextY + index * 26))
       }
 
-      if (hasDiscount || hasCouponDiscount) {
-        context.fillStyle = '#7f858b'
-        context.font = '500 28px Arial, sans-serif'
-        const previousPriceText = `DE ${money(priceBeforeCoupon)}`
-        context.fillText(previousPriceText, 72, footerY)
-        const previousPriceWidth = context.measureText(previousPriceText).width
-        context.strokeStyle = '#d83232'
-        context.lineWidth = 4
-        context.beginPath()
-        context.moveTo(72, footerY - 10)
-        context.lineTo(72 + previousPriceWidth, footerY - 10)
-        context.stroke()
-        context.fillStyle = '#f6c548'
-        context.font = '800 48px Arial, sans-serif'
-        context.fillText(originalPrice > 0 ? `POR ${money(promotionalPrice)}` : 'CONSULTE O PREÇO', 72 + previousPriceWidth + 38, footerY)
-      } else {
-        context.fillStyle = '#ffffff'
-        context.font = '800 48px Arial, sans-serif'
-        context.fillText(originalPrice > 0 ? money(promotionalPrice) : 'CONSULTE O PREÇO', 72, footerY)
-      }
       if (normalizedCoupon) {
         context.fillStyle = matchedCoupon ? '#d83232' : '#555b61'
         context.fillRect(72, footerY + 22, width - 144, couponUsageLimit ? 124 : 86)
@@ -610,21 +620,21 @@ export default function AdminPromotions({ products, onMessage }: Props) {
           context.fillText(`VÁLIDO PARA OS PRIMEIROS ${couponUsageLimit} CLIENTES`, 96, footerY + 118)
         }
       }
-      context.fillStyle = '#d83232'
-      context.fillRect(72, height - 32, 120, 4)
-      context.fillStyle = '#f6c548'
-      context.font = '800 23px Arial, sans-serif'
-      context.fillText('ACESSE www.lojaalphatec.com.br', 216, height - 18)
+      drawSiteCallout()
       setCanvasReady(true)
     }
 
-    if (!selectedProduct.image) return draw()
+    if (!selectedProduct.image) {
+      draw()
+      return () => { cancelled = true }
+    }
     const image = new Image()
     image.crossOrigin = 'anonymous'
     image.onload = () => draw(image)
     image.onerror = () => draw()
     image.src = selectedProduct.image
-  }, [contentType, reelSource, reelDestination, siteVideoZoom, reelVideoUrl, reelVideoDuration, reelHook, reelCta, mode, categoryProducts, categories, selectedCategory, coupon, couponBenefit, couponDiscountPercent, couponUsageLimit, format, headline, hasCouponDiscount, hasDiscount, originalPrice, normalizedCoupon, priceBeforeCoupon, promotionalPrice, selectedFormat, selectedProduct, discountPercent, matchedCoupon, showDiscount])
+    return () => { cancelled = true }
+  }, [photoPost, onMessage, brandLogo, contentType, reelSource, reelDestination, siteVideoZoom, reelVideoUrl, reelVideoDuration, reelHook, reelCta, mode, categoryProducts, categories, selectedCategory, coupon, couponBenefit, couponDiscountPercent, couponUsageLimit, format, headline, hasCouponDiscount, hasDiscount, originalPrice, normalizedCoupon, priceBeforeCoupon, promotionalPrice, selectedFormat, selectedProduct, discountPercent, matchedCoupon, showDiscount])
 
   function handleProductChange(event: ChangeEvent<HTMLSelectElement>) {
     setSelectedId(event.target.value)
@@ -732,7 +742,7 @@ export default function AdminPromotions({ products, onMessage }: Props) {
         <div>
           <p className="eyebrow">{contentType === 'reel' && reelDestination === 'site' ? 'PADRÃO PARA E-COMMERCE' : 'CONTEÚDO PARA INSTAGRAM'}</p>
           <h2>Posts promocionais</h2>
-          <p className="form-hint">{contentType === 'reel' && reelDestination === 'site' ? 'Ajuste o enquadramento e gere um vídeo quadrado para a página do produto.' : 'Escolha uma peça, destaque o preço e crie uma arte pronta para publicar.'}</p>
+          <p className="form-hint">{contentType === 'reel' && reelDestination === 'site' ? 'Ajuste o enquadramento e gere um vídeo quadrado para a página do produto.' : contentType === 'feed' ? 'Crie uma arte com a logo Alpha Tec, sem preços e com chamada para acessar a loja.' : 'Escolha uma peça e crie um Reel pronto para publicar.'}</p>
         </div>
         <button className="primary-button" type="button" onClick={downloadPost} disabled={isRecording || (contentType === 'reel' && reelSource === 'video' && !reelVideoFile)}>{isRecording ? `Gravando ${recordingProgress}%` : contentType === 'reel' ? reelDestination === 'site' ? 'Gerar vídeo para site' : 'Gerar Reel' : 'Gerar post para Instagram'} <span>↓</span></button>
       </div>
@@ -781,14 +791,16 @@ export default function AdminPromotions({ products, onMessage }: Props) {
           ) : (
             <label>Categoria<select value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)}>{categories.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
           )}
+          {contentType === 'feed' && mode === 'product' && <label>Modelo da arte<select value={productPostLayout} onChange={(event) => setProductPostLayout(event.target.value as ProductPostLayout)}><option value="photo">Foto ampliada + logo + site</option><option value="details">Produto com informações técnicas</option></select></label>}
+          {photoPost && <p className="form-hint">A foto preenche todo o quadro quadrado, sem distorção. Imagens não quadradas podem ter as bordas recortadas. A arte mostra a logo, a chamada para o site e, quando informado, um cupom válido.</p>}
           {!(contentType === 'reel' && reelDestination === 'site') && <>
-            <label>Chamada principal<input value={headline} maxLength={34} onChange={(event) => setHeadline(event.target.value)} placeholder={mode === 'category' ? 'VITRINE DA SEMANA' : 'OFERTA ESPECIAL'} /></label>
+            {!photoPost && <label>Chamada principal<input value={headline} maxLength={34} onChange={(event) => setHeadline(event.target.value)} placeholder={mode === 'category' ? 'VITRINE DA SEMANA' : 'OFERTA ESPECIAL'} /></label>}
             <label>Cupom de desconto<input value={coupon} maxLength={20} onChange={(event) => setCoupon(event.target.value.toUpperCase())} placeholder="EX.: ALPHA10" />{normalizedCoupon && <small className={`promotion-coupon-status ${matchedCoupon ? 'valid' : 'invalid'}`}>{matchedCoupon ? `Cupom válido: ${couponBenefit || 'benefício cadastrado'}` : 'Cupom não encontrado ou inativo'}</small>}</label>
           </>}
           {contentType === 'feed' && <label>Formato<select value={format} onChange={(event) => setFormat(event.target.value as PostFormat)}>{formatOptions.map((option) => <option key={option.value} value={option.value}>{option.label} ({option.width} x {option.height})</option>)}</select></label>}
-          {!(contentType === 'reel' && reelDestination === 'site') && <label className="promotion-toggle"><input type="checkbox" checked={showDiscount} onChange={(event) => setShowDiscount(event.target.checked)} /> {mode === 'category' ? 'Mostrar descontos cadastrados nas peças da categoria' : `Mostrar desconto cadastrado${discountPercent > 0 ? ` (-${discountPercent}%)` : ' (este produto não tem desconto)'}`}</label>}
+          {contentType === 'reel' && reelDestination === 'instagram' && <label className="promotion-toggle"><input type="checkbox" checked={showDiscount} onChange={(event) => setShowDiscount(event.target.checked)} /> Mostrar desconto cadastrado{discountPercent > 0 ? ` (-${discountPercent}%)` : ' (este produto não tem desconto)'}</label>}
           {contentType === 'reel' && reelDestination === 'site' ? null : mode === 'product' ? (
-            <div className="promotion-product-summary"><span>Preço para o post</span><strong>{originalPrice > 0 ? money(promotionalPrice) : 'Consulte o preço'}</strong>{(hasDiscount || hasCouponDiscount) && <small>De {money(priceBeforeCoupon)} por {money(promotionalPrice)}{hasCouponDiscount ? ` com cupom -${couponDiscountPercent}%` : ''}</small>}</div>
+            contentType === 'feed' ? <div className="promotion-product-summary"><span>Chamada do post</span><strong>Confira no site</strong><small>www.lojaalphatec.com.br · arte e legenda sem preços</small></div> : <div className="promotion-product-summary"><span>Preço para o Reel</span><strong>{originalPrice > 0 ? money(promotionalPrice) : 'Consulte o preço'}</strong>{(hasDiscount || hasCouponDiscount) && <small>De {money(priceBeforeCoupon)} por {money(promotionalPrice)}{hasCouponDiscount ? ` com cupom -${couponDiscountPercent}%` : ''}</small>}</div>
           ) : (
             <>
               <fieldset className="category-checkbox-field promotion-product-picker">
@@ -825,4 +837,3 @@ export default function AdminPromotions({ products, onMessage }: Props) {
     </div>
   )
 }
-

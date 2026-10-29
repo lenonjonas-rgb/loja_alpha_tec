@@ -159,6 +159,11 @@ export default function AdminOrders({ products, onMessage }: Props) {
   }
 
   async function printLabels(targetOrders: Order[]) {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return onMessage('Permita pop-ups neste site para abrir as etiquetas para impressão.')
+    printWindow.document.title = 'Preparando etiquetas para impressão'
+    printWindow.document.body.textContent = 'Preparando etiquetas para impressão...'
+
     const prepared: Order[] = []
     for (const order of targetOrders) {
       let current = order
@@ -172,15 +177,22 @@ export default function AdminOrders({ products, onMessage }: Props) {
           }
         } catch { /* usa a referência interna quando a API oficial falhar */ }
       }
-      if (!resolveLabelAddress(current).cep) return onMessage(`O pedido #${order.id.slice(0, 8)} não tem CEP no pedido nem no cadastro do cliente.`)
+      if (!resolveLabelAddress(current).cep) {
+        printWindow.close()
+        return onMessage(`O pedido #${order.id.slice(0, 8)} não tem CEP no pedido nem no cadastro do cliente.`)
+      }
       prepared.push(current)
     }
-    if (!prepared.length) return onMessage('Selecione pelo menos um pedido.')
+    if (!prepared.length) {
+      printWindow.close()
+      return onMessage('Selecione pelo menos um pedido.')
+    }
     try {
-      await generateShippingLabels(prepared)
+      await generateShippingLabels(prepared, printWindow)
       setSelectedIds([])
-      onMessage(`${prepared.length} etiqueta(s) gerada(s) em A4 paisagem.`)
+      onMessage(`${prepared.length} etiqueta(s) aberta(s) para impressão em A4 paisagem.`)
     } catch {
+      printWindow.close()
       onMessage('Não foi possível gerar as etiquetas.')
     }
   }

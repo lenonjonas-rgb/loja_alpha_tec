@@ -128,7 +128,7 @@ async function drawShippingLabel(pdf: any, order: LabelOrder, x: number, y: numb
   pdf.text('Não aceite a encomenda se a embalagem estiver violada.', x + margin, y + labelHeight - margin)
 }
 
-export async function generateShippingLabels(orders: LabelOrder[]) {
+export async function generateShippingLabels(orders: LabelOrder[], printWindow: Window) {
   const { jsPDF } = await import('jspdf')
   const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' })
   const logo = await imageDataUrl('/logo-header-uniform.jpg').catch(() => null)
@@ -138,9 +138,10 @@ export async function generateShippingLabels(orders: LabelOrder[]) {
     if (index > 0 && index % 2 === 0) pdf.addPage('a4', 'landscape')
     await drawShippingLabel(pdf, orders[index], (index % 2) * labelWidth, 0, labelWidth, labelHeight, logo)
   }
-  pdf.save(`etiquetas-alpha-tec-${new Date().toISOString().slice(0, 10)}.pdf`)
+  pdf.autoPrint()
+  printWindow.location.href = pdf.output('bloburl').toString()
 }
 
-export async function generateShippingLabel(order: LabelOrder) {
-  return generateShippingLabels([order])
+export async function generateShippingLabel(order: LabelOrder, printWindow: Window) {
+  return generateShippingLabels([order], printWindow)
 }

@@ -17,24 +17,41 @@ async function persistInvoice(supabase: ReturnType<typeof getSupabaseServer>, or
 }
 
 // o endereço do cliente vive na tabela addresses, não em customers: anexa o mais recente de cada cliente
-async function attachCustomerAddresses(supabase: ReturnType<typeof getSupabaseServer>, orders: any[]) {
+async function attachOrderDetails(supabase: ReturnType<typeof getSupabaseServer>, orders: any[]) {
   const customerIds = Array.from(new Set(orders.map((order) => order.customer_id).filter(Boolean)))
-  if (!customerIds.length) return orders
-
-  const { data: addresses } = await supabase
-    .from('addresses')
-    .select('customer_id,cep,street,number,complement,city,state')
-    .in('customer_id', customerIds)
-
   const addressByCustomer = new Map<string, any>()
-  for (const address of addresses || []) {
-    if (!addressByCustomer.has(String(address.customer_id))) addressByCustomer.set(String(address.customer_id), address)
+  if (customerIds.length) {
+    const { data: addresses, error: addressesError } = await supabase
+      .from('addresses')
+      .select('customer_id,cep,street,number,complement,city,state')
+      .in('customer_id', customerIds)
+    if (addressesError) throw addressesError
+    for (const address of addresses || []) {
+      if (!addressByCustomer.has(String(address.customer_id))) addressByCustomer.set(String(address.customer_id), address)
+    }
+  }
+
+  const productIds = Array.from(new Set(orders.flatMap((order) => (order.order_items || []).map((item: any) => item.product_id).filter(Boolean))))
+  const imageByProduct = new Map<string, string>()
+  if (productIds.length) {
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('id,image_url')
+      .in('id', productIds)
+    if (productsError) throw productsError
+    for (const product of products || []) {
+      if (product.image_url) imageByProduct.set(String(product.id), String(product.image_url))
+    }
   }
 
   return orders.map((order) => {
     const address = addressByCustomer.get(String(order.customer_id))
     return {
       ...order,
+      order_items: (order.order_items || []).map((item: any) => ({
+        ...item,
+        product_image_url: item.product_id ? imageByProduct.get(String(item.product_id)) || null : null,
+      })),
       customer_address: address
         ? {
           cep: address.cep || '',
@@ -48,8 +65,8 @@ async function attachCustomerAddresses(supabase: ReturnType<typeof getSupabaseSe
   })
 }
 
-const adminOrderSelect = 'id,customer_id,status,payment_status,payment_method,subtotal,shipping,total,created_at,tracking_code,carrier,invoice_url,shipping_address,manual_customer_name,manual_customer_phone,manual_customer_email,customers(name,email,phone,document),order_items(product_name,internal_code,quantity,unit_price,total)'
-const adminOrderSelectFallback = 'id,customer_id,status,payment_status,payment_method,subtotal,shipping,total,created_at,tracking_code,carrier,invoice_url,shipping_address,customers(name,email,phone,document),order_items(product_name,internal_code,quantity,unit_price,total)'
+const adminOrderSelect = 'id,customer_id,status,payment_status,payment_method,subtotal,shipping,total,created_at,tracking_code,carrier,invoice_url,shipping_address,manual_customer_name,manual_customer_phone,manual_customer_email,customers(name,email,phone,document),order_items(product_id,product_name,internal_code,quantity,unit_price,total)'
+const adminOrderSelectFallback = 'id,customer_id,status,payment_status,payment_method,subtotal,shipping,total,created_at,tracking_code,carrier,invoice_url,shipping_address,customers(name,email,phone,document),order_items(product_id,product_name,internal_code,quantity,unit_price,total)'
 
 // enquanto scripts/commerce.sql não for executado no Supabase, as colunas manual_customer_* ainda não existem;
 // nesse caso cai para a consulta antiga em vez de quebrar o carregamento de pedidos
@@ -81,7 +98,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
       if (!isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
       const data = await selectAdminOrders(supabase)
-      return res.status(200).json(await attachCustomerAddresses(supabase, data))
+      return res.status(200).json(await attachOrderDetails(supabase, data))
     } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível carregar os pedidos.' }) }
   }
   if (req.method === 'PATCH' && !isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
@@ -106,7 +123,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const orderLabel: Record<string, string> = { pending: 'Pendente', confirmed: 'Confirmado', processing: 'Em separação', shipped: 'Enviado', delivered: 'Entregue', cancelled: 'Cancelado' }
         await supabase.from('notifications').insert({ customer_id: data.customer_id, order_id: data.id, title: 'Atualização do pedido', message: `Seu pedido agora está: ${orderLabel[data.status] || data.status}.`, status: data.status })
       }
-      const [enriched] = await attachCustomerAddresses(supabase, [data])
+      const [enriched] = await attachOrderDetails(supabase, [data])
       return res.status(200).json(enriched)
     } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível atualizar o pedido.' }) }
   }
@@ -170,7 +187,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const { data: fullOrder, error: fullOrderError } = await supabase.from('orders').select(adminOrderSelect).eq('id', order.id).single()
       if (fullOrderError) throw fullOrderError
-      const [enriched] = await attachCustomerAddresses(supabase, [fullOrder])
+      const [enriched] = await attachOrderDetails(supabase, [fullOrder])
       return res.status(201).json(enriched)
     } catch (error) {
       const message = error instanceof Error ? error.message : String((error as { message?: unknown })?.message || '')

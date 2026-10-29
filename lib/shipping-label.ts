@@ -41,13 +41,6 @@ function splitCityState(city: string) {
   return { city: (name || '').trim(), state: (state || '').trim() }
 }
 
-async function barcodeDataUrl(value: string, width: number) {
-  const JsBarcode = (await import('jsbarcode')).default
-  const canvas = document.createElement('canvas')
-  JsBarcode(canvas, value, { format: 'CODE128', displayValue: false, margin: 0, height: 60, width })
-  return canvas.toDataURL('image/png')
-}
-
 async function imageDataUrl(path: string) {
   const response = await fetch(path)
   if (!response.ok) throw new Error('Logo da loja não encontrada.')
@@ -88,29 +81,7 @@ async function drawShippingLabel(pdf: any, order: LabelOrder, x: number, y: numb
   pdf.line(x + margin, cursor, x + labelWidth - margin, cursor)
   cursor += 6
 
-  const codeForBarcode = trackingCode || order.id.replace(/-/g, '').slice(0, 20).toUpperCase()
-  try {
-    const barcode = await barcodeDataUrl(codeForBarcode, 1.5)
-    pdf.addImage(barcode, 'PNG', x + margin, cursor, width, 20)
-    cursor += 23
-  } catch {
-    pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(12)
-    pdf.text(codeForBarcode, x + margin, cursor + 8)
-    cursor += 12
-  }
-  pdf.setFont('helvetica', 'bold')
-  pdf.setFontSize(10)
-  pdf.text(codeForBarcode, x + labelWidth / 2, cursor, { align: 'center' })
-  cursor += 4
-  if (!trackingCode) {
-    pdf.setFont('helvetica', 'normal')
-    pdf.setFontSize(7)
-    pdf.text('Referência interna — rastreio oficial ainda não informado.', x + labelWidth / 2, cursor + 4, { align: 'center' })
-    cursor += 7
-  }
-
-  cursor += 3
+  cursor += 37
   pdf.line(x + margin, cursor, x + labelWidth - margin, cursor)
   cursor += 7
   pdf.setFont('helvetica', 'bold')

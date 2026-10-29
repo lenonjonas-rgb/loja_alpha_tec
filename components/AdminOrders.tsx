@@ -2,7 +2,7 @@ import { ChangeEvent, useEffect, useState } from 'react'
 import { getCarrierTrackingUrl } from '../lib/carrier-tracking'
 import { generateShippingLabels, resolveLabelAddress, type LabelAddress, type LabelCustomer } from '../lib/shipping-label'
 
-type Order = { id: string; created_at: string; status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'; payment_status: 'pending' | 'paid' | 'failed' | 'refunded'; payment_method: string | null; total: number; tracking_code: string | null; carrier: string | null; invoice_url: string | null; shipping_address: LabelAddress | null; customer_address?: LabelAddress | null; customers: LabelCustomer | null; manual_customer_name?: string | null; manual_customer_phone?: string | null; manual_customer_email?: string | null; order_items: { product_name: string; internal_code: string | null; quantity: number }[] }
+type Order = { id: string; created_at: string; status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'; payment_status: 'pending' | 'paid' | 'failed' | 'refunded'; payment_method: string | null; total: number; shipping: number | null; tracking_code: string | null; carrier: string | null; invoice_url: string | null; shipping_address: LabelAddress | null; customer_address?: LabelAddress | null; customers: LabelCustomer | null; manual_customer_name?: string | null; manual_customer_phone?: string | null; manual_customer_email?: string | null; order_items: { product_name: string; internal_code: string | null; quantity: number }[] }
 type CartOpportunity = { customer_id: string; updated_at: string; customer: { name: string | null; email: string | null; phone: string | null } | null; items: { product_name: string; internal_code: string | null; quantity: number; unit_price: number }[] }
 type Product = { id: string; name: string; internalCode?: string; price: number; discountPercent?: number; active: boolean }
 type ManualItem = { productId: string; quantity: number; unitPrice: number }
@@ -13,6 +13,7 @@ const paymentStatuses = ['pending', 'paid', 'failed', 'refunded'] as const
 const orderLabel: Record<string, string> = { pending: 'Pendente', confirmed: 'Confirmado', processing: 'Em separação', shipped: 'Enviado', delivered: 'Entregue', cancelled: 'Cancelado' }
 const paymentLabel: Record<string, string> = { pending: 'Pagamento pendente', paid: 'Pago', failed: 'Pagamento falhou', refunded: 'Estornado' }
 const paymentMethodLabel: Record<string, string> = { pix: 'Pix (Mercado Pago)', card: 'Cartão (Mercado Pago)', boleto: 'Boleto (Mercado Pago)', manual: 'Venda fora do site', cash: 'Dinheiro', other: 'Outro' }
+const formatMoney = (value: number) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const blankManualItem = (): ManualItem => ({ productId: '', quantity: 1, unitPrice: 0 })
 
 export default function AdminOrders({ products, onMessage }: Props) {
@@ -255,6 +256,13 @@ export default function AdminOrders({ products, onMessage }: Props) {
       {!visibleOrders.length && !visibleCarts.length && <p className="form-hint">Nenhum pedido nesta etapa.</p>}
       {visibleOrders.map((order) => {
         const expanded = expandedIds.includes(order.id)
+        const destination = resolveLabelAddress(order)
+        const customerEmail = order.customers?.email || order.manual_customer_email
+        const customerName = destination.name || order.manual_customer_name
+        const customerPhone = destination.phone || order.manual_customer_phone
+        const productAmount = Number(order.total || 0) - Number(order.shipping || 0)
+        const streetAddress = [destination.address, destination.number].filter(Boolean).join(', ')
+        const fullStreetAddress = [streetAddress, destination.complement].filter(Boolean).join(' - ')
         return <article className={`order-card ${expanded ? 'expanded' : ''}`} key={order.id} onClick={() => toggleExpanded(order.id)}>
           <div className="order-summary">
             <div className="order-select" onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(order.id)} onChange={() => toggleSelection(order.id)} aria-label={`Selecionar pedido ${order.id.slice(0, 8)}`} /></div>
@@ -264,7 +272,21 @@ export default function AdminOrders({ products, onMessage }: Props) {
           </div>
           {expanded && <div className="order-details" onClick={(event) => event.stopPropagation()}>
             <p className="order-payment-method">Pagamento: <strong>{order.payment_method ? (paymentMethodLabel[order.payment_method] || order.payment_method) : 'Não informado'}</strong></p>
-            {!order.customers && (order.manual_customer_phone || order.manual_customer_email) && <p className="form-hint">Pedido manual · {order.manual_customer_phone || 'sem telefone'}{order.manual_customer_email ? ` · ${order.manual_customer_email}` : ''}</p>}
+            <div className="order-payment-breakdown" aria-label="Valores pagos no pedido">
+              <p>Produtos pagos <strong>{formatMoney(productAmount)}</strong></p>
+              <p>Frete pago <strong>{formatMoney(Number(order.shipping || 0))}</strong></p>
+            </div>
+            <section className="order-customer-details" aria-label="Dados do cliente">
+              <h4>Dados do cliente</h4>
+              <p><strong>{customerName || 'Nome não informado'}</strong></p>
+              {customerEmail && <p>E-mail: {customerEmail}</p>}
+              {customerPhone && <p>Telefone: {customerPhone}</p>}
+              {destination.document && <p>CPF/CNPJ: {destination.document}</p>}
+              {fullStreetAddress && <p>Endereço: {fullStreetAddress}</p>}
+              {destination.city && <p>Cidade: {destination.city}</p>}
+              {destination.cep && <p>CEP: {destination.cep}</p>}
+              {!order.customers && <small>Pedido manual</small>}
+            </section>
             <p className="order-invoice-status">{order.invoice_url ? <a href={order.invoice_url} target="_blank" rel="noreferrer">Ver nota fiscal anexada</a> : 'Sem nota fiscal anexada'}</p>
             <div className="lead-actions"><select value={order.payment_status} onChange={(event) => void updateOrder(order, order.status, event.target.value as Order['payment_status'])}>{paymentStatuses.map((paymentStatus) => <option key={paymentStatus} value={paymentStatus}>{paymentLabel[paymentStatus]}</option>)}</select><select value={order.status} onChange={(event) => void updateOrder(order, event.target.value as Order['status'])}>{orderStatuses.map((status) => <option key={status} value={status}>{orderLabel[status]}</option>)}</select></div>
             <p className="order-carrier">{order.carrier ? <>{order.carrier} {order.tracking_code && <a href={getCarrierTrackingUrl(order.carrier, order.tracking_code) || '#'} target="_blank" rel="noreferrer">{order.tracking_code}</a>}</> : 'Transportadora não definida'}</p>

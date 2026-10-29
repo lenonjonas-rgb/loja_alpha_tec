@@ -364,6 +364,13 @@ a { color: inherit; text-decoration: none; }
 .order-details .lead-actions select, .order-details .tracking-code-input { box-sizing: border-box; height: 40px; margin: 0; width: 220px; }
 .order-details .tracking-code-input { padding: 10px; }
 .order-details .order-carrier { margin: 12px 0 6px; }
+.order-payment-breakdown { background: #f7f7f8; display: flex; flex-wrap: wrap; gap: 8px 28px; margin: 14px 0; padding: 12px 14px; }
+.order-payment-breakdown p { margin: 0; }
+.order-payment-breakdown strong { margin-left: 6px; }
+.order-customer-details { border: 1px solid #e2e3e4; margin: 14px 0; padding: 14px; }
+.order-customer-details h4 { font-family: 'Barlow Condensed'; font-size: 17px; margin: 0 0 8px; text-transform: uppercase; }
+.order-customer-details p { font-size: 12px; margin: 5px 0; overflow-wrap: anywhere; }
+.order-customer-details small { color: #686c70; display: block; font-size: 10px; margin-top: 8px; }
 .cart-recovery-list { margin: 20px 0 24px; }
 .cart-recovery-heading { align-items: baseline; border-bottom: 1px solid #e2e3e4; display: flex; justify-content: space-between; margin-bottom: 4px; padding-bottom: 10px; }
 .cart-recovery-heading h3 { font-size: 15px; margin: 0; }

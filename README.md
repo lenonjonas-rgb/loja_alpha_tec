@@ -87,6 +87,54 @@ entregas anteriores à assinatura. Rastreios precisam estar cadastrados nos
 pedidos. Testes locais: `node --test tests/correios-delivery.test.cjs`.
 Referência: [documentação oficial Webhook](https://api.correios.com.br/webhook/v3/api-docs).
 
+#### Mensagens de pedido pelo WhatsApp
+
+Nos detalhes de cada pedido, o botão WhatsApp prepara uma mensagem conforme
+o status salvo: pendente, confirmado, em separação, enviado, entregue ou
+cancelado. A mensagem de envio inclui a transportadora, o código e o link de
+rastreio quando disponíveis. Funciona também em pedidos manuais e acrescenta
+o DDI 55 a telefones brasileiros com DDD sem código de país.
+
+O botão pode ser usado novamente a qualquer momento e **não envia sozinho**:
+é necessário conferir e enviar no aplicativo. Confirmação agradece a compra;
+separação informa a preparação; entrega convida clientes cadastrados a avaliar
+com foto, com os pontos definidos no programa (independentemente da nota).
+Pedidos manuais sem conta vinculada não prometem pontos inacessíveis.
+
+Na recuperação de carrinhos, **cada clique** em "WhatsApp + novo cupom de 10%"
+cria um código diferente, exclusivo da conta do cliente, para uma compra,
+válido por 7 dias, com desconto de 10% nos produtos (não no frete).
+"Reabrir mensagem" reutiliza a mensagem já preparada sem criar outro cupom.
+Cupons anteriores continuam válidos até o uso ou vencimento. Um novo clique
+gera outra oferta; o sistema não confirma que a mensagem foi efetivamente
+enviada no aplicativo.
+
+Antes de habilitar a recuperação, execute
+[scripts/cart-recovery.sql](scripts/cart-recovery.sql) no Supabase, após
+[scripts/commerce.sql](scripts/commerce.sql). O RPC de emissão é exclusivo
+de `service_role`; a API exige administrador com papel administrativo ou
+master. A propriedade do cupom é verificada pela sessão do cliente na
+validação e nos dois caminhos de checkout, com proteção adicional no banco.
+O consumo na confirmação do pagamento é transacional, inclusive quando o
+administrador marca o pagamento como pago. O identificador do pedido que
+usou o cupom é preservado mesmo se o pedido for excluído.
+
+Carrinhos sem itens ou com pedido iniciado/concluído após sua última
+atualização não recebem oferta. Pedidos com pagamento pendente continuam
+distintos de carrinhos não concluídos: não recebem cupom pelo botão do pedido.
+Um cupom novo não altera Pix ou boleto emitido anteriormente.
+
+O WhatsApp não permite transformar um texto isolado em link com rótulo:
+a mensagem de envio mostra o código e a URL clicável do canal oficial.
+Transportadoras cujo site exige documento ou nota fiscal abrem a página
+oficial, sem prometer preenchimento automático do código. Não há URL de
+rastreio inventada para transportadoras desconhecidas.
+
+Testes: `node --test tests/order-whatsapp.test.cjs tests/cart-recovery.test.cjs`.
+Para validar as regras transacionais no SQL Editor, execute
+[tests/cart-recovery.sql](tests/cart-recovery.sql); os dados sintéticos são
+revertidos no final, sem envio de mensagens ou cobranças.
+
 #### Variáveis mínimas
 
 Para o site abrir e o catálogo funcionar: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ALPHA_MASTER_USER`, `ALPHA_MASTER_PASSWORD`, `ADMIN_SESSION_SECRET`, `NEXT_PUBLIC_APP_URL` e `NEXT_PUBLIC_WHATSAPP_NUMBER`.

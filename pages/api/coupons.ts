@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
 import { hasProductCategory } from '../../lib/products'
+import { getCouponError } from '../../lib/coupon-rules'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido.' })
@@ -8,9 +9,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const items = Array.isArray(req.body?.items) ? req.body.items : []
   if (!code) return res.status(400).json({ error: 'Informe um cupom.' })
   try {
-    const { data, error } = await getSupabaseServer()
+    const supabase = getSupabaseServer()
+    const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
+    let customerId: string | null = null
+    if (token) {
+      const { data: auth, error: authError } = await supabase.auth.getUser(token)
+      if (authError || !auth.user) return res.status(401).json({ error: 'Sessão inválida.' })
+      customerId = auth.user.id
+    }
+    const { data, error } = await supabase
       .from('coupons')
-      .select('id,code,discount_percent,expires_at,usage_limit,used_count,product_id,category,free_shipping')
+      .select('id,code,discount_percent,expires_at,usage_limit,used_count,product_id,category,free_shipping,customer_id')
       .eq('code', code)
       .eq('active', true)
       .maybeSingle()
@@ -18,11 +27,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (error && /product_id|category/i.test(error.message)) {
       const fallback = await getSupabaseServer()
         .from('coupons')
-        .select('id,code,discount_percent,expires_at,usage_limit,used_count,product_id,category,free_shipping')
+        .select('id,code,discount_percent,expires_at,usage_limit,used_count,product_id,category,free_shipping,customer_id')
         .eq('code', code)
         .eq('active', true)
         .maybeSingle()
       if (fallback.error) throw fallback.error
+      const fallbackError = getCouponError(fallback.data, customerId)
+      if (fallbackError) return res.status(400).json({ error: fallbackError })
       if (!fallback.data || (fallback.data.expires_at && new Date(fallback.data.expires_at) < new Date()) || (fallback.data.usage_limit !== null && fallback.data.used_count >= fallback.data.usage_limit)) {
         return res.status(404).json({ error: 'Cupom inválido, expirado ou esgotado.' })
       }
@@ -46,6 +57,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (error) throw error
+    const validationError = getCouponError(data, customerId)
+    if (validationError) return res.status(400).json({ error: validationError })
     if (!data || (data.expires_at && new Date(data.expires_at) < new Date()) || (data.usage_limit !== null && data.used_count >= data.usage_limit)) {
       return res.status(404).json({ error: 'Cupom inválido, expirado ou esgotado.' })
     }
@@ -92,6 +105,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ code: data.code, discountPercent: Number(data.discount_percent || 0), freeShipping: Boolean(data.free_shipping) })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Não foi possível validar o cupom.'
+    if (/customer_id/i.test(message)) return res.status(503).json({ error: 'Validação de cupons indisponível. A loja precisa aplicar scripts/cart-recovery.sql no Supabase.' })
     if (/product_id|category|free_shipping/i.test(message)) {
       return res.status(400).json({ error: 'A tabela de cupons ainda não está com as colunas necessárias. Execute scripts/commerce.sql no Supabase para criar product_id, category e free_shipping.' })
     }

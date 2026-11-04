@@ -278,7 +278,19 @@ export default function Checkout() {
       checkPendingPayment(true)
     }
   }, [router.isReady, router.query.payment])
-  async function applyCoupon(codeToApply = couponCode) { const response = await fetch('/api/coupons', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: codeToApply, items }) }); const result = await response.json(); if (!response.ok) return setError(result.error); setCoupon({ code: result.code, discountPercent: Number(result.discountPercent) || 0, freeShipping: Boolean(result.freeShipping) }); setError(result.freeShipping ? 'Cupom aplicado: frete grátis.' : 'Cupom aplicado.') }
+  async function applyCoupon(codeToApply = couponCode) {
+    try {
+      const session = supabase ? (await supabase.auth.getSession()).data.session : null
+      const response = await fetch('/api/coupons', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}) }, body: JSON.stringify({ code: codeToApply, items }) })
+      const result = await response.json()
+      if (!response.ok) { setCoupon(null); return setError(result.error || 'Não foi possível validar o cupom.') }
+      setCoupon({ code: result.code, discountPercent: Number(result.discountPercent) || 0, freeShipping: Boolean(result.freeShipping) })
+      setError(result.freeShipping ? 'Cupom aplicado: frete grátis.' : 'Cupom aplicado.')
+    } catch {
+      setCoupon(null)
+      setError('Não foi possível validar o cupom agora. Tente novamente.')
+    }
+  }
   function saveNewAddress() {
     if (!newAddress || !newAddress.cep || !newAddress.address || !newAddress.number || !newAddress.city) return setError('Preencha CEP, endereço, número e cidade para salvar o endereço.')
     const saved = [...addressOptions.filter((item) => item.id !== 'current'), newAddress]

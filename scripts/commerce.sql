@@ -47,6 +47,8 @@ create table if not exists public.coupons (
 alter table public.coupons add column if not exists product_id text;
 alter table public.coupons add column if not exists category text;
 alter table public.coupons add column if not exists free_shipping boolean not null default false;
+alter table public.coupons add column if not exists customer_id uuid references public.customers(id) on delete cascade;
+alter table public.coupons add column if not exists redeemed_order_id uuid;
 create index if not exists coupons_code_active_idx on public.coupons (code, active);
 create index if not exists coupons_product_id_idx on public.coupons (product_id);
 create index if not exists coupons_category_idx on public.coupons (category);
@@ -206,6 +208,7 @@ begin
       and active = true
       and (expires_at is null or expires_at >= now())
       and (usage_limit is null or used_count < usage_limit)
+      and (customer_id is null or customer_id = order_customer_id)
     for update;
 
     if not found then

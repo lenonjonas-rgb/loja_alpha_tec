@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useCart } from '../components/CartContext'
 import { useCustomer } from '../components/CustomerContext'
+import { supabase } from '../lib/supabase'
 import { readPendingPayment, clearPendingPayment, confirmPendingPayment } from '../lib/pending-payment'
 
 const money = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`
@@ -66,9 +67,10 @@ export default function Cart() {
     if (!trimmedCode) return setCouponMessage('Informe o código do cupom.')
 
     try {
+      const session = supabase ? (await supabase.auth.getSession()).data.session : null
       const response = await fetch('/api/coupons', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}) },
         body: JSON.stringify({ code: trimmedCode, items })
       })
 

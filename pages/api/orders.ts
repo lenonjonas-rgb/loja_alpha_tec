@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
 import { isAdmin } from '../../lib/admin-auth'
 import { sendAdminPush } from '../../lib/admin-push'
+import { getCouponError } from '../../lib/coupon-rules'
 
 export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
 
@@ -212,8 +213,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let shippingTotal = Number(shipping) || 0
     let discount = 0
     let appliedCoupon: { id: string; used_count: number } | null = null
-    if (couponCode) { const { data: coupon } = await supabase.from('coupons').select('id,discount_percent,expires_at,usage_limit,used_count,free_shipping').eq('code', String(couponCode).toUpperCase()).eq('active', true).maybeSingle(); if (!coupon || (coupon.expires_at && new Date(coupon.expires_at) < new Date()) || (coupon.usage_limit !== null && coupon.used_count >= coupon.usage_limit)) return res.status(400).json({ error: 'Cupom inválido, expirado ou esgotado.' }); discount = subtotal * Number(coupon.discount_percent || 0) / 100; shippingTotal = coupon.free_shipping ? 0 : shippingTotal; appliedCoupon = { id: coupon.id, used_count: coupon.used_count } }
-    const { data: order, error: orderError } = await supabase.from('orders').insert({ customer_id: customerId, status: 'pending', payment_status: 'pending', payment_method: paymentMethod || null, coupon_code: couponCode ? String(couponCode).toUpperCase() : null, carrier: carrier || null, subtotal, shipping: shippingTotal, total: subtotal + shippingTotal - discount }).select('id').single()
+    if (couponCode) {
+      const { data: coupon, error: couponError } = await supabase.from('coupons').select('id,discount_percent,expires_at,usage_limit,used_count,free_shipping,customer_id').eq('code', String(couponCode).trim().toUpperCase()).eq('active', true).maybeSingle()
+      if (couponError) throw couponError
+      const validationError = getCouponError(coupon, user.id)
+      if (validationError) return res.status(400).json({ error: validationError })
+      if (!coupon) throw new Error('Cupom não encontrado.')
+      discount = subtotal * Number(coupon.discount_percent || 0) / 100
+      shippingTotal = coupon.free_shipping ? 0 : shippingTotal
+      // Cupons exclusivos são consumidos na confirmação transacional do pagamento.
+      if (!coupon.customer_id) appliedCoupon = { id: coupon.id, used_count: coupon.used_count }
+    }
+    const { data: order, error: orderError } = await supabase.from('orders').insert({ customer_id: customerId, status: 'pending', payment_status: 'pending', payment_method: paymentMethod || null, coupon_code: couponCode ? String(couponCode).trim().toUpperCase() : null, carrier: carrier || null, subtotal, shipping: shippingTotal, total: subtotal + shippingTotal - discount }).select('id').single()
     if (orderError) throw orderError
     const orderItems = items.map((item: { id: string; quantity: number }) => { const product = priceById.get(item.id)!; return { order_id: order.id, product_id: item.id, product_name: product.name, internal_code: product.internalCode || null, quantity: item.quantity, unit_price: product.price, total: product.price * item.quantity } })
     const { error: itemError } = await supabase.from('order_items').insert(orderItems)

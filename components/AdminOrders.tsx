@@ -1,5 +1,6 @@
 import { ChangeEvent, useEffect, useState } from 'react'
 import { getCarrierTrackingUrl } from '../lib/carrier-tracking'
+import { getOrderWhatsAppUrl, normalizeWhatsAppPhone } from '../lib/order-whatsapp'
 import { generateShippingLabels, resolveLabelAddress, type LabelAddress, type LabelCustomer } from '../lib/shipping-label'
 
 type Order = { id: string; created_at: string; status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'; payment_status: 'pending' | 'paid' | 'failed' | 'refunded'; payment_method: string | null; total: number; shipping: number | null; tracking_code: string | null; carrier: string | null; invoice_url: string | null; shipping_address: LabelAddress | null; customer_address?: LabelAddress | null; customers: LabelCustomer | null; manual_customer_name?: string | null; manual_customer_phone?: string | null; manual_customer_email?: string | null; order_items: { product_id?: string | null; product_name: string; product_image_url?: string | null; internal_code: string | null; quantity: number }[] }
@@ -19,6 +20,8 @@ const blankManualItem = (): ManualItem => ({ productId: '', quantity: 1, unitPri
 export default function AdminOrders({ products, onMessage }: Props) {
   const [orders, setOrders] = useState<Order[]>([])
   const [cartOpportunities, setCartOpportunities] = useState<CartOpportunity[]>([])
+  const [recoveringCart, setRecoveringCart] = useState<string | null>(null)
+  const [recoveryLinks, setRecoveryLinks] = useState<Record<string, { url: string; code: string }>>({})
   const [activeStatus, setActiveStatus] = useState<Order['status']>('processing')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [expandedIds, setExpandedIds] = useState<string[]>([])
@@ -31,6 +34,32 @@ export default function AdminOrders({ products, onMessage }: Props) {
     fetch('/api/orders').then((response) => response.ok ? response.json() : Promise.reject()).then(setOrders).catch(() => onMessage('Não foi possível carregar os pedidos.'))
     fetch('/api/abandoned-carts').then((response) => response.ok ? response.json() : Promise.reject()).then(setCartOpportunities).catch(() => onMessage('Não foi possível carregar os carrinhos para recuperação.'))
   }, [onMessage])
+
+  async function recoverCart(cart: CartOpportunity) {
+    const popup = window.open('about:blank', '_blank')
+    if (!popup) return onMessage('Permita pop-ups para abrir o WhatsApp. Nenhum cupom foi criado.')
+    popup.opener = null
+    setRecoveringCart(cart.customer_id)
+    try {
+      const response = await fetch('/api/cart-recovery', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customerId: cart.customer_id }) })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Não foi possível criar o cupom.')
+      if (typeof result.whatsappUrl !== 'string' || !result.whatsappUrl.startsWith('https://wa.me/') || typeof result.code !== 'string') {
+        throw new Error('Resposta inválida ao preparar a mensagem do WhatsApp.')
+      }
+      setRecoveryLinks((links) => ({ ...links, [cart.customer_id]: { url: result.whatsappUrl, code: result.code } }))
+      if (popup.closed) onMessage(`Cupom ${result.code} criado. Use Reabrir mensagem para enviar ao cliente.`)
+      else {
+        popup.location.href = result.whatsappUrl
+        onMessage(`Cupom ${result.code} criado: 10% nos produtos, exclusivo desta conta, válido por 7 dias e para uma compra. Confira e envie a mensagem no WhatsApp.`)
+      }
+    } catch (error) {
+      popup.close()
+      onMessage(error instanceof Error ? error.message : 'Não foi possível preparar a mensagem de recuperação.')
+    } finally {
+      setRecoveringCart(null)
+    }
+  }
 
   async function updateOrder(order: Order, status: Order['status'], paymentStatus = order.payment_status, trackingCode = order.tracking_code || '', invoiceBase64?: string) {
     const response = await fetch('/api/orders', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: order.id, status, paymentStatus, trackingCode, invoiceBase64 }) })
@@ -248,8 +277,8 @@ export default function AdminOrders({ products, onMessage }: Props) {
         <div className="cart-recovery-heading"><h3>Carrinhos para recuperar</h3><span>{visibleCarts.length} cliente(s)</span></div>
         {visibleCarts.map((cart) => {
           const customer = cart.customer
-          const phone = String(customer?.phone || '').replace(/\D/g, '')
-          const message = `Olá${customer?.name ? `, ${customer.name}` : ''}! Vi que você deixou alguns itens no carrinho da Alpha Tec. Posso ajudar com alguma dúvida?`
+          const phone = normalizeWhatsAppPhone(customer?.phone)
+          const recoveryLink = recoveryLinks[cart.customer_id]
           const total = cart.items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0)
           return <article className="cart-recovery-card" key={cart.customer_id}>
             <div className="cart-recovery-main">
@@ -259,7 +288,8 @@ export default function AdminOrders({ products, onMessage }: Props) {
             </div>
             <strong className="cart-recovery-total">R$ {total.toFixed(2).replace('.', ',')}</strong>
             <div className="cart-recovery-actions">
-              {phone && <a className="cart-contact-whatsapp" href={`https://wa.me/${phone}?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer">WhatsApp</a>}
+              {phone ? <button type="button" className="cart-contact-whatsapp" disabled={recoveringCart !== null} onClick={() => void recoverCart(cart)}>{recoveringCart === cart.customer_id ? 'Criando cupom...' : 'WhatsApp + novo cupom de 10%'}</button> : <span>Telefone ausente ou inválido para WhatsApp.</span>}
+              {recoveryLink && <a href={recoveryLink.url} target="_blank" rel="noreferrer">Reabrir mensagem ({recoveryLink.code})</a>}
               {customer?.email && <a className="cart-contact-email" href={`mailto:${customer.email}?subject=${encodeURIComponent('Podemos ajudar com seu carrinho?')}`}>E-mail</a>}
             </div>
           </article>
@@ -272,6 +302,7 @@ export default function AdminOrders({ products, onMessage }: Props) {
         const customerEmail = order.customers?.email || order.manual_customer_email
         const customerName = destination.name || order.manual_customer_name
         const customerPhone = destination.phone || order.manual_customer_phone
+        const whatsappUrl = getOrderWhatsAppUrl(order, customerPhone, customerName)
         const productAmount = Number(order.total || 0) - Number(order.shipping || 0)
         const streetAddress = [destination.address, destination.number].filter(Boolean).join(', ')
         const fullStreetAddress = [streetAddress, destination.complement].filter(Boolean).join(' - ')
@@ -293,6 +324,8 @@ export default function AdminOrders({ products, onMessage }: Props) {
               <p><strong>{customerName || 'Nome não informado'}</strong></p>
               {customerEmail && <p>E-mail: {customerEmail}</p>}
               {customerPhone && <p>Telefone: {customerPhone}</p>}
+              {whatsappUrl ? <p><a className="cart-contact-whatsapp" href={whatsappUrl} target="_blank" rel="noreferrer">WhatsApp: avisar {orderLabel[order.status].toLowerCase()}</a></p> : <p className="form-hint">WhatsApp indisponível: telefone do cliente ausente ou inválido.</p>}
+              {whatsappUrl && <small>Abre a mensagem da etapa atual para conferir e enviar no WhatsApp. Clique em Enviar no aplicativo para concluir.</small>}
               {destination.document && <p>CPF/CNPJ: {destination.document}</p>}
               {fullStreetAddress && <p>Endereço: {fullStreetAddress}</p>}
               {destination.city && <p>Cidade: {destination.city}</p>}

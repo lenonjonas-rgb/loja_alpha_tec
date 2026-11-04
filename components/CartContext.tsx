@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import type { Product } from '../lib/products'
 import { supabase } from '../lib/supabase'
 import { useCustomer } from './CustomerContext'
@@ -28,9 +28,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const { customer } = useCustomer()
   const [items, setItems] = useState<CartItem[]>([])
   const [hydrated, setHydrated] = useState(false)
-  const guestCartNotified = useRef(false)
-  // guarda o id do cliente já sincronizado com o servidor, para não repetir a mescla a cada render
-  const syncedCustomerId = useRef<string | null>(null)
+  const [syncedCustomerId, setSyncedCustomerId] = useState<string | null>(null)
 
   useEffect(() => {
     try {
@@ -59,61 +57,59 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [items, hydrated])
 
-  useEffect(() => {
-    if (hydrated && items.length === 0) guestCartNotified.current = false
-  }, [items.length, hydrated])
-
   // carrinho fica atrelado à conta: ao logar, busca o carrinho salvo no servidor e mescla com o que estava no dispositivo
   useEffect(() => {
     if (!hydrated || !supabase) return
-    if (!customer?.id) {
-      syncedCustomerId.current = null
+    const customerId = customer?.id
+    if (!customerId) {
+      setSyncedCustomerId(null)
       return
     }
-    if (syncedCustomerId.current === customer.id) return
-    syncedCustomerId.current = customer.id
+    let cancelled = false
+    setSyncedCustomerId(null)
     void (async () => {
       const { data } = await supabase!.auth.getSession()
       const token = data.session?.access_token
       if (!token) return
       try {
         const response = await fetch('/api/cart', { headers: { Authorization: `Bearer ${token}` } })
-        if (!response.ok) return
+        if (!response.ok) throw new Error('Não foi possível carregar o carrinho salvo.')
         const result = await response.json()
+        if (cancelled) return
         const serverItems: CartItem[] = Array.isArray(result.items) ? result.items : []
         setItems((current) => mergeCarts(current, serverItems))
+        setSyncedCustomerId(customerId)
       } catch (e) {
         console.error('Erro ao sincronizar carrinho com o servidor:', e)
       }
     })()
+    return () => { cancelled = true }
   }, [customer?.id, hydrated])
 
   // qualquer alteração no carrinho de um cliente logado é replicada ao servidor, para valer em qualquer dispositivo
   useEffect(() => {
     if (!hydrated || !supabase || !customer?.id) return
-    if (syncedCustomerId.current !== customer.id) return
+    if (syncedCustomerId !== customer.id) return
+    let cancelled = false
     const timeout = setTimeout(() => {
       void (async () => {
         const { data } = await supabase!.auth.getSession()
         const token = data.session?.access_token
-        if (!token) return
+        if (!token || cancelled) return
         try {
-          await fetch('/api/cart', { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ items }) })
+          const response = await fetch('/api/cart', { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ items }) })
+          if (!response.ok) throw new Error('Não foi possível salvar o carrinho.')
         } catch (e) {
           console.error('Erro ao salvar carrinho no servidor:', e)
         }
       })()
     }, 600)
-    return () => clearTimeout(timeout)
-  }, [items, customer?.id, hydrated])
+    return () => { cancelled = true; clearTimeout(timeout) }
+  }, [items, customer?.id, hydrated, syncedCustomerId])
 
 
   function addItem(product: Product) {
     if (!product || !product.id) return
-    if (!customer?.id && items.length === 0 && !guestCartNotified.current) {
-      guestCartNotified.current = true
-      void fetch('/api/guest-cart-event', { method: 'POST' }).catch(() => undefined)
-    }
     setItems((current) => {
       const cartKey = getCartKey(product)
       const existing = current.find((item) => getCartKey(item) === cartKey)

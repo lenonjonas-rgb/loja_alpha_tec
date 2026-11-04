@@ -144,6 +144,39 @@ Para validar as regras transacionais no SQL Editor, execute
 [tests/compra10.sql](tests/compra10.sql); os dados sintéticos são
 revertidos no final, sem envio de mensagens ou cobranças.
 
+### Avisos de carrinho pendente
+
+O aviso push aos administradores é enviado apenas após **3 horas sem mudança
+nos produtos/quantidades e sem pagamento concluído**. O Supabase Cron verifica
+a cada 5 minutos, mesmo sem ninguém com o site aberto. Atrasos de execução ou
+de entrega push podem aumentar esse intervalo.
+
+Login, logout, ordem dos itens e atualizações de nome/preço não reiniciam o
+prazo nem repetem um aviso já enviado. Mudar produto, modelo ou quantidade
+inicia novas 3 horas e permite outro aviso. Esvaziar o carrinho ou confirmar
+o pagamento cancela o aviso; uma mudança posterior inicia um novo ciclo.
+Visitantes só entram nessa regra ao entrar na conta e salvar o carrinho.
+Os carrinhos anteriores à migração são tratados como já avisados, evitando
+reenvio dos antigos alertas imediatos. Alertas de pedidos efetivamente criados
+e de pagamento aprovado mantêm suas regras anteriores.
+
+Execute [scripts/cart-notifications.sql](scripts/cart-notifications.sql) depois
+de commerce.sql. Configure um segredo aleatório de pelo menos 32 caracteres
+em `CART_NOTIFICATIONS_SECRET` na Vercel (Production) e o mesmo valor no Vault
+do Supabase com nome `cart_notifications_secret`. Após publicar a aplicação,
+execute [scripts/cart-notifications-cron.sql](scripts/cart-notifications-cron.sql).
+Nunca registre o segredo no Git. O endpoint aceita somente POST autenticado.
+
+A reserva transacional impede execuções concorrentes de repetir avisos.
+Se nenhum dispositivo for alcançado, o aviso é liberado para nova tentativa;
+com entrega parcial não se repete para evitar duplicar nos dispositivos já
+alcançados. A reserva é feita antes do envio: uma interrupção abrupta da função
+pode perder aquele aviso, em vez de arriscar duplicá-lo. Os retornos HTTP e os
+logs da função/cron permitem acompanhar falhas.
+
+Testes: `node --test tests/cart-notifications.test.cjs` e
+[tests/cart-notifications.sql](tests/cart-notifications.sql) (rollback).
+
 #### Variáveis mínimas
 
 Para o site abrir e o catálogo funcionar: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ALPHA_MASTER_USER`, `ALPHA_MASTER_PASSWORD`, `ADMIN_SESSION_SECRET`, `NEXT_PUBLIC_APP_URL` e `NEXT_PUBLIC_WHATSAPP_NUMBER`.

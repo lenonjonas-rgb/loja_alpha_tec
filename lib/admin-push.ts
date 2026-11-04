@@ -9,7 +9,8 @@ function isConfigured() {
 
 export async function sendAdminPush(payload: PushPayload) {
   const supabase = getSupabaseServer()
-  const { data: subscriptions } = await supabase.from('admin_push_subscriptions').select('id,endpoint,subscription')
+  const { data: subscriptions, error } = await supabase.from('admin_push_subscriptions').select('id,endpoint,subscription')
+  if (error) throw error
   if (!subscriptions?.length) return { sent: 0, failed: 0 }
 
   const webSubscriptions = subscriptions.filter((item) => String(item.endpoint).startsWith('https://'))

@@ -25,7 +25,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!coupon || typeof coupon.code !== 'string' || typeof coupon.expires_at !== 'string' || !Number.isFinite(Date.parse(coupon.expires_at))) {
       throw new Error('Resposta inválida ao criar cupom de recuperação.')
     }
-    const message = getCartRecoveryMessage(customer.name, coupon.code)
+    const validDays = Math.max(1, Math.ceil((Date.parse(coupon.expires_at) - Date.now()) / 86400000))
+    const message = getCartRecoveryMessage(customer.name, coupon.code, validDays)
     return res.status(201).json({ code: coupon.code, expiresAt: coupon.expires_at, whatsappUrl: `https://wa.me/${phone}?text=${encodeURIComponent(message)}` })
   } catch (error) {
     console.error('Falha ao criar cupom de recuperação do carrinho:', error)

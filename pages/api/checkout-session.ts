@@ -5,7 +5,7 @@ import { getStripe } from '../../lib/stripe'
 import { maxRedeemablePoints, pointsToDiscount } from '../../lib/loyalty'
 import { getCorreiosLimitViolation } from '../../lib/shipping-limits'
 import { getCompatibleModels } from '../../lib/products'
-import { getCouponError } from '../../lib/coupon-rules'
+import { getCustomerCouponError } from '../../lib/coupon-rules'
 
 type CheckoutItem = { id: string; quantity: number; selectedModel?: string }
 type PricedProduct = { name: string; internalCode: string; price: number; pictureUrl: string; weightKg: number; heightCm: number; widthCm: number; lengthCm: number; compatibleModels: string[] }
@@ -83,13 +83,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (normalizedCouponCode) {
       const { data: coupon, error: couponError } = await supabase
         .from('coupons')
-        .select('discount_percent,expires_at,usage_limit,used_count,free_shipping,customer_id')
+        .select('code,discount_percent,expires_at,usage_limit,used_count,free_shipping,customer_id')
         .eq('code', normalizedCouponCode)
         .eq('active', true)
         .maybeSingle()
 
       if (couponError) throw couponError
-      const validationError = getCouponError(coupon, authData.user.id)
+      const validationError = await getCustomerCouponError(supabase, coupon, authData.user.id)
       if (validationError) return res.status(400).json({ error: validationError })
       if (!coupon || (coupon.expires_at && new Date(coupon.expires_at) < new Date()) || (coupon.usage_limit !== null && coupon.used_count >= coupon.usage_limit)) {
         return res.status(400).json({ error: 'Cupom inválido, expirado ou esgotado.' })

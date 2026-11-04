@@ -48,10 +48,10 @@ export default function AdminOrders({ products, onMessage }: Props) {
         throw new Error('Resposta inválida ao preparar a mensagem do WhatsApp.')
       }
       setRecoveryLinks((links) => ({ ...links, [cart.customer_id]: { url: result.whatsappUrl, code: result.code } }))
-      if (popup.closed) onMessage(`Cupom ${result.code} criado. Use Reabrir mensagem para enviar ao cliente.`)
+      if (popup.closed) onMessage(`Oferta ${result.code} preparada. Use Reabrir mensagem para enviar ao cliente.`)
       else {
         popup.location.href = result.whatsappUrl
-        onMessage(`Cupom ${result.code} criado: 10% nos produtos, exclusivo desta conta, válido por 7 dias e para uma compra. Confira e envie a mensagem no WhatsApp.`)
+        onMessage(`Oferta ${result.code} preparada: 10% de desconto, exclusiva desta conta e para uma compra. Confira a validade na mensagem e envie no WhatsApp.`)
       }
     } catch (error) {
       popup.close()
@@ -288,7 +288,7 @@ export default function AdminOrders({ products, onMessage }: Props) {
             </div>
             <strong className="cart-recovery-total">R$ {total.toFixed(2).replace('.', ',')}</strong>
             <div className="cart-recovery-actions">
-              {phone ? <button type="button" className="cart-contact-whatsapp" disabled={recoveringCart !== null} onClick={() => void recoverCart(cart)}>{recoveringCart === cart.customer_id ? 'Criando cupom...' : 'WhatsApp + novo cupom de 10%'}</button> : <span>Telefone ausente ou inválido para WhatsApp.</span>}
+              {phone ? <button type="button" className="cart-contact-whatsapp" disabled={recoveringCart !== null} onClick={() => void recoverCart(cart)}>{recoveringCart === cart.customer_id ? 'Preparando oferta...' : 'WhatsApp + cupom COMPRA10'}</button> : <span>Telefone ausente ou inválido para WhatsApp.</span>}
               {recoveryLink && <a href={recoveryLink.url} target="_blank" rel="noreferrer">Reabrir mensagem ({recoveryLink.code})</a>}
               {customer?.email && <a className="cart-contact-email" href={`mailto:${customer.email}?subject=${encodeURIComponent('Podemos ajudar com seu carrinho?')}`}>E-mail</a>}
             </div>

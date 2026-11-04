@@ -13,8 +13,8 @@ function storeUrl(path: string) {
   return `${(process.env.NEXT_PUBLIC_APP_URL || 'https://www.lojaalphatec.com.br').replace(/\/+$/, '')}${path}`
 }
 
-export function getCartRecoveryMessage(customerName: string | null, code: string): string {
-  return `Olá${customerName?.trim() ? `, ${customerName.trim()}` : ''}! Seus produtos estão esperando por você na Alpha Tec!\n\nGanhe 10% de desconto com o cupom *${code}*, exclusivo para você e válido por 7 dias.\n\nConclua sua compra: ${storeUrl('/cart')}\n\nPrecisa de ajuda? É só responder!`
+export function getCartRecoveryMessage(customerName: string | null, code: string, validDays = 7): string {
+  return `Olá${customerName?.trim() ? `, ${customerName.trim()}` : ''}! Seus produtos estão esperando por você na Alpha Tec!\n\nGanhe 10% de desconto com o cupom *${code}*, exclusivo para você e válido por ${validDays} ${validDays === 1 ? 'dia' : 'dias'}.\n\nConclua sua compra: ${storeUrl('/cart')}\n\nPrecisa de ajuda? É só responder!`
 }
 
 export function normalizeWhatsAppPhone(phone: string | null | undefined): string | null {

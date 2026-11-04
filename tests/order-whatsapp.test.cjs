@@ -69,9 +69,9 @@ test('thanks the buyer and invites honest photo reviews using actual loyalty rew
 })
 
 test('recovery message is concise with a short coupon and validity in days only', () => {
-  const text = messaging.getCartRecoveryMessage('Ana', 'AT10-A1B2C3D4')
+  const text = messaging.getCartRecoveryMessage('Ana', 'COMPRA10')
   assert.ok(text.includes('10% de desconto'))
-  assert.ok(text.includes('*AT10-A1B2C3D4*'))
+  assert.ok(text.includes('*COMPRA10*'))
   assert.ok(text.includes('exclusivo para você'))
   assert.ok(text.includes('válido por 7 dias'))
   assert.ok(!text.includes('frete'))
@@ -79,6 +79,8 @@ test('recovery message is concise with a short coupon and validity in days only'
   assert.ok(!/\d{2}\/\d{2}\/\d{4}|\d{2}:\d{2}/.test(text))
   assert.ok(text.length < 350)
   assert.ok(text.includes('/cart'))
+  assert.ok(messaging.getCartRecoveryMessage('Ana', 'COMPRA10', 2).includes('válido por 2 dias'))
+  assert.ok(messaging.getCartRecoveryMessage('Ana', 'COMPRA10', 1).includes('válido por 1 dia.'))
 })
 
 test('normalizes Brazilian and international numbers and URL-encodes personalized text', () => {

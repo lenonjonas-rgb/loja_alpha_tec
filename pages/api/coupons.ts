@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseServer } from '../../lib/supabase-server'
 import { hasProductCategory } from '../../lib/products'
-import { getCouponError } from '../../lib/coupon-rules'
+import { getCustomerCouponError } from '../../lib/coupon-rules'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido.' })
@@ -32,7 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .eq('active', true)
         .maybeSingle()
       if (fallback.error) throw fallback.error
-      const fallbackError = getCouponError(fallback.data, customerId)
+      const fallbackError = await getCustomerCouponError(supabase, fallback.data, customerId)
       if (fallbackError) return res.status(400).json({ error: fallbackError })
       if (!fallback.data || (fallback.data.expires_at && new Date(fallback.data.expires_at) < new Date()) || (fallback.data.usage_limit !== null && fallback.data.used_count >= fallback.data.usage_limit)) {
         return res.status(404).json({ error: 'Cupom inválido, expirado ou esgotado.' })
@@ -57,7 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (error) throw error
-    const validationError = getCouponError(data, customerId)
+    const validationError = await getCustomerCouponError(supabase, data, customerId)
     if (validationError) return res.status(400).json({ error: validationError })
     if (!data || (data.expires_at && new Date(data.expires_at) < new Date()) || (data.usage_limit !== null && data.used_count >= data.usage_limit)) {
       return res.status(404).json({ error: 'Cupom inválido, expirado ou esgotado.' })

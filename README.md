@@ -101,24 +101,27 @@ separação informa a preparação; entrega convida clientes cadastrados a avali
 com foto, com os pontos definidos no programa (independentemente da nota).
 Pedidos manuais sem conta vinculada não prometem pontos inacessíveis.
 
-Na recuperação de carrinhos, **cada clique** em "WhatsApp + novo cupom de 10%"
-cria um código diferente, exclusivo da conta do cliente, para uma compra,
-válido por 7 dias, com desconto de 10% nos produtos (não no frete).
-Os novos códigos têm 13 caracteres (exemplo: `AT10-A1B2C3D4`), com
-verificação de unicidade e nova tentativa em caso de colisão. Códigos antigos
-continuam válidos. A mensagem curta informa apenas a validade em dias,
-sem data/hora ou observação sobre frete; as regras do desconto não mudam.
+Na recuperação de carrinhos, "WhatsApp + cupom COMPRA10" libera o código
+**COMPRA10** para a conta do cliente, para uma única compra, válido por 7
+dias, com desconto de 10% nos produtos (não no frete). Cada cliente tem sua
+própria validade e controle de uso, sem depender de um limite global.
+A conta precisa ter recebido a oferta para aplicar o código.
 "Reabrir mensagem" reutiliza a mensagem já preparada sem criar outro cupom.
-Cupons anteriores continuam válidos até o uso ou vencimento. Um novo clique
-gera outra oferta; o sistema não confirma que a mensagem foi efetivamente
-enviada no aplicativo.
+Novo clique reutiliza uma oferta válida sem estender seu prazo; uma oferta
+expirada e não usada pode ser renovada por mais 7 dias. Uma oferta usada não
+é renovada. Cupons antigos continuam válidos até o uso ou vencimento.
+A mensagem informa a validade restante em dias, sem data/hora ou observação
+sobre frete. O sistema não confirma o envio no aplicativo.
 
 Antes de habilitar a recuperação, execute
-[scripts/cart-recovery.sql](scripts/cart-recovery.sql) no Supabase, após
-[scripts/commerce.sql](scripts/commerce.sql). O RPC de emissão é exclusivo
+[scripts/commerce.sql](scripts/commerce.sql), depois
+[scripts/cart-recovery.sql](scripts/cart-recovery.sql) e, por último,
+[scripts/compra10.sql](scripts/compra10.sql) no Supabase. Reaplique o último
+se reinstalar os scripts anteriores. O RPC de emissão é exclusivo
 de `service_role`; a API exige administrador com papel administrativo ou
 master. A propriedade do cupom é verificada pela sessão do cliente na
 validação e nos dois caminhos de checkout, com proteção adicional no banco.
+As ofertas por cliente são privadas (RLS e acesso somente por `service_role`).
 O consumo na confirmação do pagamento é transacional, inclusive quando o
 administrador marca o pagamento como pago. O identificador do pedido que
 usou o cupom é preservado mesmo se o pedido for excluído.
@@ -138,7 +141,7 @@ rastreio inventada para transportadoras desconhecidas.
 
 Testes: `node --test tests/order-whatsapp.test.cjs tests/cart-recovery.test.cjs`.
 Para validar as regras transacionais no SQL Editor, execute
-[tests/cart-recovery.sql](tests/cart-recovery.sql); os dados sintéticos são
+[tests/compra10.sql](tests/compra10.sql); os dados sintéticos são
 revertidos no final, sem envio de mensagens ou cobranças.
 
 #### Variáveis mínimas

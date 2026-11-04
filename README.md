@@ -52,6 +52,11 @@ reenvios não repetem notificações.
 
 Ativação em produção:
 
+O contrato precisa ter o serviço **85863**, vinculado à API **534 — SRO -
+Rastro - Async**. Acesso à documentação ou à consulta de `wh-rastro` no CWS
+não comprova essa habilitação. Se o cadastro retornar `HOO-154`, solicite aos
+Correios a inclusão do serviço no contrato antes de prosseguir.
+
 1. Execute [scripts/correios-delivery.sql](scripts/correios-delivery.sql) no SQL
    Editor do Supabase, após o schema de comércio. A função só pode ser
    executada por `service_role`.

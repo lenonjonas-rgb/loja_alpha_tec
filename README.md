@@ -55,8 +55,10 @@ Ativação em produção:
 1. Execute [scripts/correios-delivery.sql](scripts/correios-delivery.sql) no SQL
    Editor do Supabase, após o schema de comércio. A função só pode ser
    executada por `service_role`.
-2. Gere um segredo aleatório forte e configure `CORREIOS_WEBHOOK_SECRET` apenas
-   no servidor da Vercel, junto de `CORREIOS_CONTRATO`. Publique a aplicação.
+2. Gere um segredo aleatório forte de 40 caracteres (por exemplo, 20 bytes
+   aleatórios em hexadecimal); os Correios aceitam de 8 a 40 caracteres.
+   Configure `CORREIOS_WEBHOOK_SECRET` apenas no servidor da Vercel, junto de
+   `CORREIOS_CONTRATO`. Publique novamente após definir ou alterar o segredo.
 3. Com token de contrato no CWS, consulte
    `GET /webhook/v1/servicos/wh-rastro/assinaturas` antes de criar uma assinatura,
    para não duplicar integrações existentes.

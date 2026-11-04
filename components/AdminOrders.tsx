@@ -266,12 +266,12 @@ export default function AdminOrders({ products, onMessage }: Props) {
       <button className="primary-button" type="button" onClick={() => void createManualOrder()}>Registrar pedido <span>→</span></button>
     </div>}
     <nav className="order-status-tabs" aria-label="Status dos pedidos">
-      {orderStatuses.map((status) => <button key={status} type="button" className={activeStatus === status ? `active ${status}` : ''} onClick={() => { setActiveStatus(status); setSelectedIds([]) }}><span>{orderLabel[status]}</span><strong>{orders.filter((order) => order.status === status).length}</strong></button>)}
+      {orderStatuses.map((status) => <button key={status} type="button" className={activeStatus === status ? `active ${status}` : ''} onClick={() => { setActiveStatus(status); setSelectedIds([]) }}><span>{orderLabel[status]}</span><strong>{orders.filter((order) => order.status === status).length + (status === 'pending' ? cartOpportunities.length : 0)}</strong></button>)}
     </nav>
     <section className="order-status-panel">
       <div className="order-list-toolbar">
-        <label><input type="checkbox" checked={allSelected} onChange={() => toggleAll(visibleOrders)} /> Selecionar todos</label>
-        <span>{visibleOrders.length} pedido(s) em {orderLabel[activeStatus].toLowerCase()}</span>
+        <label><input type="checkbox" checked={allSelected} disabled={!visibleOrders.length} onChange={() => toggleAll(visibleOrders)} /> Selecionar todos os pedidos</label>
+        <span>{activeStatus === 'pending' ? `${visibleOrders.length + visibleCarts.length} pendência(s): ${visibleCarts.length} carrinho(s) e ${visibleOrders.length} pedido(s) aguardando confirmação` : `${visibleOrders.length} pedido(s) em ${orderLabel[activeStatus].toLowerCase()}`}</span>
       </div>
       {visibleCarts.length > 0 && <div className="cart-recovery-list">
         <div className="cart-recovery-heading"><h3>Carrinhos para recuperar</h3><span>{visibleCarts.length} cliente(s)</span></div>

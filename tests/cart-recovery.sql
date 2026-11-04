@@ -24,6 +24,7 @@ begin
   select * into first_coupon from public.create_cart_recovery_coupon(first_customer);
   select * into next_coupon from public.create_cart_recovery_coupon(first_customer);
   assert first_coupon.code <> next_coupon.code, 'Cada emissão precisa gerar um código diferente.';
+  assert first_coupon.code ~ '^AT10-[0-9A-F]{8}$', 'O código deve ter 13 caracteres.';
   assert first_coupon.expires_at = now() + interval '7 days', 'Validade incorreta.';
   assert exists (
     select 1 from public.coupons where code = first_coupon.code and discount_percent = 10

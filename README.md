@@ -104,6 +104,10 @@ Pedidos manuais sem conta vinculada não prometem pontos inacessíveis.
 Na recuperação de carrinhos, **cada clique** em "WhatsApp + novo cupom de 10%"
 cria um código diferente, exclusivo da conta do cliente, para uma compra,
 válido por 7 dias, com desconto de 10% nos produtos (não no frete).
+Os novos códigos têm 13 caracteres (exemplo: `AT10-A1B2C3D4`), com
+verificação de unicidade e nova tentativa em caso de colisão. Códigos antigos
+continuam válidos. A mensagem curta informa apenas a validade em dias,
+sem data/hora ou observação sobre frete; as regras do desconto não mudam.
 "Reabrir mensagem" reutiliza a mensagem já preparada sem criar outro cupom.
 Cupons anteriores continuam válidos até o uso ou vencimento. Um novo clique
 gera outra oferta; o sistema não confirma que a mensagem foi efetivamente
@@ -123,6 +127,8 @@ Carrinhos sem itens ou com pedido iniciado/concluído após sua última
 atualização não recebem oferta. Pedidos com pagamento pendente continuam
 distintos de carrinhos não concluídos: não recebem cupom pelo botão do pedido.
 Um cupom novo não altera Pix ou boleto emitido anteriormente.
+A contagem da aba Pendente soma os carrinhos exibidos e os pedidos pendentes;
+o resumo discrimina cada tipo. A seleção em lote continua exclusiva de pedidos.
 
 O WhatsApp não permite transformar um texto isolado em link com rótulo:
 a mensagem de envio mostra o código e a URL clicável do canal oficial.

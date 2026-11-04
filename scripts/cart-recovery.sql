@@ -61,10 +61,15 @@ begin
   ) then
     raise exception 'O cliente já iniciou ou concluiu um pedido após este carrinho. Atualize a lista antes de oferecer um cupom.';
   end if;
-  return query
-    insert into public.coupons as c (code, discount_percent, expires_at, usage_limit, customer_id)
-    values ('VOLTE10-' || upper(replace(gen_random_uuid()::text, '-', '')), 10, now() + interval '7 days', 1, p_customer_id)
-    returning c.code, c.expires_at;
+  for attempt in 1..5 loop
+    return query
+      insert into public.coupons as c (code, discount_percent, expires_at, usage_limit, customer_id)
+      values ('AT10-' || upper(left(replace(gen_random_uuid()::text, '-', ''), 8)), 10, now() + interval '7 days', 1, p_customer_id)
+      on conflict on constraint coupons_code_key do nothing
+      returning c.code, c.expires_at;
+    if found then return; end if;
+  end loop;
+  raise exception 'Não foi possível gerar um código único. Tente novamente.';
 end;
 $$;
 

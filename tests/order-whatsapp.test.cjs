@@ -68,15 +68,16 @@ test('thanks the buyer and invites honest photo reviews using actual loyalty rew
   assert.ok(!manual.includes('pontos'))
 })
 
-test('recovery message includes the exact coupon, deadline, restrictions and cart link', () => {
-  const text = messaging.getCartRecoveryMessage('Ana', 'VOLTE10-TEST', '2026-11-11T18:00:00.000Z')
-  assert.ok(text.includes('10% de desconto nos produtos'))
-  assert.ok(text.includes('VOLTE10-TEST'))
-  assert.ok(text.includes('11/11/2026'))
-  assert.ok(text.includes('15:00:00'))
-  assert.ok(text.includes('exclusivo da sua conta'))
-  assert.ok(text.includes('uma compra'))
-  assert.ok(text.includes('não inclui o frete'))
+test('recovery message is concise with a short coupon and validity in days only', () => {
+  const text = messaging.getCartRecoveryMessage('Ana', 'AT10-A1B2C3D4')
+  assert.ok(text.includes('10% de desconto'))
+  assert.ok(text.includes('*AT10-A1B2C3D4*'))
+  assert.ok(text.includes('exclusivo para você'))
+  assert.ok(text.includes('válido por 7 dias'))
+  assert.ok(!text.includes('frete'))
+  assert.ok(!text.includes('Brasília'))
+  assert.ok(!/\d{2}\/\d{2}\/\d{4}|\d{2}:\d{2}/.test(text))
+  assert.ok(text.length < 350)
   assert.ok(text.includes('/cart'))
 })
 

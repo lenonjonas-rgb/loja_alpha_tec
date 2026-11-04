@@ -38,6 +38,48 @@ Depois do primeiro deploy:
 8. Execute `scripts/commerce.sql` e `scripts/leads.sql` no SQL Editor do projeto Supabase antes de testar cadastro, carrinho, pedidos, cupons, avaliações e leads. Se a loja já estiver em produção, execute novamente o `scripts/commerce.sql` atualizado para adicionar os campos de tipo de peça e Part Number do fabricante ao catálogo. Classifique os produtos já cadastrados na edição de cada produto; os novos campos não alteram a classificação automaticamente.
 9. Se for usar etiquetas, preencha as credenciais de produção dos Correios e confirme a autenticação em `https://www.seudominio.com.br/api/correios-status` usando uma sessão administrativa.
 
+#### Entrega automática pelos Correios (Webhook)
+
+O endpoint `POST /api/correios-webhook` recebe avisos `wh-rastro` de entrega
+(`BDE-1`, `BDI-1`, `BDR-1`). Valida `x-correios-signature` com HMAC SHA-256
+sobre o corpo original e exige o contrato de `CORREIOS_CONTRATO`.
+Pedidos com transportadora Correios, rastreio correspondente e status
+confirmado, em separação ou enviado passam para entregue. Pedidos cancelados
+ou já entregues não são alterados; pagamento não é modificado.
+A data informada pelos Correios é preservada. Datas sem fuso são interpretadas
+como UTC-03:00. Atualização e notificação ao cliente são transacionais;
+reenvios não repetem notificações.
+
+Ativação em produção:
+
+1. Execute [scripts/correios-delivery.sql](scripts/correios-delivery.sql) no SQL
+   Editor do Supabase, após o schema de comércio. A função só pode ser
+   executada por `service_role`.
+2. Gere um segredo aleatório forte e configure `CORREIOS_WEBHOOK_SECRET` apenas
+   no servidor da Vercel, junto de `CORREIOS_CONTRATO`. Publique a aplicação.
+3. Com token de contrato no CWS, consulte
+   `GET /webhook/v1/servicos/wh-rastro/assinaturas` antes de criar uma assinatura,
+   para não duplicar integrações existentes.
+4. Cadastre uma assinatura pelo
+   `POST /webhook/v1/servicos/wh-rastro/assinaturas`, com descrição, e-mail
+   responsável, `language: "PT"` e `enderecos` contendo `nome`, a URL HTTPS
+   canônica `https://SEU-DOMINIO/api/correios-webhook`, o mesmo `secret` e
+   `tipoEventos: [{"tipo":"BDE-1"},{"tipo":"BDI-1"},{"tipo":"BDR-1"}]`.
+   Não use URLs que redirecionam, nem exponha o segredo em links ou no Git.
+5. Execute o teste oficial da assinatura e confira o payload recebido antes
+   de considerar a integração ativa. O parser aceita lista de objetos SRO
+   (direta ou no campo `objetos`), com `codObjeto` e `eventos` contendo
+   `codigo`, `tipo` e `dtHrCriado`. Formatos inesperados geram log e HTTP 500
+   para permitir retentativas; não são confirmados silenciosamente.
+6. Valide uma entrega de teste, incluindo a data, a notificação e o reenvio
+   do mesmo evento. Confirme resposta HTTP 200 sem corpo em até 2 segundos,
+   conforme exigido pelos Correios. Monitore erros e latência na hospedagem.
+
+O serviço cobre objetos vinculados ao contrato; não consulta retroativamente
+entregas anteriores à assinatura. Rastreios precisam estar cadastrados nos
+pedidos. Testes locais: `node --test tests/correios-delivery.test.cjs`.
+Referência: [documentação oficial Webhook](https://api.correios.com.br/webhook/v3/api-docs).
+
 #### Variáveis mínimas
 
 Para o site abrir e o catálogo funcionar: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ALPHA_MASTER_USER`, `ALPHA_MASTER_PASSWORD`, `ADMIN_SESSION_SECRET`, `NEXT_PUBLIC_APP_URL` e `NEXT_PUBLIC_WHATSAPP_NUMBER`.

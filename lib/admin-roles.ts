@@ -5,7 +5,7 @@ export function isAdminRole(value: unknown): value is AdminRole {
   return typeof value === 'string' && (ADMIN_ROLES as readonly string[]).includes(value)
 }
 
-export type AdminTab = 'orders' | 'dashboard' | 'leads' | 'products' | 'bulk' | 'coupons' | 'questions' | 'store' | 'promotions' | 'users'
+export type AdminTab = 'orders' | 'dashboard' | 'leads' | 'products' | 'bulk' | 'media' | 'coupons' | 'questions' | 'store' | 'promotions' | 'users'
 
 export const ROLE_LABELS: Record<AdminRole, string> = {
   kiosk: 'Nível 0 · Visão geral (TV)',
@@ -19,8 +19,8 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
 export const ROLE_TABS: Record<AdminRole, AdminTab[]> = {
   kiosk: ['dashboard'],
   logistica: ['orders', 'leads'],
-  administrativo: ['orders', 'leads', 'products', 'bulk', 'coupons', 'questions', 'promotions'],
-  master: ['orders', 'dashboard', 'leads', 'products', 'bulk', 'coupons', 'promotions', 'questions', 'store', 'users'],
+  administrativo: ['orders', 'leads', 'products', 'bulk', 'media', 'coupons', 'questions', 'promotions'],
+  master: ['orders', 'dashboard', 'leads', 'products', 'bulk', 'media', 'coupons', 'promotions', 'questions', 'store', 'users'],
 }
 
 export function canAccessTab(role: AdminRole | null | undefined, tab: AdminTab) {

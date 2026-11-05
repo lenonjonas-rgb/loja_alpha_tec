@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
 import { CORREIOS_PACKAGE_DEFAULTS } from '../lib/shipping-limits'
-import { getProductCategories } from '../lib/products'
+import { getProductCategories, MAX_EXTRA_IMAGES } from '../lib/products'
 import { equipmentCategories, partTypes } from '../lib/product-taxonomy'
 
 type Product = {
@@ -16,6 +16,7 @@ type Product = {
   description: string
   specifications: string
   image: string
+  images?: string[]
   price: number
   active: boolean
   stock: number
@@ -158,6 +159,41 @@ export default function AdminProducts({ products, onSaved, onDeleted, onReordere
     reader.readAsDataURL(file)
   }
 
+  function addGalleryImages(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files || [])
+    event.target.value = ''
+    if (!files.length || !selected) return
+    if (files.some((file) => !file.type.startsWith('image/'))) return onMessage('Selecione apenas arquivos de imagem válidos.')
+    const currentImages = selected.images || []
+    const available = MAX_EXTRA_IMAGES - currentImages.length
+    if (available <= 0) return onMessage(`Limite de ${MAX_EXTRA_IMAGES} fotos adicionais atingido. Remova uma foto para adicionar outra.`)
+    const accepted = files.slice(0, available)
+    Promise.all(accepted.map((file) => new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result || ''))
+      reader.onerror = () => reject(new Error('Não foi possível ler um dos arquivos de imagem.'))
+      reader.readAsDataURL(file)
+    }))).then((dataUrls) => {
+      setSelected((current) => current ? { ...current, images: [...(current.images || []), ...dataUrls].slice(0, MAX_EXTRA_IMAGES) } : current)
+      if (files.length > accepted.length) onMessage(`Somente ${accepted.length} foto(s) adicionada(s): o produto aceita até ${MAX_EXTRA_IMAGES} fotos adicionais.`)
+    }).catch((error: unknown) => onMessage(error instanceof Error ? error.message : 'Não foi possível ler os arquivos de imagem.'))
+  }
+
+  function removeGalleryImage(index: number) {
+    setSelected((current) => current ? { ...current, images: (current.images || []).filter((_, itemIndex) => itemIndex !== index) } : current)
+  }
+
+  function promoteGalleryImage(index: number) {
+    setSelected((current) => {
+      if (!current) return current
+      const gallery = [...(current.images || [])]
+      const [promoted] = gallery.splice(index, 1)
+      if (!promoted) return current
+      if (current.image) gallery.splice(index, 0, current.image)
+      return { ...current, image: promoted, images: gallery.slice(0, MAX_EXTRA_IMAGES) }
+    })
+  }
+
   function editProduct(product: Product) {
     setSelected({
       ...product,
@@ -204,8 +240,18 @@ export default function AdminProducts({ products, onSaved, onDeleted, onReordere
           <label>Modelos compatíveis<textarea value={selected.compatibleEquipment || ''} onChange={(event) => setSelected({ ...selected, compatibleEquipment: event.target.value })} placeholder={'Movement RT 150\nMovement RT 250\nMovement RT 350'} /></label>
           <label>Descrição<textarea required value={selected.description} onChange={(event) => setSelected({ ...selected, description: event.target.value })} /></label>
           <label>Especificações<textarea required value={selected.specifications || ''} onChange={(event) => setSelected({ ...selected, specifications: event.target.value })} placeholder={'Tensão: 220V\nPotência: 2,2HP'} /></label>
-          <label>Imagem<input type="file" accept="image/*" onChange={image} /></label>
+          <label>Imagem principal<input type="file" accept="image/*" onChange={image} /></label>
           {selected.image && <img className="admin-image-preview" src={selected.image} alt="Pré-visualização do produto" />}
+          <label>Fotos adicionais ({(selected.images || []).length}/{MAX_EXTRA_IMAGES})<input type="file" accept="image/*" multiple onChange={addGalleryImages} /></label>
+          {(selected.images || []).length > 0 && <div className="admin-gallery-grid">
+            {(selected.images || []).map((galleryImage, index) => <div className="admin-gallery-item" key={`${index}-${galleryImage.slice(-24)}`}>
+              <img src={galleryImage} alt={`Foto adicional ${index + 1}`} />
+              <div className="admin-gallery-actions">
+                <button type="button" onClick={() => promoteGalleryImage(index)}>Tornar principal</button>
+                <button type="button" onClick={() => removeGalleryImage(index)}>Remover</button>
+              </div>
+            </div>)}
+          </div>}
         </div>
 
         <div className="active-field">

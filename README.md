@@ -28,6 +28,28 @@ MP4 depende do suporte do navegador/WebView; quando somente WebM estiver
 disponível, converta para MP4 antes de publicar no Instagram.
 O arquivo não é vinculado automaticamente ao cadastro do produto.
 
+## Editor de mídia para cadastro de produtos
+
+Em **Editor de mídia** (níveis Administrativo e Master), envie a foto ou o
+vídeo original da peça para gerar a mídia padronizada 1200×1200 usada no
+cadastro: produto centralizado com proporções preservadas, fundo cinza
+técnico e sombra suave — o mesmo padrão do vídeo de produto para o site.
+Ajuste ampliação (1×–2,6×) e posição horizontal/vertical; para vídeos,
+selecione início e fim do corte em segundos. Fotos são exportadas em PNG e
+vídeos são gravados em tempo real, sem áudio (MP4 quando o navegador
+suportar; caso contrário, WebM). Fotos padronizadas podem ser salvas
+diretamente em um produto cadastrado, como foto principal (substitui a
+atual) ou na galeria; vídeos continuam sendo exportados como arquivo.
+
+## Galeria de fotos do produto
+
+Cada produto tem uma foto principal e até 5 fotos adicionais. Na aba
+**Produtos**, edite o produto para enviar várias fotos de uma vez, remover
+fotos da galeria ou promover uma foto adicional a principal. Na página do
+produto, as fotos aparecem como miniaturas clicáveis abaixo da foto em
+destaque. A galeria usa a coluna `extra_image_urls`; execute
+`scripts/commerce.sql` no Supabase para criá-la em bancos existentes.
+
 No navegador, PNG e vídeos são baixados. No app atualizado, abre-se o
 compartilhamento nativo para escolher onde salvar/enviar (máximo de 32 MB
 por arquivo). APKs antigos mostram uma orientação para atualizar, sem

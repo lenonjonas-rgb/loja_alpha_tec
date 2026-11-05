@@ -3,6 +3,7 @@ import Link from 'next/link'
 import AdminBulkProducts from '../components/AdminBulkProducts'
 import AdminDashboard from '../components/AdminDashboard'
 import AdminLeads from '../components/AdminLeads'
+import AdminMediaStudio from '../components/AdminMediaStudio'
 import AdminOrders from '../components/AdminOrders'
 import AdminProducts from '../components/AdminProducts'
 import AdminPromotions from '../components/AdminPromotions'
@@ -13,7 +14,7 @@ import AdminCouponsPage from './admin/coupons'
 import AdminPushSetup from '../components/AdminPushSetup'
 import { ROLE_LABELS, ROLE_TABS, type AdminRole, type AdminTab } from '../lib/admin-roles'
 
-type Product = { id: string; name: string; internalCode?: string; manufacturerPartNumber?: string; partType: string; displayOrder?: number; brand: string; category: string; compatibleEquipment: string; description: string; specifications: string; image: string; price: number; active: boolean; stock: number; discountPercent: number; flashSale: boolean; showInBanner: boolean; showInFeatured: boolean; weightKg?: number; heightCm?: number; widthCm?: number; lengthCm?: number }
+type Product = { id: string; name: string; internalCode?: string; manufacturerPartNumber?: string; partType: string; displayOrder?: number; brand: string; category: string; compatibleEquipment: string; description: string; specifications: string; image: string; images?: string[]; price: number; active: boolean; stock: number; discountPercent: number; flashSale: boolean; showInBanner: boolean; showInFeatured: boolean; weightKg?: number; heightCm?: number; widthCm?: number; lengthCm?: number }
 
 const tabItems: { key: AdminTab; label: string }[] = [
   { key: 'orders', label: 'Pedidos' },
@@ -21,6 +22,7 @@ const tabItems: { key: AdminTab; label: string }[] = [
   { key: 'leads', label: 'Leads' },
   { key: 'products', label: 'Produtos' },
   { key: 'bulk', label: 'Cadastro' },
+  { key: 'media', label: 'Editor de mídia' },
   { key: 'promotions', label: 'Posts promocionais' },
   { key: 'coupons', label: 'Cupons' },
   { key: 'questions', label: 'Perguntas' },
@@ -134,6 +136,7 @@ export default function Admin() {
         {tab === 'leads' && <AdminLeads onMessage={setMessage} />}
         {tab === 'products' && <AdminProducts products={products} onSaved={(updated) => setProducts((items) => items.map((item) => item.id === updated.id ? updated : item))} onDeleted={(deletedId) => setProducts((items) => items.filter((item) => item.id !== deletedId))} onReordered={(ordered) => setProducts(ordered)} onMessage={setMessage} />}
         {tab === 'bulk' && <AdminBulkProducts onMessage={setMessage} />}
+        {tab === 'media' && <AdminMediaStudio products={products} onSaved={(updated) => setProducts((items) => items.map((item) => item.id === updated.id ? updated : item))} onMessage={setMessage} />}
         {tab === 'promotions' && <AdminPromotions products={products} onMessage={setMessage} />}
         {tab === 'coupons' && <AdminCouponsPage />}
         {tab === 'questions' && <AdminQuestions onMessage={setMessage} />}

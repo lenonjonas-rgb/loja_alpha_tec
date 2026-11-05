@@ -12,6 +12,7 @@ alter table public.products add column if not exists internal_code text;
 alter table public.products add column if not exists manufacturer_part_number text;
 alter table public.products add column if not exists part_type text;
 alter table public.products add column if not exists display_order integer;
+alter table public.products add column if not exists extra_image_urls jsonb not null default '[]'::jsonb;
 with ordered_products as (
   select id, row_number() over (order by created_at desc, id) - 1 as position
   from public.products

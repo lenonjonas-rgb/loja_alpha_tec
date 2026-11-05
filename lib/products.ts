@@ -11,6 +11,7 @@ export type Product = {
   specifications?: string
   price: number
   image: string
+  images?: string[]
   compatibleEquipment?: string
   selectedModel?: string
   cartKey?: string
@@ -25,6 +26,9 @@ export type Product = {
   widthCm?: number
   lengthCm?: number
 }
+
+// Limite de fotos adicionais por produto, além da foto principal.
+export const MAX_EXTRA_IMAGES = 5
 
 export function getCompatibleModels(value?: string): string[] {
   return String(value || '')

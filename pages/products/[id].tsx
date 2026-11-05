@@ -35,6 +35,7 @@ export default function ProductPage() {
   const [selectedModel, setSelectedModel] = useState('')
   const [modelError, setModelError] = useState('')
   const [activeTab, setActiveTab] = useState<DetailTab>('description')
+  const [activeImageIndex, setActiveImageIndex] = useState(0)
   const [loading, setLoading] = useState(true)
   const [product, setProduct] = useState<any>(null)
   const [questions, setQuestions] = useState<ProductQuestion[]>([])
@@ -90,6 +91,7 @@ export default function ProductPage() {
     setSelectedModel('')
     setModelError('')
     setAdded(false)
+    setActiveImageIndex(0)
 
     setLoading(true)
     fetch('/api/products')
@@ -172,6 +174,8 @@ export default function ProductPage() {
   const finalPrice = discountNum > 0 ? priceNum * (1 - discountNum / 100) : priceNum
   const stockNum = typeof product.stock === 'number' ? product.stock : 1
   const compatibleModels = getCompatibleModels(product.compatibleEquipment)
+  const galleryImages: string[] = [product.image, ...(Array.isArray(product.images) ? product.images : [])].filter((url: unknown, index: number, urls: unknown[]): url is string => typeof url === 'string' && Boolean(url) && urls.indexOf(url) === index)
+  const activeImage = galleryImages[Math.min(activeImageIndex, Math.max(0, galleryImages.length - 1))] || product.image
   const specificationLines = (product.specifications || '')
     .split(/\n|\r\n|\;\s*/)
     .map((line: string) => line.trim())
@@ -198,8 +202,17 @@ export default function ProductPage() {
           ← Voltar para produtos
         </Link>
       <div className="detail-layout">
-        <div className="detail-image">
-          <ProductImage src={product.image} name={product.name || 'Produto'} eager />
+        <div className="detail-image-column">
+          <div className="detail-image">
+            <ProductImage src={activeImage} name={product.name || 'Produto'} eager />
+          </div>
+          {galleryImages.length > 1 && <div className="detail-gallery-thumbs" role="tablist" aria-label="Fotos do produto">
+            {galleryImages.map((url, index) => (
+              <button key={url} type="button" className={index === activeImageIndex ? 'active' : ''} onClick={() => setActiveImageIndex(index)} aria-label={`Foto ${index + 1} de ${galleryImages.length}`}>
+                <img src={url} alt="" loading="lazy" decoding="async" />
+              </button>
+            ))}
+          </div>}
         </div>
         <div className="detail-copy">
           <p className="eyebrow">{partTypes.find((partType) => partType.value === product.partType)?.label || 'PEÇA PARA EQUIPAMENTO FITNESS'}</p>

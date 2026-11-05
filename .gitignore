@@ -7,3 +7,4 @@ env.local
 credentials.json
 Alpha-Tec-*.apk
 public/images/products/*.webp
+tsconfig.tsbuildinfo

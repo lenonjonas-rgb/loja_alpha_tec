@@ -10,6 +10,8 @@ env.local
 .env.*
 !.env.example
 .tmp*
+credentials.json
+Alpha-Tec-*.apk
 *.log
 *.tsbuildinfo
 *.jks

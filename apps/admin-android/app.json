@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Alpha Tec Admin",
+    "name": "Alpha Tec",
     "slug": "alpha-tec-admin",
     "scheme": "alphatecadmin",
     "version": "1.0.0",
@@ -27,7 +27,7 @@
     },
     "android": {
       "package": "br.com.lojaalphatec.admin",
-      "versionCode": 2,
+      "versionCode": 3,
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {

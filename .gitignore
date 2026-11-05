@@ -4,4 +4,6 @@ dist/
 env.local
 .env.local
 /.env
+credentials.json
+Alpha-Tec-*.apk
 public/images/products/*.webp

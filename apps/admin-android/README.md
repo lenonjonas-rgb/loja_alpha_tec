@@ -1,4 +1,4 @@
-# Alpha Tec Admin Android
+# Alpha Tec Android
 
 Expo app that opens the protected admin site online. The website remains the source of truth, so published admin updates appear when the app is opened or refreshed.
 
@@ -14,6 +14,24 @@ Install Expo Go on the Android device and scan the QR code shown by Expo.
 The default URL is `https://lojaalphatec.com.br/admin`. For local development, create `.env.local` in this folder and point `EXPO_PUBLIC_ADMIN_URL` to the development server, for example `http://10.0.2.2:3000/admin` for the Android emulator. For a physical phone, use the computer's LAN IP and run Next.js with `--hostname 0.0.0.0`.
 
 The device needs internet access to use the admin panel. Expo Go is for development; a standalone Android build can be produced later with EAS Build.
+
+## Local signed APK
+
+On Windows, install a compatible Java 17 JDK and Android SDK (platform/build
+tools 36.0.0, NDK 27.1.12297006), and set `JAVA_HOME` and `ANDROID_HOME`.
+The Expo signing key must be downloaded once with
+`npx eas-cli@latest credentials --platform android` using the `preview` profile.
+Keep `credentials.json` and `credentials/android/keystore.jks` private; both are
+ignored by Git and EAS uploads.
+
+From this directory, run `npm run build:apk`. The script prebuilds and compiles
+the release app, signs it with the existing Expo keystore, verifies its
+certificate/package/name/version and alignment, then writes
+`Alpha-Tec-v<version>-build<versionCode>.apk` directly into the repository root.
+Before each subsequent release, increase `android.versionCode` in `app.json`;
+the script refuses to overwrite an existing APK. Install with
+`adb install -r C:\Sistema\loja_alpha_tec\Alpha-Tec-v1.0.0-build3.apk` to update
+the existing app without uninstalling it.
 
 ## App icon
 

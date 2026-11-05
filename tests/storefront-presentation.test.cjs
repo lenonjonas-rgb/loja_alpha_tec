@@ -126,12 +126,14 @@ test('banner respeita seleção administrativa e não inventa promoção', () =>
     loading: false, error: '',
   }))
   assert.match(html, /Correia de teste/)
+  assert.match(html, /technical-banner-overlay/)
   assert.doesNotMatch(html, /Não selecionada|Inativa|DESTAQUE DA SEMANA|OFF|Próxima peça/)
 })
 
 test('banner sem seleção explica identificação; com várias peças oferece controles', () => {
   const empty = renderToStaticMarkup(React.createElement(HeroBanner, { products: [], loading: false, error: '' }))
   assert.match(empty, /modelo certo/)
+  assert.doesNotMatch(empty, /technical-banner-overlay/)
   const multiple = renderToStaticMarkup(React.createElement(HeroBanner, { products: [{ ...base, showInBanner: true }, { ...base, id: 'second', showInBanner: true }], loading: false, error: '' }))
   assert.match(multiple, /Peça anterior/)
   assert.match(multiple, /Próxima peça/)

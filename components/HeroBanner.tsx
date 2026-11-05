@@ -22,7 +22,7 @@ export default function HeroBanner({ products, loading, error }: { products: Pro
   }
 
   return (
-    <section className="technical-banner" aria-label="Peças selecionadas pela Alpha Tec">
+    <section className="technical-banner technical-banner-overlay" aria-label="Peças selecionadas pela Alpha Tec">
       <div className="technical-banner-top">
         <span className="technical-banner-label">SELEÇÃO ALPHA TEC</span>
         {slides.length > 1 && <span className="technical-banner-count">{selectedIndex + 1} / {slides.length}</span>}

@@ -231,6 +231,15 @@ A assinatura horizontal está em `public/brand-logo.svg`: ALPHA TEC em uma linha
 
 Após publicar, solicite nova indexação da página inicial no Google Search Console, tanto para o domínio raiz quanto para `www` se ambos forem usados. O arquivo do favicon deve continuar acessível ao Googlebot-Image, com URL estável. A atualização no Google pode levar dias ou semanas e não é garantida imediatamente. Referência: https://developers.google.com/search/docs/appearance/favicon-in-search.
 
+O sitemap em `/sitemap.xml` consulta os produtos atuais do Supabase, com paginação,
+e inclui somente produtos ativos, além das páginas públicas e categorias, sem URLs
+duplicadas. Produtos do catálogo estático são preservados quando não substituídos
+pelo banco. Falhas na consulta retornam HTTP 503 para não publicar um sitemap
+incompleto. Não são inventadas datas de alteração a cada leitura.
+Envie o endereço do sitemap no Search Console e acompanhe a indexação; o envio
+e a solicitação de rastreio não garantem indexação nem posição para palavras-chave.
+Teste: `node --test tests/sitemap.test.cjs`.
+
 Coloque as imagens originais em `images-inbox/`. Formatos aceitos: JPG, JPEG, PNG e WEBP.
 
 Para processar as imagens uma vez:

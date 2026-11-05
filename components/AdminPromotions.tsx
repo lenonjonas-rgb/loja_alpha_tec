@@ -1,6 +1,8 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { getProductCategories, hasProductCategory } from '../lib/products'
 import type { Product } from '../lib/products'
+import { exportPromotion } from '../lib/promotion-export'
+import { getMediaPlacement, getVideoClip } from '../lib/promotion-video'
 
 type Props = { products: Product[]; onMessage: (message: string) => void }
 type PostFormat = 'portrait' | 'square'
@@ -22,6 +24,12 @@ const categoryTaglines = [
   'Peças originais, treino sem parar.',
   'Qualidade que mantém seu equipamento em movimento.',
   'Selecionamos o que há de melhor para você.',
+]
+
+const postIdeas = [
+  { title: 'Peça em detalhe', hook: 'CADA DETALHE IMPORTA', tip: 'Mostre um close da peça e destaque uma especificação cadastrada, sem prometer compatibilidade não confirmada.' },
+  { title: 'Manutenção em dia', hook: 'SEU EQUIPAMENTO PRECISA DE ATENÇÃO?', tip: 'Mostre sinais de desgaste e convide o cliente a conferir o código e a compatibilidade antes da compra.' },
+  { title: 'Produto em movimento', hook: 'VEJA A PEÇA DE TODOS OS ÂNGULOS', tip: 'Grave uma rotação curta com fundo limpo e boa iluminação. Termine com uma chamada para o site.' },
 ]
 
 const money = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`
@@ -76,6 +84,7 @@ export default function AdminPromotions({ products, onMessage }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const reelVideoRef = useRef<HTMLVideoElement>(null)
   const reelStartTimeRef = useRef(0)
+  const recordingCleanupRef = useRef<(() => void) | null>(null)
   const selectedProduct = activeProducts.find((product) => product.id === selectedId) || activeProducts[0]
   const selectedFormat = formatOptions.find((option) => option.value === format) || formatOptions[0]
   const originalPrice = Number(selectedProduct?.price || 0)
@@ -101,7 +110,15 @@ export default function AdminPromotions({ products, onMessage }: Props) {
   )
   const [brandLogo, setBrandLogo] = useState<HTMLImageElement | null>(null)
   const [productPostLayout, setProductPostLayout] = useState<ProductPostLayout>('photo')
+  const [clipStart, setClipStart] = useState(0)
+  const [clipEnd, setClipEnd] = useState(0)
+  const [videoOffsetX, setVideoOffsetX] = useState(0)
+  const [videoOffsetY, setVideoOffsetY] = useState(0)
+  const [isExporting, setIsExporting] = useState(false)
+  const [captionHook, setCaptionHook] = useState('')
+  const clipDuration = Math.max(0, clipEnd - clipStart)
   const photoPost = contentType === 'feed' && mode === 'product' && productPostLayout === 'photo'
+  useEffect(() => () => recordingCleanupRef.current?.(), [])
   useEffect(() => {
     let cancelled = false
     const image = new Image()
@@ -120,7 +137,7 @@ export default function AdminPromotions({ products, onMessage }: Props) {
       return [...current, productId]
     })
   }
-  const caption = useMemo(() => {
+  const baseCaption = useMemo(() => {
     if (contentType === 'reel') {
       if (!selectedProduct) return ''
       const lines = [`${reelHook.trim().toUpperCase() || 'TREINO PARADO?'}`, '', `Conheça ${selectedProduct.name} e mantenha seu equipamento pronto para o treino.`]
@@ -173,6 +190,7 @@ export default function AdminPromotions({ products, onMessage }: Props) {
     lines.push('', 'Confira os detalhes e encontre sua peça em www.lojaalphatec.com.br.', '', '#AlphaTec #PecasFitness #Academia #EquipamentosFitness')
     return lines.join('\n')
   }, [photoPost, contentType, reelHook, reelCta, mode, selectedCategory, categoryProducts, categories, couponBenefit, couponDiscountPercent, couponUsageLimit, hasCouponDiscount, hasDiscount, headline, matchedCoupon, normalizedCoupon, originalPrice, priceBeforeCoupon, promotionalPrice, selectedProduct])
+  const caption = contentType === 'feed' && captionHook ? `${captionHook}\n\n${baseCaption}` : baseCaption
 
   useEffect(() => {
     if (!selectedProduct && activeProducts[0]) setSelectedId(activeProducts[0].id)
@@ -209,13 +227,14 @@ export default function AdminPromotions({ products, onMessage }: Props) {
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
+    setCanvasReady(false)
     if (mode === 'category' && !categoryProducts.length) return
     if (mode === 'product' && !selectedProduct) return
     if (contentType === 'reel') {
       const width = 1080
       const height = 1920
       const siteOutput = reelDestination === 'site'
-      const reelDuration = siteOutput && reelVideoDuration > 0 ? reelVideoDuration * 1000 : 12_000
+      const reelDuration = reelSource === 'video' && clipDuration > 0 ? clipDuration * 1000 : 12_000
       const canvasWidth = siteOutput ? 1200 : width
       const canvasHeight = siteOutput ? 1200 : height
       canvas.width = canvasWidth
@@ -225,17 +244,17 @@ export default function AdminPromotions({ products, onMessage }: Props) {
       if (!context || !selectedProduct) return
       let animationFrame = 0
       let ready = false
+      let cancelled = false
       let productImage: HTMLImageElement | undefined
       reelStartTimeRef.current = performance.now()
 
       if (reelSource === 'photo' && selectedProduct.image) {
         productImage = new Image()
         productImage.crossOrigin = 'anonymous'
-        productImage.onload = () => { if (!ready) { ready = true; setCanvasReady(true) } }
-        productImage.onerror = () => { if (!ready) { ready = true; setCanvasReady(true) } }
+        productImage.onload = () => { if (!cancelled && !ready) { ready = true; setCanvasReady(true) } }
+        productImage.onerror = () => { if (!cancelled) onMessage('Não foi possível carregar a foto da peça para o Reel.') }
         productImage.src = selectedProduct.image
-      } else {
-        ready = true
+      } else if (reelSource === 'video' && reelVideoUrl && reelVideoRef.current && !reelVideoRef.current.error && reelVideoDuration > 0) {
         setCanvasReady(true)
       }
 
@@ -267,24 +286,24 @@ export default function AdminPromotions({ products, onMessage }: Props) {
           ? { x: 150, y: 150, width: 900, height: 900 }
           : { x: 54, y: 570, width: width - 108, height: 900 }
         const video = reelVideoRef.current
+        if (recordingCleanupRef.current && video && video.currentTime >= clipEnd) video.pause()
+        if (!recordingCleanupRef.current && reelSource === 'video' && video && video.readyState >= 2 && clipDuration > 0 && (video.currentTime < clipStart || video.currentTime >= clipEnd)) {
+          video.currentTime = clipStart
+        }
         const media = reelSource === 'video' && video && video.readyState >= 2 ? video : productImage
         if (media) {
           const sourceWidth = media instanceof HTMLVideoElement ? media.videoWidth : media.naturalWidth
           const sourceHeight = media instanceof HTMLVideoElement ? media.videoHeight : media.naturalHeight
           if (sourceWidth && sourceHeight) {
-            const fitScale = siteOutput
-              ? Math.min(mediaBox.width / sourceWidth, mediaBox.height / sourceHeight)
-              : Math.max(mediaBox.width / sourceWidth, mediaBox.height / sourceHeight)
-            const scale = fitScale * (siteOutput ? siteVideoZoom : 1)
-            const drawWidth = sourceWidth * scale
-            const drawHeight = sourceHeight * scale
+            const placement = getMediaPlacement(sourceWidth, sourceHeight, mediaBox, siteOutput, siteOutput || reelSource === 'video' ? siteVideoZoom : 1, videoOffsetX, videoOffsetY)
+            const { width: drawWidth, height: drawHeight } = placement
             context.save()
             context.beginPath()
             context.rect(mediaBox.x, mediaBox.y, mediaBox.width, mediaBox.height)
             context.clip()
             if (siteOutput) {
               context.filter = 'drop-shadow(0px 24px 24px rgba(28,32,35,.22))'
-              context.drawImage(media, mediaBox.x + (mediaBox.width - drawWidth) / 2, mediaBox.y + (mediaBox.height - drawHeight) / 2, drawWidth, drawHeight)
+              context.drawImage(media, placement.x, placement.y, drawWidth, drawHeight)
               context.filter = 'none'
             } else if (reelSource === 'photo') {
               const facing = Math.cos((elapsed / 6000) * Math.PI * 2)
@@ -293,7 +312,7 @@ export default function AdminPromotions({ products, onMessage }: Props) {
               context.scale(horizontalScale, 1)
               context.drawImage(media, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight)
             } else {
-              context.drawImage(media, mediaBox.x + (mediaBox.width - drawWidth) / 2, mediaBox.y + (mediaBox.height - drawHeight) / 2, drawWidth, drawHeight)
+              context.drawImage(media, placement.x, placement.y, drawWidth, drawHeight)
             }
             context.restore()
           }
@@ -368,7 +387,7 @@ export default function AdminPromotions({ products, onMessage }: Props) {
       }
 
       drawFrame()
-      return () => cancelAnimationFrame(animationFrame)
+      return () => { cancelled = true; cancelAnimationFrame(animationFrame) }
     }
     const { width, height } = selectedFormat
     canvas.width = width
@@ -634,13 +653,24 @@ export default function AdminPromotions({ products, onMessage }: Props) {
     image.onerror = () => draw()
     image.src = selectedProduct.image
     return () => { cancelled = true }
-  }, [photoPost, onMessage, brandLogo, contentType, reelSource, reelDestination, siteVideoZoom, reelVideoUrl, reelVideoDuration, reelHook, reelCta, mode, categoryProducts, categories, selectedCategory, coupon, couponBenefit, couponDiscountPercent, couponUsageLimit, format, headline, hasCouponDiscount, hasDiscount, originalPrice, normalizedCoupon, priceBeforeCoupon, promotionalPrice, selectedFormat, selectedProduct, discountPercent, matchedCoupon, showDiscount])
+  }, [clipStart, clipEnd, clipDuration, videoOffsetX, videoOffsetY, photoPost, onMessage, brandLogo, contentType, reelSource, reelDestination, siteVideoZoom, reelVideoUrl, reelVideoDuration, reelHook, reelCta, mode, categoryProducts, categories, selectedCategory, coupon, couponBenefit, couponDiscountPercent, couponUsageLimit, format, headline, hasCouponDiscount, hasDiscount, originalPrice, normalizedCoupon, priceBeforeCoupon, promotionalPrice, selectedFormat, selectedProduct, discountPercent, matchedCoupon, showDiscount])
 
   function handleProductChange(event: ChangeEvent<HTMLSelectElement>) {
     setSelectedId(event.target.value)
   }
 
-  function downloadPost() {
+  async function saveMedia(blob: Blob, fileName: string) {
+    setIsExporting(true)
+    try {
+      const result = await exportPromotion(blob, fileName)
+      onMessage(result === 'shared' ? 'Compartilhamento aberto. Escolha um aplicativo para salvar ou enviar o arquivo.' : `Arquivo gerado em ${fileName.split('.').pop()?.toUpperCase()}. Confira os downloads.`)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  async function downloadPost() {
+    if (isRecording || isExporting) return
     if (contentType === 'reel') {
       void downloadReel()
       return
@@ -651,15 +681,13 @@ export default function AdminPromotions({ products, onMessage }: Props) {
     if (mode === 'product' && !selectedProduct) return onMessage('Selecione um produto para gerar o post.')
     const fileNameSource = mode === 'category' ? selectedCategory : selectedProduct?.name || 'alpha-tec'
     try {
-      const link = document.createElement('a')
-      link.download = `post-${fileNameSource.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'alpha-tec'}.png`
-      link.href = canvas.toDataURL('image/png')
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      onMessage('Post promocional gerado e baixado em PNG.')
-    } catch {
-      onMessage('Não foi possível gerar o PNG. Verifique se a imagem do produto permite uso externo.')
+      setIsExporting(true)
+      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Não foi possível gerar o PNG.')), 'image/png'))
+      await saveMedia(blob, `post-${fileNameSource.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'alpha-tec'}.png`)
+    } catch (error) {
+      onMessage(error instanceof Error && error.name !== 'SecurityError' ? error.message : 'Não foi possível gerar o PNG. Verifique se a imagem do produto permite uso externo.')
+    } finally {
+      setIsExporting(false)
     }
   }
 
@@ -674,30 +702,64 @@ export default function AdminPromotions({ products, onMessage }: Props) {
     if (!mimeType) return onMessage('Este navegador não oferece um formato de vídeo compatível para gravação.')
 
     const video = reelSource === 'video' ? reelVideoRef.current : null
+    let cleanup: (() => void) | undefined
     try {
+      const duration = video ? getVideoClip(reelVideoDuration, clipStart, clipEnd).duration * 1000 : 12_000
+      if (reelSource === 'video' && !video) throw new Error('Aguarde o vídeo terminar de carregar.')
+      setIsRecording(true)
       if (video) {
-        video.currentTime = 0
-        await video.play()
+        video.pause()
+        if (video.seeking || Math.abs(video.currentTime - clipStart) > 0.001) {
+          await new Promise<void>((resolve, reject) => {
+            const finish = () => {
+              window.clearTimeout(timeout)
+              video.removeEventListener('seeked', seeked)
+            }
+            const seeked = () => { finish(); resolve() }
+            const timeout = window.setTimeout(() => { finish(); reject(new Error('Não foi possível posicionar o vídeo no início do corte.')) }, 10_000)
+            video.addEventListener('seeked', seeked)
+            video.currentTime = clipStart
+          })
+        }
       }
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
       reelStartTimeRef.current = performance.now()
       const stream = canvas.captureStream(30)
-      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 })
+      let recorder: MediaRecorder
+      try {
+        recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 })
+      } catch (error) {
+        stream.getTracks().forEach((track) => track.stop())
+        throw error
+      }
       const chunks: BlobPart[] = []
       const siteOutput = reelDestination === 'site'
-      const duration = siteOutput && video && Number.isFinite(video.duration) && video.duration > 0 ? Math.round(video.duration * 1000) : 12_000
       let progressTimer = 0
-      recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data) }
-      recorder.onerror = () => {
+      let stopTimer = 0
+      let failed = false
+      const release = () => {
+        window.clearInterval(progressTimer)
+        window.clearTimeout(stopTimer)
         stream.getTracks().forEach((track) => track.stop())
         if (video) video.pause()
+        recordingCleanupRef.current = null
+      }
+      cleanup = () => {
+        failed = true
+        if (recorder.state !== 'inactive') recorder.stop()
+        release()
+      }
+      recordingCleanupRef.current = cleanup
+      recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data) }
+      recorder.onerror = () => {
+        cleanup?.()
         setIsRecording(false)
         setRecordingProgress(0)
         onMessage('Não foi possível gravar o vídeo. Tente outro arquivo ou navegador.')
       }
       recorder.onstop = () => {
-        window.clearInterval(progressTimer)
-        stream.getTracks().forEach((track) => track.stop())
-        if (video) video.pause()
+        release()
+        if (failed) return
         setIsRecording(false)
         setRecordingProgress(0)
         const outputType = recorder.mimeType || mimeType
@@ -705,25 +767,41 @@ export default function AdminPromotions({ products, onMessage }: Props) {
         const extension = outputType.includes('mp4') ? 'mp4' : 'webm'
         const filePrefix = siteOutput ? 'produto-site' : 'reel'
         const fileName = `${filePrefix}-${(selectedProduct?.name || 'alpha-tec').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.${extension}`
-        const link = document.createElement('a')
-        link.download = fileName
-        link.href = URL.createObjectURL(blob)
-        document.body.appendChild(link)
-        link.click()
-        link.remove()
-        window.setTimeout(() => URL.revokeObjectURL(link.href), 1000)
-        onMessage(siteOutput ? `Vídeo para site gerado em ${extension.toUpperCase()}.` : extension === 'mp4' ? 'Reel gerado e baixado em MP4.' : 'Reel gerado em WebM. Para publicar no Instagram, converta o arquivo para MP4.')
+        void saveMedia(blob, fileName).then(() => {
+          if (!siteOutput && extension === 'webm') onMessage('Reel gerado em WebM. Para publicar no Instagram, converta o arquivo para MP4.')
+        }).catch((error: unknown) => onMessage(error instanceof Error ? error.message : 'Não foi possível exportar o vídeo.'))
       }
+      const begin = () => {
+        if (failed || recorder.state !== 'recording') return
+        window.clearTimeout(stopTimer)
+        reelStartTimeRef.current = performance.now()
+        const startedAt = Date.now()
+        progressTimer = window.setInterval(() => setRecordingProgress(Math.min(100, Math.round(((Date.now() - startedAt) / duration) * 100))), 250)
+        stopTimer = window.setTimeout(() => { if (recorder.state === 'recording') recorder.stop() }, duration)
+      }
+      recorder.onstart = () => {
+        if (video) {
+          void video.play().then(begin).catch(() => {
+            cleanup?.()
+            setIsRecording(false)
+            setRecordingProgress(0)
+            onMessage('Não foi possível reproduzir o vídeo para gravar o trecho selecionado.')
+          })
+        } else begin()
+      }
+      stopTimer = window.setTimeout(() => {
+        cleanup?.()
+        setIsRecording(false)
+        setRecordingProgress(0)
+        onMessage('A gravação demorou demais para iniciar. Tente novamente ou use outro formato de vídeo.')
+      }, 15_000)
       recorder.start(250)
-      setIsRecording(true)
-      const startedAt = Date.now()
-      progressTimer = window.setInterval(() => setRecordingProgress(Math.min(100, Math.round(((Date.now() - startedAt) / duration) * 100))), 250)
-      window.setTimeout(() => { if (recorder.state === 'recording') recorder.stop() }, duration)
-    } catch {
+    } catch (error) {
+      cleanup?.()
       if (video) video.pause()
       setIsRecording(false)
       setRecordingProgress(0)
-      onMessage('Não foi possível iniciar a gravação. Verifique o vídeo enviado e tente novamente.')
+      onMessage(error instanceof Error ? error.message : 'Não foi possível iniciar a gravação. Verifique o vídeo enviado e tente novamente.')
     }
   }
 
@@ -744,12 +822,23 @@ export default function AdminPromotions({ products, onMessage }: Props) {
           <h2>Posts promocionais</h2>
           <p className="form-hint">{contentType === 'reel' && reelDestination === 'site' ? 'Ajuste o enquadramento e gere um vídeo quadrado para a página do produto.' : contentType === 'feed' ? 'Crie uma arte com a logo Alpha Tec, sem preços e com chamada para acessar a loja.' : 'Escolha uma peça e crie um Reel pronto para publicar.'}</p>
         </div>
-        <button className="primary-button" type="button" onClick={downloadPost} disabled={isRecording || (contentType === 'reel' && reelSource === 'video' && !reelVideoFile)}>{isRecording ? `Gravando ${recordingProgress}%` : contentType === 'reel' ? reelDestination === 'site' ? 'Gerar vídeo para site' : 'Gerar Reel' : 'Gerar post para Instagram'} <span>↓</span></button>
+        <button className="primary-button" type="button" onClick={() => void downloadPost()} disabled={!canvasReady || isRecording || isExporting || (contentType === 'reel' && reelSource === 'video' && !reelVideoFile)}>{isExporting ? 'Exportando...' : isRecording ? `Gravando ${recordingProgress}%` : contentType === 'reel' ? reelDestination === 'site' ? 'Gerar vídeo para site' : 'Gerar Reel' : 'Gerar post para Instagram'} <span>↓</span></button>
       </div>
 
       {!activeProducts.length ? <p className="form-hint">Cadastre pelo menos um produto ativo para criar um post.</p> : <div className="promotion-studio-layout">
         <div className="promotion-controls">
+          <fieldset disabled={isRecording || isExporting} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
           <h3>Configuração da oferta</h3>
+          <details>
+            <summary>Ideias para posts mais atrativos</summary>
+            <p className="form-hint">Aplique uma sugestão para preencher a chamada e o gancho da legenda. As fotos do feed mantêm seu layout.</p>
+            {postIdeas.map((idea) => <div key={idea.title}>
+              <strong>{idea.title}</strong>
+              <p className="form-hint">{idea.tip}</p>
+              <button type="button" className="secondary-button" onClick={() => { setHeadline(idea.title.toUpperCase()); setReelHook(idea.hook); setCaptionHook(idea.hook) }}>Usar ideia: {idea.title}</button>
+            </div>)}
+            {captionHook && <button type="button" onClick={() => setCaptionHook('')}>Remover gancho da legenda do feed</button>}
+          </details>
           <div className="promotion-mode-toggle" role="tablist" aria-label="Formato do conteúdo">
             <button type="button" className={contentType === 'feed' ? 'is-active' : ''} onClick={() => setContentType('feed')}>Arte para feed</button>
             <button type="button" className={contentType === 'reel' ? 'is-active' : ''} onClick={() => { setContentType('reel'); setMode('product') }}>Reel de produto</button>
@@ -761,7 +850,7 @@ export default function AdminPromotions({ products, onMessage }: Props) {
             </div>
             {reelDestination === 'instagram' && <div className="promotion-mode-toggle" role="tablist" aria-label="Origem do vídeo">
               <button type="button" className={reelSource === 'photo' ? 'is-active' : ''} onClick={() => setReelSource('photo')}>Animar foto</button>
-              <button type="button" className={reelSource === 'video' ? 'is-active' : ''} onClick={() => setReelSource('video')}>Vídeo 360°</button>
+              <button type="button" className={reelSource === 'video' ? 'is-active' : ''} onClick={() => setReelSource('video')}>Enviar vídeo</button>
             </div>}
             {reelSource === 'video' && <label className="promotion-reel-file">Vídeo da peça<input type="file" accept="video/*" onChange={(event) => {
               const file = event.target.files?.[0]
@@ -770,15 +859,27 @@ export default function AdminPromotions({ products, onMessage }: Props) {
                 event.target.value = ''
                 return
               }
+              setCanvasReady(false)
+              setReelVideoDuration(0)
+              setClipStart(0)
+              setClipEnd(0)
               setReelVideoFile(file || null)
-            }} /><small>{reelVideoFile ? `${reelVideoFile.name} · ${reelDestination === 'site' ? `${reelVideoDuration.toFixed(1)}s · saída quadrada` : 'será usado em um Reel de 12 segundos'}` : reelDestination === 'site' ? 'Envie o vídeo do produto para aplicar o padrão de e-commerce.' : 'Envie um vídeo curto da peça girando em 360°.'}</small></label>}
+            }} /><small>{reelVideoFile ? `${reelVideoFile.name} · original ${reelVideoDuration.toFixed(1)}s · trecho ${clipDuration.toFixed(1)}s` : 'Envie um vídeo vertical ou quadrado e selecione o trecho desejado.'}</small></label>}
+            {reelSource === 'video' && reelVideoDuration > 0 && <>
+              <label>Início do corte (segundos)<input type="number" min="0" max={Math.max(0, clipEnd - 0.1)} step="0.1" value={clipStart} onChange={(event) => setClipStart(Math.max(0, Math.min(Number(event.target.value), clipEnd - Math.min(0.1, reelVideoDuration))))} /></label>
+              <label>Fim do corte (segundos)<input type="number" min={clipStart + Math.min(0.1, reelVideoDuration)} max={reelVideoDuration} step="0.1" value={clipEnd} onChange={(event) => setClipEnd(Math.max(clipStart + Math.min(0.1, reelVideoDuration), Math.min(Number(event.target.value), reelVideoDuration)))} /></label>
+              <label>Ampliação<input type="range" min="1" max="2.6" step="0.1" value={siteVideoZoom} onChange={(event) => setSiteVideoZoom(Number(event.target.value))} /><small>{siteVideoZoom.toFixed(1)}× · proporções preservadas</small></label>
+              <label>Posição horizontal<input type="range" min="-1" max="1" step="0.05" value={videoOffsetX} onChange={(event) => setVideoOffsetX(Number(event.target.value))} /></label>
+              <label>Posição vertical<input type="range" min="-1" max="1" step="0.05" value={videoOffsetY} onChange={(event) => setVideoOffsetY(Number(event.target.value))} /></label>
+              <button type="button" onClick={() => { setSiteVideoZoom(1); setVideoOffsetX(0); setVideoOffsetY(0); setClipStart(0); setClipEnd(reelVideoDuration) }}>Restaurar vídeo inteiro e centralizar</button>
+              <p className="form-hint">Exportação silenciosa do trecho selecionado, em tempo real. O arquivo pode incluir um breve quadro inicial enquanto o codificador é preparado. Mantenha esta tela aberta. No app, o arquivo final deve ter até 32 MB. Música pode ser adicionada no Instagram.</p>
+            </>}
             {reelDestination === 'instagram' && <>
               <label>Gancho inicial<input value={reelHook} maxLength={42} onChange={(event) => setReelHook(event.target.value)} placeholder="Ex.: TREINO PARADO?" /></label>
               <label>Chamada para ação<input value={reelCta} maxLength={48} onChange={(event) => setReelCta(event.target.value)} placeholder="Ex.: ACESSE LOJAALPHATEC.COM.BR" /></label>
               <p className="form-hint">Na opção de foto, a imagem gira durante todo o Reel. Para mostrar a rotação real da peça, envie um vídeo 360°. A gravação é silenciosa; adicione música pelo Instagram.</p>
             </>}
             {reelDestination === 'site' && <>
-              <label className="promotion-site-zoom">Enquadramento da peça<input type="range" min="1" max="2.6" step="0.1" value={siteVideoZoom} onChange={(event) => setSiteVideoZoom(Number(event.target.value))} /><small>Ampliação de {siteVideoZoom.toFixed(1)}×; ajuste para preencher melhor o quadro sem cortar a peça.</small></label>
               <p className="form-hint">Saída quadrada 1200×1200, produto centralizado com proporções preservadas, fundo cinza técnico e sombra suave. O vídeo original continua visível dentro da área do produto.</p>
             </>}
           </>}
@@ -822,12 +923,28 @@ export default function AdminPromotions({ products, onMessage }: Props) {
             </>
           )}
           {!(contentType === 'reel' && reelDestination === 'site') && <p className="form-hint">A porcentagem exibida vem do cupom salvo na aba Cupons. O post não aceita valores inventados e identifica quando o código ainda não existe.</p>}
-
+          </fieldset>
         </div>
         <div className="promotion-preview-panel">
-          <div className="promotion-preview-toolbar"><span>{contentType === 'reel' ? reelDestination === 'site' ? 'Prévia do vídeo de produto' : 'Prévia do Reel' : 'Prévia do post'}</span><small>{contentType === 'reel' ? reelDestination === 'site' ? `1200 x 1200px · ${reelVideoDuration.toFixed(1)}s` : '1080 x 1920px · 12s' : `${selectedFormat.width} x ${selectedFormat.height}px`}</small></div>
+          <div className="promotion-preview-toolbar"><span>{contentType === 'reel' ? reelDestination === 'site' ? 'Prévia do vídeo de produto' : 'Prévia do Reel' : 'Prévia do post'}</span><small>{contentType === 'reel' ? `${reelDestination === 'site' ? '1200 x 1200' : '1080 x 1920'}px · ${reelSource === 'video' ? clipDuration.toFixed(1) : '12'}s` : `${selectedFormat.width} x ${selectedFormat.height}px`}</small></div>
           <canvas ref={canvasRef} className={`promotion-canvas${contentType === 'reel' ? reelDestination === 'site' ? ' is-site-video' : ' is-reel' : ''}`} aria-label={contentType === 'reel' ? reelDestination === 'site' ? 'Prévia do vídeo de produto para site' : 'Prévia do Reel promocional' : 'Prévia do post promocional'} />
-          {contentType === 'reel' && reelSource === 'video' && reelVideoUrl && <video ref={reelVideoRef} src={reelVideoUrl} className="promotion-source-video" muted playsInline loop={reelDestination !== 'site'} aria-hidden="true" onLoadedMetadata={(event) => setReelVideoDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)} onLoadedData={(event) => event.currentTarget.play().catch(() => undefined)} />}
+          {contentType === 'reel' && reelSource === 'video' && reelVideoUrl && <video ref={reelVideoRef} src={reelVideoUrl} className="promotion-source-video" muted playsInline loop={!isRecording} aria-hidden="true" onLoadedMetadata={(event) => {
+            const duration = event.currentTarget.duration
+            if (!Number.isFinite(duration) || duration <= 0) {
+              setCanvasReady(false)
+              onMessage('Não foi possível ler a duração do vídeo. Envie outro arquivo.')
+              return
+            }
+            setReelVideoDuration(duration)
+            setClipStart(0)
+            setClipEnd(duration)
+          }} onLoadedData={(event) => {
+            if (Number.isFinite(event.currentTarget.duration) && event.currentTarget.duration > 0) setCanvasReady(true)
+            void event.currentTarget.play().catch(() => onMessage('A prévia automática foi bloqueada. Toque em Gerar para iniciar a reprodução.'))
+          }} onError={() => {
+            setCanvasReady(false)
+            onMessage('Não foi possível abrir o vídeo. Tente um arquivo MP4 compatível com seu aparelho.')
+          }} />}
           {!(contentType === 'reel' && reelDestination === 'site') && <div className="promotion-caption-panel">
             <div className="promotion-preview-toolbar"><span>{contentType === 'reel' ? 'Legenda para o Reel' : 'Legenda para Instagram'}</span><button type="button" onClick={() => void copyCaption()}>Copiar legenda</button></div>
             <textarea value={caption} onChange={() => undefined} readOnly aria-label="Legenda gerada para Instagram" />

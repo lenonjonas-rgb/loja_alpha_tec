@@ -15,6 +15,34 @@ The default URL is `https://lojaalphatec.com.br/admin`. For local development, c
 
 The device needs internet access to use the admin panel. Expo Go is for development; a standalone Android build can be produced later with EAS Build.
 
+## App icon
+
+The launcher icon uses the same `public/brand-mark.svg` as the website favicon.
+Run `npm run icons:generate` from the repository root to regenerate both sets
+of icons. Android adaptive and themed icons use separate transparent layers,
+with padding to avoid clipping in circular launcher masks.
+Icon changes require building and installing a new APK.
+The repository-root `.easignore` excludes local environment files, cookies,
+dependencies and caches from the cloud build upload.
+
+## Posts and video export
+
+The app receives generated PNG/MP4/WebM files from the protected admin page,
+writes them to its local cache and opens Android's share sheet. Choose a
+compatible app to save or send the file. Cancelling the sheet does not mean
+the file was saved. Cache files may be removed by the operating system.
+Exports are limited to 32 MB per file; trim longer videos in **Posts** first.
+The editor supports start/end trimming, zoom and horizontal/vertical positioning.
+Video export is silent, runs in real time and requires keeping the app open.
+MP4 support depends on the device WebView; WebM may require conversion for Instagram.
+
+This feature requires a new APK containing `expo-file-system` and `expo-sharing`
+and the updated admin website. Publishing only the website is not enough.
+Build with `npx eas-cli@latest build --platform android --profile preview`
+and install the resulting APK. Old APKs show an update instruction on export.
+On a physical device, verify a PNG export, a trimmed video export, cancelling
+the share sheet and returning to the editor without losing the selected file.
+
 ## Android push notifications
 
 Remote push is not available in Expo Go on Android. Install an EAS APK to test it.

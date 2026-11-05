@@ -13,7 +13,8 @@
           "defaultChannel": "admin-events",
           "color": "#d5322f"
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -26,11 +27,13 @@
     },
     "android": {
       "package": "br.com.lojaalphatec.admin",
+      "versionCode": 2,
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "backgroundColor": "#202225",
-        "foregroundImage": "./assets/icon.png"
+        "backgroundColor": "#18191b",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
     },

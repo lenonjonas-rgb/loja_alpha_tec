@@ -17,6 +17,29 @@ Para produto único, o modelo padrão “Foto ampliada + logo + site” mostra a
 
 As artes de feed do painel administrativo usam a logo de `public/brand-logo.svg` nos formatos 1080×1350 e 1080×1080. Posts de produto e de categoria não exibem preços na arte nem na legenda gerada; a chamada “Confira no site” direciona para www.lojaalphatec.com.br. Cupons cadastrados continuam disponíveis. A geração aguarda o carregamento da logo, e falhas são informadas no painel. Reels e vídeos para o site mantêm seu comportamento.
 
+Em **Posts > Reel de produto**, escolha **Enviar vídeo** ou **Editar para site**.
+Envie o arquivo, selecione início e fim do corte em segundos e ajuste ampliação
+e posição horizontal/vertical. A prévia repete o trecho escolhido; a exportação
+grava somente esse trecho, sem áudio e em tempo real. Mantenha a tela aberta.
+O arquivo pode incluir um breve quadro inicial de preparação do codificador;
+a duração final pode, portanto, superar a duração do trecho selecionado.
+O formato de saída é 1080×1920 para Reels ou 1200×1200 para o site.
+MP4 depende do suporte do navegador/WebView; quando somente WebM estiver
+disponível, converta para MP4 antes de publicar no Instagram.
+O arquivo não é vinculado automaticamente ao cadastro do produto.
+
+No navegador, PNG e vídeos são baixados. No app atualizado, abre-se o
+compartilhamento nativo para escolher onde salvar/enviar (máximo de 32 MB
+por arquivo). APKs antigos mostram uma orientação para atualizar, sem
+simular sucesso. A nova integração exige publicar o painel e instalar um
+novo APK; atualizar apenas o site não adiciona módulos nativos ao app.
+
+**Ideias para posts mais atrativos** oferece sugestões de close de detalhes,
+manutenção e produto em movimento. **Usar ideia** preenche a chamada e o
+gancho do Reel e acrescenta um gancho à legenda do feed, sem alterar o layout
+da foto nem inventar especificações ou descontos.
+Testes: `node --test tests/admin-promotions.test.cjs tests/promotion-media.test.cjs`.
+
 ## Publicação na Vercel
 
 1. Envie este projeto para um repositório no GitHub.

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, AppState, BackHandler, Linking, Platform, Pressable, SafeAreaView, StatusBar, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, AppState, BackHandler, Linking, Platform, Pressable, SafeAreaView, StatusBar, StyleSheet, Text, View } from 'react-native'
 import { WebView } from 'react-native-webview'
 import Constants from 'expo-constants'
 import * as Notifications from 'expo-notifications'
+import { sharePromotionMedia } from './media-export'
 
 const ADMIN_URL = process.env.EXPO_PUBLIC_ADMIN_URL || 'https://lojaalphatec.com.br/admin'
 const ADMIN_ORIGIN = new URL(ADMIN_URL).origin
@@ -22,6 +23,8 @@ export default function App() {
   const expoPushTokenRef = useRef('')
   const expoPushErrorRef = useRef('')
   const filePickerPendingRef = useRef(false)
+  const sharingPendingRef = useRef(false)
+  const exportingRef = useRef(false)
   const [canGoBack, setCanGoBack] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -40,6 +43,10 @@ export default function App() {
       const wasInactive = appStateRef.current === 'background' || appStateRef.current === 'inactive'
       appStateRef.current = nextState
       if (wasInactive && nextState === 'active') {
+        if (sharingPendingRef.current) {
+          sharingPendingRef.current = false
+          return
+        }
         if (filePickerPendingRef.current) {
           filePickerPendingRef.current = false
           return
@@ -117,10 +124,37 @@ export default function App() {
     webViewRef.current?.injectJavaScript(`window.__alphaTecReceiveNativePushError?.(${JSON.stringify(message)});true;`)
   }
 
-  function handleWebViewMessage(message: string) {
+  async function exportMedia(payload: { id?: unknown; fileName?: unknown; dataUrl?: unknown }) {
+    if (typeof payload.id !== 'string') return
+    const respond = (error?: string) => {
+      webViewRef.current?.injectJavaScript(`window.dispatchEvent(new CustomEvent('alpha-tec-export-result',{detail:${JSON.stringify({ id: payload.id, error })}}));true;`)
+    }
+    if (exportingRef.current) {
+      respond('Já existe uma exportação em andamento. Aguarde o compartilhamento terminar.')
+      return
+    }
+    exportingRef.current = true
+    sharingPendingRef.current = true
     try {
+      await sharePromotionMedia(payload)
+      respond()
+    } catch (error) {
+      console.warn('Falha ao exportar mídia:', error)
+      const message = error instanceof Error ? error.message : 'Não foi possível salvar ou compartilhar o arquivo.'
+      respond(message)
+      Alert.alert('Falha na exportação', message)
+    } finally {
+      exportingRef.current = false
+    }
+  }
+
+  function handleWebViewMessage(message: string, sourceUrl: string) {
+    try {
+      if (new URL(sourceUrl).origin !== ADMIN_ORIGIN) return
       const payload = JSON.parse(message)
-      if (payload.type === 'admin-file-picker-opened') {
+      if (payload.type === 'admin-export-media') {
+        void exportMedia(payload)
+      } else if (payload.type === 'admin-file-picker-opened') {
         filePickerPendingRef.current = true
       } else if (payload.type === 'request-admin-push-token' && expoPushTokenRef.current) {
         sendPushTokenToAdminPage(expoPushTokenRef.current)
@@ -153,8 +187,9 @@ export default function App() {
           thirdPartyCookiesEnabled
           pullToRefreshEnabled={Platform.OS === 'android'}
           overScrollMode="never"
-          injectedJavaScriptBeforeContentLoaded={`(function(){document.addEventListener('click',function(event){var target=event.target;var label=target instanceof Element?target.closest('label'):null;var fileInput=target instanceof HTMLInputElement&&target.type==='file'?target:label&&label.querySelector('input[type="file"]');if(fileInput&&window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify({type:'admin-file-picker-opened'}));}},true);})();true;`}
-          onMessage={(event) => handleWebViewMessage(event.nativeEvent.data)}
+          injectedJavaScriptBeforeContentLoaded={`window.__alphaTecNativeExportVersion=1;(function(){document.addEventListener('click',function(event){var target=event.target;var label=target instanceof Element?target.closest('label'):null;var fileInput=target instanceof HTMLInputElement&&target.type==='file'?target:label&&label.querySelector('input[type="file"]');if(fileInput&&window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify({type:'admin-file-picker-opened'}));}},true);})();true;`}
+          injectedJavaScript="window.__alphaTecNativeExportVersion=1;true;"
+          onMessage={(event) => handleWebViewMessage(event.nativeEvent.data, event.nativeEvent.url)}
           onShouldStartLoadWithRequest={handleNavigationRequest}
           onNavigationStateChange={(navigation) => setCanGoBack(navigation.canGoBack)}
           onLoadStart={() => { setIsLoading(true); setLoadError('') }}

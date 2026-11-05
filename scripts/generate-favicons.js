@@ -4,6 +4,7 @@ const sharp = require('sharp')
 
 const publicDir = path.join(__dirname, '..', 'public')
 const source = path.join(publicDir, 'brand-mark.svg')
+const appAssetsDir = path.join(__dirname, '..', 'apps', 'admin-android', 'assets')
 
 async function generate() {
   await sharp(path.join(publicDir, 'brand-logo.svg'))
@@ -15,6 +16,20 @@ async function generate() {
     await sharp(source).resize(size, size).png().toFile(path.join(publicDir, `favicon-${size}.png`))
   }
   await sharp(source).resize(180, 180).png().toFile(path.join(publicDir, 'apple-touch-icon.png'))
+
+  await sharp(source).resize(1024, 1024).flatten({ background: '#18191b' }).png().toFile(path.join(appAssetsDir, 'icon.png'))
+  await sharp(source).resize(48, 48).png().toFile(path.join(appAssetsDir, 'favicon.png'))
+  const mark = (await fs.readFile(source, 'utf8')).replace(/<rect\b[^>]*\/>/, '')
+  const foreground = await sharp(Buffer.from(mark)).resize(720, 720).png().toBuffer()
+  await sharp({ create: { width: 1024, height: 1024, channels: 4, background: '#00000000' } })
+    .composite([{ input: foreground, gravity: 'centre' }])
+    .png()
+    .toFile(path.join(appAssetsDir, 'android-icon-foreground.png'))
+  const monochrome = await sharp(foreground).tint('#ffffff').png().toBuffer()
+  await sharp({ create: { width: 1024, height: 1024, channels: 4, background: '#00000000' } })
+    .composite([{ input: monochrome, gravity: 'centre' }])
+    .png()
+    .toFile(path.join(appAssetsDir, 'android-icon-monochrome.png'))
 
   const sizes = [16, 32, 48]
   const images = await Promise.all(sizes.map((size) => sharp(source).resize(size, size).png().toBuffer()))
@@ -33,7 +48,7 @@ async function generate() {
     offset += image.length
   })
   await fs.writeFile(path.join(publicDir, 'favicon.ico'), Buffer.concat([header, ...images]))
-  console.log('Logo JPG gerado de brand-logo.svg; favicons PNG, ICO e apple-touch-icon gerados de brand-mark.svg.')
+  console.log('Logo JPG gerado de brand-logo.svg; favicons e ícones do app gerados de brand-mark.svg.')
 }
 
 generate().catch((error) => {

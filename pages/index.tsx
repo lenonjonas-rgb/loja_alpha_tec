@@ -53,12 +53,12 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Inversor Movement e Peças para Esteira | Alpha Tec</title>
-        <meta name="description" content="Encontre inversor Movement para esteira, peças e acessórios para equipamentos de academia na Alpha Tec, com envio para todo o Brasil." />
+        <title>Alpha Tec | Manutenção de academia</title>
+        <meta name="description" content="Manutenção de academia em Florianópolis e na Grande Florianópolis. Assistência técnica para equipamentos fitness e venda de peças com envio para todo o Brasil." />
         <meta name="robots" content="index, follow" />
         <link rel="canonical" href={siteUrl} />
-        <meta property="og:title" content="Inversor Movement e Peças para Esteira | Alpha Tec" />
-        <meta property="og:description" content="Encontre inversor Movement para esteira, peças e acessórios para equipamentos de academia na Alpha Tec, com envio para todo o Brasil." />
+        <meta key="og:title" property="og:title" content="Alpha Tec | Manutenção de academia" />
+        <meta key="og:description" property="og:description" content="Manutenção de academia em Florianópolis e na Grande Florianópolis. Assistência técnica para equipamentos fitness e venda de peças com envio para todo o Brasil." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={siteUrl} />
       </Head>

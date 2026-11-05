@@ -38,8 +38,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <link rel="canonical" href={siteUrl} />
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="Loja Alpha Tec" />
-        <meta property="og:title" content={siteTitle} />
-        <meta property="og:description" content={siteDescription} />
+        <meta key="og:title" property="og:title" content={siteTitle} />
+        <meta key="og:description" property="og:description" content={siteDescription} />
         <meta property="og:url" content={siteUrl} />
         <meta property="og:image" content={`${siteUrl}/logo-header-uniform.jpg`} />
         <meta name="twitter:card" content="summary_large_image" />

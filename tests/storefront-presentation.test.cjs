@@ -40,6 +40,17 @@ const PaymentMethods = loadSource(path.join('components', 'PaymentMethods.tsx'))
 const FooterSecurity = loadSource(path.join('components', 'FooterSecurity.tsx')).default
 const base = { id: 'piece', name: 'Correia de teste', category: 'Esteiras', price: 120, image: '', stock: 3, description: '', active: true }
 
+test('chamada de manutenção aparece antes das categorias sem duplicar o bloco ou alterar o destino', () => {
+  const home = fs.readFileSync(path.join(root, 'pages', 'index.tsx'), 'utf8')
+  const callouts = [...home.matchAll(/<section className="container service-callout"[\s\S]*?<\/section>/g)]
+  assert.equal(callouts.length, 1)
+  assert.ok(home.indexOf('className="trust-bar"') < callouts[0].index)
+  assert.ok(callouts[0].index < home.indexOf('className="container content-section equipment-section"'))
+  assert.match(callouts[0][0], /aria-labelledby="maintenance-callout-title"/)
+  assert.match(callouts[0][0], /<Link href="\/maintenance" className="outline-button">Solicitar manutenção/)
+  assert.match(callouts[0][0], /Consulte a cobertura pelo seu CEP/)
+})
+
 test('divulgação dos pagamentos permanece somente no rodapé compartilhado', () => {
   const layout = fs.readFileSync(path.join(root, 'components', 'Layout.tsx'), 'utf8')
   assert.equal((layout.match(/<PaymentMethods\b/g) || []).length, 1)

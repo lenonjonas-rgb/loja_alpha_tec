@@ -1,14 +1,25 @@
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Product } from '../lib/products'
 import { formatProductPrice, getProductCompatibilityLabel, getProductSalePrice } from '../lib/product-presentation'
 import ProductImage from './ProductImage'
 
 export default function HeroBanner({ products, loading, error }: { products: Product[]; loading: boolean; error: string }) {
   const [index, setIndex] = useState(0)
+  const [hovered, setHovered] = useState(false)
+  const [focused, setFocused] = useState(false)
   const slides = products.filter((product) => product.active !== false && product.showInBanner)
+  const slideCount = slides.length
   const selectedIndex = slides.length ? index % slides.length : 0
   const product = slides[selectedIndex]
+
+  useEffect(() => {
+    if (slideCount < 2 || hovered || focused) return
+    const timer = setInterval(() => {
+      setIndex((current) => (current + 1) % slideCount)
+    }, 2000)
+    return () => clearInterval(timer)
+  }, [slideCount, hovered, focused])
 
   if (!product) {
     return (
@@ -22,7 +33,16 @@ export default function HeroBanner({ products, loading, error }: { products: Pro
   }
 
   return (
-    <section className="technical-banner technical-banner-overlay" aria-label="Peças selecionadas pela Alpha Tec">
+    <section
+      className="technical-banner technical-banner-overlay"
+      aria-label="Peças selecionadas pela Alpha Tec"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false)
+      }}
+    >
       <div className="technical-banner-top">
         <span className="technical-banner-label">SELEÇÃO ALPHA TEC</span>
         {slides.length > 1 && <span className="technical-banner-count">{selectedIndex + 1} / {slides.length}</span>}

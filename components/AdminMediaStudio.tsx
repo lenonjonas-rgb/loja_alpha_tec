@@ -12,6 +12,22 @@ const CANVAS_SIZE = 1200
 const MEDIA_BOX = { x: 150, y: 150, width: 900, height: 900 }
 const DEFAULT_IMAGE_ZOOM = 1
 const DEFAULT_VIDEO_ZOOM = 1.8
+const BACKDROP_SRC = '/product-backdrop.jpg'
+
+// A biblioteca de recorte é carregada via CDN em runtime: o bundle ONNX dela não é compatível
+// com o empacotamento do Next/webpack, e os modelos de IA já são baixados de CDN de qualquer forma.
+type BackgroundRemovalModule = { removeBackground: (source: Blob, config?: { output?: { format?: 'image/png' | 'image/jpeg' | 'image/webp'; quality?: number }; progress?: (key: string, current: number, total: number) => void }) => Promise<Blob> }
+const BG_REMOVAL_MODULE_URL = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/+esm'
+let backgroundRemovalPromise: Promise<BackgroundRemovalModule> | null = null
+function loadBackgroundRemoval() {
+  if (!backgroundRemovalPromise) {
+    backgroundRemovalPromise = (import(/* webpackIgnore: true */ BG_REMOVAL_MODULE_URL) as Promise<BackgroundRemovalModule>).catch((error: unknown) => {
+      backgroundRemovalPromise = null
+      throw error
+    })
+  }
+  return backgroundRemovalPromise
+}
 
 // Mesmo fundo técnico usado no vídeo de produto para o site (AdminPromotions).
 function drawTechnicalFrame(context: CanvasRenderingContext2D) {
@@ -46,6 +62,22 @@ function drawMedia(context: CanvasRenderingContext2D, media: CanvasImageSource, 
   context.restore()
 }
 
+// Composição com fundo padrão da marca: produto recortado pela IA sobre o backdrop técnico, com sombra suave.
+function drawAiComposite(context: CanvasRenderingContext2D, backdrop: HTMLImageElement, cutout: HTMLImageElement, zoom: number, offsetX: number, offsetY: number) {
+  context.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
+  const scale = Math.max(CANVAS_SIZE / backdrop.naturalWidth, CANVAS_SIZE / backdrop.naturalHeight)
+  const backdropWidth = backdrop.naturalWidth * scale
+  const backdropHeight = backdrop.naturalHeight * scale
+  context.drawImage(backdrop, (CANVAS_SIZE - backdropWidth) / 2, (CANVAS_SIZE - backdropHeight) / 2, backdropWidth, backdropHeight)
+  const placement = getMediaPlacement(cutout.naturalWidth, cutout.naturalHeight, MEDIA_BOX, true, zoom, offsetX, offsetY)
+  context.save()
+  context.shadowColor = 'rgba(28,32,35,.35)'
+  context.shadowBlur = 48
+  context.shadowOffsetY = 30
+  context.drawImage(cutout, placement.x, placement.y, placement.width, placement.height)
+  context.restore()
+}
+
 export default function AdminMediaStudio({ products, onSaved, onMessage }: Props) {
   const [mediaFile, setMediaFile] = useState<File | null>(null)
   const [mediaKind, setMediaKind] = useState<MediaKind | null>(null)
@@ -64,6 +96,12 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
   const [isSaving, setIsSaving] = useState(false)
   const [linkedProductId, setLinkedProductId] = useState('')
   const [saveTarget, setSaveTarget] = useState<SaveTarget>('gallery')
+  const [aiBackground, setAiBackground] = useState(true)
+  const [backdrop, setBackdrop] = useState<HTMLImageElement | null>(null)
+  const [cutoutUrl, setCutoutUrl] = useState('')
+  const [cutoutImage, setCutoutImage] = useState<HTMLImageElement | null>(null)
+  const [isRemovingBg, setIsRemovingBg] = useState(false)
+  const [removalStatus, setRemovalStatus] = useState('')
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const recordingCleanupRef = useRef<(() => void) | null>(null)
@@ -75,6 +113,54 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
   const busy = isRecording || isExporting || isSaving
 
   useEffect(() => () => recordingCleanupRef.current?.(), [])
+
+  useEffect(() => {
+    let cancelled = false
+    const element = new Image()
+    element.onload = () => { if (!cancelled) setBackdrop(element) }
+    element.onerror = () => { if (!cancelled) onMessage('Não foi possível carregar o fundo técnico padrão. Recarregue a página para usar a troca de fundo com IA.') }
+    element.src = BACKDROP_SRC
+    return () => { cancelled = true }
+  }, [onMessage])
+
+  useEffect(() => {
+    if (mediaKind !== 'image' || !mediaFile || !aiBackground || cutoutUrl) return
+    let cancelled = false
+    setIsRemovingBg(true)
+    setRemovalStatus('Preparando a IA de recorte...')
+    loadBackgroundRemoval()
+      .then(({ removeBackground }) => removeBackground(mediaFile, {
+        output: { format: 'image/png' },
+        progress: (key, current, total) => {
+          if (cancelled) return
+          if (key.startsWith('fetch') && total > 0) setRemovalStatus(`Baixando o modelo de IA (${Math.round((current / total) * 100)}%)... só é necessário no primeiro uso.`)
+          else setRemovalStatus('Recortando o produto da foto...')
+        },
+      }))
+      .then((blob) => { if (!cancelled) setCutoutUrl(URL.createObjectURL(blob)) })
+      .catch(() => {
+        if (cancelled) return
+        setAiBackground(false)
+        onMessage('Não foi possível remover o fundo com IA neste dispositivo. A foto será enquadrada no padrão técnico sem troca de fundo.')
+      })
+      .finally(() => { if (!cancelled) { setIsRemovingBg(false); setRemovalStatus('') } })
+    return () => { cancelled = true }
+  }, [mediaKind, mediaFile, aiBackground, cutoutUrl, onMessage])
+
+  useEffect(() => {
+    if (!cutoutUrl) {
+      setCutoutImage(null)
+      return
+    }
+    let cancelled = false
+    const element = new Image()
+    element.onload = () => { if (!cancelled) setCutoutImage(element) }
+    element.onerror = () => { if (!cancelled) { setCutoutImage(null); onMessage('Não foi possível abrir o recorte gerado pela IA. Tente novamente.') } }
+    element.src = cutoutUrl
+    return () => { cancelled = true }
+  }, [cutoutUrl, onMessage])
+
+  useEffect(() => () => { if (cutoutUrl) URL.revokeObjectURL(cutoutUrl) }, [cutoutUrl])
 
   useEffect(() => {
     if (!mediaFile) {
@@ -117,6 +203,21 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
       return
     }
     if (mediaKind === 'image') {
+      if (aiBackground) {
+        if (!cutoutImage || !backdrop) {
+          setCanvasReady(false)
+          drawTechnicalFrame(context)
+          context.fillStyle = '#858a90'
+          context.font = '700 34px Arial, sans-serif'
+          context.textAlign = 'center'
+          context.fillText('REMOVENDO O FUNDO COM IA...', CANVAS_SIZE / 2, CANVAS_SIZE / 2)
+          context.textAlign = 'left'
+          return
+        }
+        drawAiComposite(context, backdrop, cutoutImage, zoom, offsetX, offsetY)
+        setCanvasReady(true)
+        return
+      }
       if (!image) { setCanvasReady(false); return }
       drawTechnicalFrame(context)
       drawMedia(context, image, image.naturalWidth, image.naturalHeight, zoom, offsetX, offsetY)
@@ -138,7 +239,7 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
     }
     drawFrame()
     return () => cancelAnimationFrame(animationFrame)
-  }, [mediaUrl, mediaKind, image, zoom, offsetX, offsetY, clipStart, clipEnd, clipDuration])
+  }, [mediaUrl, mediaKind, image, zoom, offsetX, offsetY, clipStart, clipEnd, clipDuration, aiBackground, cutoutImage, backdrop])
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -152,6 +253,8 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
     setCanvasReady(false)
     setMediaKind(kind)
     setMediaFile(file)
+    setCutoutUrl('')
+    setCutoutImage(null)
     setZoom(kind === 'video' ? DEFAULT_VIDEO_ZOOM : DEFAULT_IMAGE_ZOOM)
     setOffsetX(0)
     setOffsetY(0)
@@ -343,6 +446,10 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
           <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
             <h3>Configuração da mídia</h3>
             <label className="promotion-reel-file">Foto ou vídeo da peça<input type="file" accept="image/*,video/*" onChange={handleFileChange} /><small>{mediaFile ? mediaKind === 'video' ? `${mediaFile.name} · original ${videoDuration.toFixed(1)}s · trecho ${clipDuration.toFixed(1)}s` : mediaFile.name : 'Envie a foto ou o vídeo original da peça para padronizar antes do cadastro.'}</small></label>
+            {mediaKind === 'image' && mediaFile && <>
+              <label className="promotion-toggle"><input type="checkbox" checked={aiBackground} onChange={(event) => setAiBackground(event.target.checked)} /> Trocar fundo com IA (fundo técnico da marca)</label>
+              <p className="form-hint">{isRemovingBg ? removalStatus || 'Recortando o produto da foto...' : aiBackground ? 'A IA recorta o produto e o coloca sobre o fundo padrão da marca (cinza técnico com detalhes em grafite e vermelho), com sombra suave. Tudo roda no seu dispositivo, sem custo por imagem.' : 'A foto original é apenas enquadrada no padrão técnico, sem troca de fundo.'}</p>
+            </>}
             {mediaKind === 'video' && videoDuration > 0 && <>
               <label>Início do corte (segundos)<input type="number" min="0" max={Math.max(0, clipEnd - 0.1)} step="0.1" value={clipStart} onChange={(event) => setClipStart(Math.max(0, Math.min(Number(event.target.value), clipEnd - Math.min(0.1, videoDuration))))} /></label>
               <label>Fim do corte (segundos)<input type="number" min={clipStart + Math.min(0.1, videoDuration)} max={videoDuration} step="0.1" value={clipEnd} onChange={(event) => setClipEnd(Math.max(clipStart + Math.min(0.1, videoDuration), Math.min(Number(event.target.value), videoDuration)))} /></label>
@@ -353,7 +460,7 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
               <label>Posição vertical<input type="range" min="-1" max="1" step="0.05" value={offsetY} onChange={(event) => setOffsetY(Number(event.target.value))} /></label>
               <button type="button" onClick={resetAdjustments}>Restaurar ajustes e centralizar</button>
             </>}
-            {mediaKind === 'video' && <p className="form-hint">Exportação silenciosa do trecho selecionado, em tempo real. O arquivo pode incluir um breve quadro inicial enquanto o codificador é preparado. Mantenha esta tela aberta. No app, o arquivo final deve ter até 32 MB.</p>}
+            {mediaKind === 'video' && <p className="form-hint">Exportação silenciosa do trecho selecionado, em tempo real. O arquivo pode incluir um breve quadro inicial enquanto o codificador é preparado. Mantenha esta tela aberta. No app, o arquivo final deve ter até 32 MB. A troca de fundo com IA está disponível apenas para fotos.</p>}
             {mediaKind === 'image' && mediaFile && <>
               <h3>Vincular ao produto</h3>
               <label>Produto cadastrado (opcional)<select value={linkedProductId} onChange={(event) => setLinkedProductId(event.target.value)}>

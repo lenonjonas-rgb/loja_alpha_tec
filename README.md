@@ -34,6 +34,14 @@ Em **Editor de mídia** (níveis Administrativo e Master), envie a foto ou o
 vídeo original da peça para gerar a mídia padronizada 1200×1200 usada no
 cadastro: produto centralizado com proporções preservadas, fundo cinza
 técnico e sombra suave — o mesmo padrão do vídeo de produto para o site.
+Para fotos, a opção **Trocar fundo com IA** (ligada por padrão) recorta o
+produto com um modelo de IA que roda no próprio navegador/app (biblioteca
+carregada de cdn.jsdelivr.net e modelo de staticimgly.com; o primeiro uso
+baixa ~40 MB, depois fica em cache; sem custo por imagem) e o posiciona
+sobre o fundo padrão da marca (`public/product-backdrop.jpg`: cinza-claro
+com desenhos técnicos em grafite e ferramentas em vermelho escuro) com
+sombra suave. Desligando a opção, a foto original é apenas enquadrada.
+A troca de fundo com IA não se aplica a vídeos.
 Ajuste ampliação (1×–2,6×) e posição horizontal/vertical; para vídeos,
 selecione início e fim do corte em segundos. Fotos são exportadas em PNG e
 vídeos são gravados em tempo real, sem áudio (MP4 quando o navegador

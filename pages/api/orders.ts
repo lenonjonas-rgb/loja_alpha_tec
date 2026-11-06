@@ -67,6 +67,67 @@ async function attachOrderDetails(supabase: ReturnType<typeof getSupabaseServer>
 }
 
 const adminOrderSelect = 'id,customer_id,status,payment_status,payment_method,subtotal,shipping,total,created_at,tracking_code,carrier,invoice_url,shipping_address,manual_customer_name,manual_customer_phone,manual_customer_email,customers(name,email,phone,document),order_items(product_id,product_name,internal_code,quantity,unit_price,total)'
+
+// normaliza e valida o corpo enviado pelo formulário de pedido manual (criação e edição)
+function parseManualOrderBody(body: any): { error: string } | { orderRow: Record<string, unknown>; items: any[] } {
+  const normalizedItems = Array.isArray(body?.items) ? body.items.filter((item: any) => item && String(item.productId || '').trim() && Number(item.quantity) > 0 && Number(item.unitPrice) >= 0) : []
+  const normalizedName = String(body?.customerName || '').trim()
+  if (!normalizedName) return { error: 'Informe o nome do cliente para o pedido manual.' }
+  if (!normalizedItems.length) return { error: 'Adicione pelo menos um item ao pedido.' }
+  const allowedStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']
+  const allowedPayments = ['pending', 'paid', 'failed', 'refunded']
+  const address = body?.address || {}
+  const cepDigits = String(address.cep || '').replace(/\D/g, '')
+  if (cepDigits && cepDigits.length !== 8) return { error: 'Informe um CEP válido com 8 números.' }
+  const shippingAddress = cepDigits
+    ? {
+      name: normalizedName,
+      phone: String(body?.customerPhone || '').trim() || undefined,
+      cep: `${cepDigits.slice(0, 5)}-${cepDigits.slice(5)}`,
+      address: String(address.address || '').trim(),
+      number: String(address.number || '').trim(),
+      complement: String(address.complement || '').trim(),
+      city: String(address.city || '').trim(),
+    }
+    : null
+  const subtotal = normalizedItems.reduce((sum: number, item: any) => sum + Number(item.unitPrice) * Number(item.quantity), 0)
+  const shippingTotal = Number(body?.shipping) || 0
+  return {
+    orderRow: {
+      manual_customer_name: normalizedName,
+      manual_customer_phone: String(body?.customerPhone || '').trim() || null,
+      manual_customer_email: String(body?.customerEmail || '').trim() || null,
+      status: allowedStatuses.includes(body?.status) ? body.status : 'confirmed',
+      payment_status: allowedPayments.includes(body?.paymentStatus) ? body.paymentStatus : 'paid',
+      payment_method: body?.paymentMethod || 'manual',
+      carrier: String(body?.carrier || '').trim() || null,
+      tracking_code: String(body?.trackingCode || '').trim() || null,
+      subtotal,
+      shipping: shippingTotal,
+      total: subtotal + shippingTotal,
+      shipping_address: shippingAddress,
+    },
+    items: normalizedItems,
+  }
+}
+
+function buildManualOrderItems(orderId: string, items: any[]) {
+  return items.map((item: any) => ({
+    order_id: orderId,
+    product_id: String(item.productId),
+    product_name: String(item.name || 'Item').slice(0, 200),
+    internal_code: item.internalCode || null,
+    quantity: Number(item.quantity),
+    unit_price: Number(item.unitPrice),
+    total: Number(item.unitPrice) * Number(item.quantity),
+  }))
+}
+
+const manualOrderErrorResponse = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String((error as { message?: unknown })?.message || '')
+  const missingColumns = /manual_customer|column .* does not exist|source.* column|schema cache/i.test(message)
+  return missingColumns ? 'A tabela orders ainda não tem as colunas de pedido manual. Execute scripts/commerce.sql completo no Supabase.' : message || 'Não foi possível salvar o pedido manual.'
+}
 const adminOrderSelectFallback = 'id,customer_id,status,payment_status,payment_method,subtotal,shipping,total,created_at,tracking_code,carrier,invoice_url,shipping_address,customers(name,email,phone,document),order_items(product_id,product_name,internal_code,quantity,unit_price,total)'
 
 // enquanto scripts/commerce.sql não for executado no Supabase, as colunas manual_customer_* ainda não existem;
@@ -83,7 +144,7 @@ async function selectAdminOrders(supabase: ReturnType<typeof getSupabaseServer>)
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST' && req.method !== 'GET' && req.method !== 'PATCH' && req.method !== 'DELETE') return res.status(405).json({ error: 'Método não permitido.' })
+  if (req.method !== 'POST' && req.method !== 'GET' && req.method !== 'PATCH' && req.method !== 'PUT' && req.method !== 'DELETE') return res.status(405).json({ error: 'Método não permitido.' })
   if (req.method === 'GET') {
     try {
       const supabase = getSupabaseServer()
@@ -143,58 +204,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ deleted: true, id })
     } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : 'Não foi possível excluir o pedido.' }) }
   }
-  if (req.method === 'POST' && isAdmin(req)) {
-    const { customerName, customerPhone, customerEmail, items: manualItems, shipping: manualShipping, paymentMethod: manualPaymentMethod, status: manualStatus, paymentStatus: manualPaymentStatus, carrier: manualCarrier, trackingCode: manualTrackingCode } = req.body || {}
-    const normalizedItems = Array.isArray(manualItems) ? manualItems.filter((item: any) => item && String(item.productId || '').trim() && Number(item.quantity) > 0 && Number(item.unitPrice) >= 0) : []
-    const normalizedName = String(customerName || '').trim()
-    if (!normalizedName) return res.status(400).json({ error: 'Informe o nome do cliente para o pedido manual.' })
-    if (!normalizedItems.length) return res.status(400).json({ error: 'Adicione pelo menos um item ao pedido.' })
-    const allowedStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']
-    const allowedPayments = ['pending', 'paid', 'failed', 'refunded']
-    const finalStatus = allowedStatuses.includes(manualStatus) ? manualStatus : 'confirmed'
-    const finalPaymentStatus = allowedPayments.includes(manualPaymentStatus) ? manualPaymentStatus : 'paid'
+  if (req.method === 'PUT') {
+    if (!isAdmin(req)) return res.status(401).json({ error: 'Não autorizado.' })
+    const { id } = req.body || {}
+    if (!id) return res.status(400).json({ error: 'Pedido não informado.' })
+    const parsed = parseManualOrderBody(req.body)
+    if ('error' in parsed) return res.status(400).json({ error: parsed.error })
     try {
       const supabase = getSupabaseServer()
-      const subtotal = normalizedItems.reduce((sum: number, item: any) => sum + Number(item.unitPrice) * Number(item.quantity), 0)
-      const shippingTotal = Number(manualShipping) || 0
+      const { data: existing, error: existingError } = await supabase.from('orders').select('id,customer_id').eq('id', id).maybeSingle()
+      if (existingError) throw existingError
+      if (!existing) return res.status(404).json({ error: 'Pedido não encontrado.' })
+      if (existing.customer_id) return res.status(400).json({ error: 'Somente pedidos manuais podem ser editados.' })
+      const { error: updateError } = await supabase.from('orders').update(parsed.orderRow).eq('id', id)
+      if (updateError) throw updateError
+      const { error: deleteItemsError } = await supabase.from('order_items').delete().eq('order_id', id)
+      if (deleteItemsError) throw deleteItemsError
+      const { error: itemsError } = await supabase.from('order_items').insert(buildManualOrderItems(id, parsed.items))
+      if (itemsError) throw itemsError
+      const { data: fullOrder, error: fullOrderError } = await supabase.from('orders').select(adminOrderSelect).eq('id', id).single()
+      if (fullOrderError) throw fullOrderError
+      const [enriched] = await attachOrderDetails(supabase, [fullOrder])
+      return res.status(200).json(enriched)
+    } catch (error) { return res.status(500).json({ error: manualOrderErrorResponse(error) }) }
+  }
+  if (req.method === 'POST' && isAdmin(req)) {
+    const parsed = parseManualOrderBody(req.body)
+    if ('error' in parsed) return res.status(400).json({ error: parsed.error })
+    try {
+      const supabase = getSupabaseServer()
       const { data: order, error: orderError } = await supabase.from('orders').insert({
         customer_id: null,
-        manual_customer_name: normalizedName,
-        manual_customer_phone: String(customerPhone || '').trim() || null,
-        manual_customer_email: String(customerEmail || '').trim() || null,
-        status: finalStatus,
-        payment_status: finalPaymentStatus,
-        payment_method: manualPaymentMethod || 'manual',
-        carrier: manualCarrier || null,
-        tracking_code: String(manualTrackingCode || '').trim() || null,
-        subtotal,
-        shipping: shippingTotal,
-        total: subtotal + shippingTotal,
         source: 'manual',
+        ...parsed.orderRow,
       }).select('id').single()
       if (orderError) throw orderError
 
-      const orderItems = normalizedItems.map((item: any) => ({
-        order_id: order.id,
-        product_id: String(item.productId),
-        product_name: String(item.name || 'Item').slice(0, 200),
-        internal_code: item.internalCode || null,
-        quantity: Number(item.quantity),
-        unit_price: Number(item.unitPrice),
-        total: Number(item.unitPrice) * Number(item.quantity),
-      }))
-      const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
+      const { error: itemsError } = await supabase.from('order_items').insert(buildManualOrderItems(order.id, parsed.items))
       if (itemsError) throw itemsError
 
       const { data: fullOrder, error: fullOrderError } = await supabase.from('orders').select(adminOrderSelect).eq('id', order.id).single()
       if (fullOrderError) throw fullOrderError
       const [enriched] = await attachOrderDetails(supabase, [fullOrder])
       return res.status(201).json(enriched)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String((error as { message?: unknown })?.message || '')
-      const missingColumns = /manual_customer|column .* does not exist|source.* column|schema cache/i.test(message)
-      return res.status(500).json({ error: missingColumns ? 'A tabela orders ainda não tem as colunas de pedido manual. Execute scripts/commerce.sql completo no Supabase.' : message || 'Não foi possível registrar o pedido manual.' })
-    }
+    } catch (error) { return res.status(500).json({ error: manualOrderErrorResponse(error) }) }
   }
   const { customerId, items, shipping, paymentMethod, couponCode, carrier } = req.body || {}
   if (!customerId || !Array.isArray(items) || !items.length) return res.status(400).json({ error: 'Cliente e itens são obrigatórios.' })

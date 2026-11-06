@@ -1,12 +1,13 @@
 import { ChangeEvent, useEffect, useState } from 'react'
 import { getCarrierTrackingUrl } from '../lib/carrier-tracking'
+import { formatCep } from '../lib/formatters'
 import { getOrderWhatsAppUrl, normalizeWhatsAppPhone } from '../lib/order-whatsapp'
 import { generateShippingLabels, resolveLabelAddress, type LabelAddress, type LabelCustomer } from '../lib/shipping-label'
 
-type Order = { id: string; created_at: string; status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'; payment_status: 'pending' | 'paid' | 'failed' | 'refunded'; payment_method: string | null; total: number; shipping: number | null; tracking_code: string | null; carrier: string | null; invoice_url: string | null; shipping_address: LabelAddress | null; customer_address?: LabelAddress | null; customers: LabelCustomer | null; manual_customer_name?: string | null; manual_customer_phone?: string | null; manual_customer_email?: string | null; order_items: { product_id?: string | null; product_name: string; product_image_url?: string | null; internal_code: string | null; quantity: number }[] }
+type Order = { id: string; created_at: string; status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'; payment_status: 'pending' | 'paid' | 'failed' | 'refunded'; payment_method: string | null; total: number; shipping: number | null; tracking_code: string | null; carrier: string | null; invoice_url: string | null; shipping_address: LabelAddress | null; customer_address?: LabelAddress | null; customers: LabelCustomer | null; manual_customer_name?: string | null; manual_customer_phone?: string | null; manual_customer_email?: string | null; order_items: { product_id?: string | null; product_name: string; product_image_url?: string | null; internal_code: string | null; quantity: number; unit_price?: number }[] }
 type CartOpportunity = { customer_id: string; updated_at: string; customer: { name: string | null; email: string | null; phone: string | null } | null; items: { product_name: string; internal_code: string | null; quantity: number; unit_price: number }[] }
 type Product = { id: string; name: string; internalCode?: string; price: number; discountPercent?: number; active: boolean }
-type ManualItem = { productId: string; quantity: number; unitPrice: number }
+type ManualItem = { productId: string; quantity: number; unitPrice: number; name?: string }
 type Props = { products: Product[]; onMessage: (message: string) => void }
 
 const orderStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'] as const
@@ -16,6 +17,7 @@ const paymentLabel: Record<string, string> = { pending: 'Pagamento pendente', pa
 const paymentMethodLabel: Record<string, string> = { pix: 'Pix (Mercado Pago)', card: 'Cartão (Mercado Pago)', boleto: 'Boleto (Mercado Pago)', manual: 'Venda fora do site', cash: 'Dinheiro', other: 'Outro' }
 const formatMoney = (value: number) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const blankManualItem = (): ManualItem => ({ productId: '', quantity: 1, unitPrice: 0 })
+const blankManualForm = () => ({ customerName: '', customerPhone: '', customerEmail: '', cep: '', address: '', number: '', complement: '', city: '', shipping: '0', paymentMethod: 'manual', status: 'confirmed' as Order['status'], paymentStatus: 'paid' as Order['payment_status'], carrier: '', trackingCode: '' })
 
 export default function AdminOrders({ products, onMessage }: Props) {
   const [orders, setOrders] = useState<Order[]>([])
@@ -26,7 +28,8 @@ export default function AdminOrders({ products, onMessage }: Props) {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [expandedIds, setExpandedIds] = useState<string[]>([])
   const [showManualForm, setShowManualForm] = useState(false)
-  const [manualForm, setManualForm] = useState({ customerName: '', customerPhone: '', customerEmail: '', shipping: '0', paymentMethod: 'manual', status: 'confirmed' as Order['status'], paymentStatus: 'paid' as Order['payment_status'], carrier: '', trackingCode: '' })
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null)
+  const [manualForm, setManualForm] = useState(blankManualForm())
   const [manualItems, setManualItems] = useState<ManualItem[]>([blankManualItem()])
   const activeProducts = products.filter((product) => product.active !== false)
 
@@ -157,14 +160,74 @@ export default function AdminOrders({ products, onMessage }: Props) {
     setManualItems((items) => (items.length > 1 ? items.filter((_, itemIndex) => itemIndex !== index) : items))
   }
 
-  async function createManualOrder() {
+  function resetManualForm() {
+    setManualForm(blankManualForm())
+    setManualItems([blankManualItem()])
+    setEditingOrderId(null)
+  }
+
+  function toggleManualForm() {
+    if (showManualForm) resetManualForm()
+    setShowManualForm((current) => !current)
+  }
+
+  // preenche endereço e cidade pelo ViaCEP: só número e complemento ficam para digitar
+  async function lookupManualCep(value: string) {
+    const digits = value.replace(/\D/g, '')
+    if (digits.length !== 8) {
+      setManualForm((current) => ({ ...current, cep: formatCep(value), address: '', city: '' }))
+      return
+    }
+    setManualForm((current) => ({ ...current, cep: formatCep(value) }))
+    try {
+      const response = await fetch(`/api/cep?cep=${digits}`)
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Não foi possível consultar o CEP.')
+      setManualForm((current) => ({ ...current, address: result.address.logradouro || '', city: result.address.localidade ? `${result.address.localidade}/${result.address.uf || ''}` : '' }))
+      onMessage('Endereço preenchido pelo CEP. Informe o número e o complemento, se houver.')
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : 'Não foi possível consultar o CEP.')
+    }
+  }
+
+  function startEditOrder(order: Order) {
+    const saved = order.shipping_address || {}
+    setManualForm({
+      customerName: order.manual_customer_name || saved.name || '',
+      customerPhone: order.manual_customer_phone || saved.phone || '',
+      customerEmail: order.manual_customer_email || '',
+      cep: saved.cep || '',
+      address: saved.address || '',
+      number: saved.number || '',
+      complement: saved.complement || '',
+      city: saved.city || '',
+      shipping: String(Number(order.shipping || 0)),
+      paymentMethod: order.payment_method || 'manual',
+      status: order.status,
+      paymentStatus: order.payment_status,
+      carrier: order.carrier || '',
+      trackingCode: order.tracking_code || '',
+    })
+    setManualItems(order.order_items.length
+      ? order.order_items.map((item) => ({ productId: item.product_id || '', quantity: item.quantity, unitPrice: Number(item.unit_price || 0), name: item.product_name }))
+      : [blankManualItem()])
+    setEditingOrderId(order.id)
+    setShowManualForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  async function submitManualOrder() {
     const validItems = manualItems.filter((item) => item.productId && item.quantity > 0)
     if (!manualForm.customerName.trim()) return onMessage('Informe o nome do cliente para o pedido manual.')
     if (!validItems.length) return onMessage('Adicione pelo menos um item ao pedido.')
+    const cepDigits = manualForm.cep.replace(/\D/g, '')
+    if (cepDigits && cepDigits.length !== 8) return onMessage('Informe um CEP válido com 8 números.')
+    if (cepDigits && !manualForm.number.trim()) return onMessage('Informe o número do endereço para gerar a etiqueta.')
     const payload = {
       customerName: manualForm.customerName.trim(),
       customerPhone: manualForm.customerPhone.trim(),
       customerEmail: manualForm.customerEmail.trim(),
+      address: { cep: manualForm.cep.trim(), address: manualForm.address.trim(), number: manualForm.number.trim(), complement: manualForm.complement.trim(), city: manualForm.city.trim() },
       shipping: Number(manualForm.shipping.replace(',', '.')) || 0,
       paymentMethod: manualForm.paymentMethod,
       status: manualForm.status,
@@ -173,18 +236,18 @@ export default function AdminOrders({ products, onMessage }: Props) {
       trackingCode: manualForm.trackingCode.trim(),
       items: validItems.map((item) => {
         const product = activeProducts.find((productItem) => productItem.id === item.productId)
-        return { productId: item.productId, name: product?.name || 'Item', internalCode: product?.internalCode || '', quantity: item.quantity, unitPrice: item.unitPrice }
+        return { productId: item.productId, name: product?.name || item.name || 'Item', internalCode: product?.internalCode || '', quantity: item.quantity, unitPrice: item.unitPrice }
       }),
     }
-    const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    const isEditing = Boolean(editingOrderId)
+    const response = await fetch('/api/orders', { method: isEditing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(isEditing ? { id: editingOrderId, ...payload } : payload) })
     const result = await response.json()
-    if (!response.ok) return onMessage(result.error || 'Não foi possível registrar o pedido manual.')
-    setOrders((items) => [result, ...items])
-    setManualForm({ customerName: '', customerPhone: '', customerEmail: '', shipping: '0', paymentMethod: 'manual', status: 'confirmed', paymentStatus: 'paid', carrier: '', trackingCode: '' })
-    setManualItems([blankManualItem()])
+    if (!response.ok) return onMessage(result.error || (isEditing ? 'Não foi possível atualizar o pedido manual.' : 'Não foi possível registrar o pedido manual.'))
+    setOrders((items) => (isEditing ? items.map((item) => (item.id === result.id ? result : item)) : [result, ...items]))
+    resetManualForm()
     setShowManualForm(false)
     setActiveStatus(result.status)
-    onMessage('Pedido manual registrado com sucesso.')
+    onMessage(isEditing ? 'Pedido manual atualizado com sucesso.' : 'Pedido manual registrado com sucesso.')
   }
 
   async function printLabels(targetOrders: Order[]) {
@@ -233,20 +296,28 @@ export default function AdminOrders({ products, onMessage }: Props) {
   return <div className="orders-dashboard">
     <div className="lead-toolbar">
       <div><h2>Pedidos do site</h2><p className="form-hint">Selecione um status para ver seus pedidos.</p></div>
-      <div className="bulk-order-actions"><button className="outline-button" type="button" onClick={() => setShowManualForm((current) => !current)}>{showManualForm ? 'Cancelar' : 'Novo pedido manual'}</button><button className="label-button bulk-label-button" type="button" disabled={!selectedIds.length} onClick={() => void printLabels(orders.filter((order) => selectedIds.includes(order.id)))}>Imprimir etiquetas ({selectedIds.length})</button>{activeStatus === 'cancelled' ? <button className="bulk-cancel-button" type="button" disabled={!selectedIds.length} onClick={() => void deleteSelectedCancelled()}>Excluir selecionados</button> : <button className="bulk-cancel-button" type="button" disabled={!selectedIds.length} onClick={() => void cancelSelected()}>Cancelar selecionados</button>}</div>
+      <div className="bulk-order-actions"><button className="outline-button" type="button" onClick={toggleManualForm}>{showManualForm ? 'Cancelar' : 'Novo pedido manual'}</button><button className="label-button bulk-label-button" type="button" disabled={!selectedIds.length} onClick={() => void printLabels(orders.filter((order) => selectedIds.includes(order.id)))}>Imprimir etiquetas ({selectedIds.length})</button>{activeStatus === 'cancelled' ? <button className="bulk-cancel-button" type="button" disabled={!selectedIds.length} onClick={() => void deleteSelectedCancelled()}>Excluir selecionados</button> : <button className="bulk-cancel-button" type="button" disabled={!selectedIds.length} onClick={() => void cancelSelected()}>Cancelar selecionados</button>}</div>
     </div>
     {showManualForm && <div className="manual-order-form">
-      <h3>Pedido feito fora do site</h3>
-      <p className="form-hint">Registre vendas por telefone, WhatsApp ou presenciais. O cliente não precisa ter cadastro no site.</p>
+      <h3>{editingOrderId ? `Editar pedido #${editingOrderId.slice(0, 8)}` : 'Pedido feito fora do site'}</h3>
+      <p className="form-hint">{editingOrderId ? 'Altere os dados do pedido manual e salve para atualizar.' : 'Registre vendas por telefone, WhatsApp ou presenciais. O cliente não precisa ter cadastro no site.'}</p>
       <div className="form-grid">
         <label>Nome do cliente<input required value={manualForm.customerName} onChange={(event) => setManualForm({ ...manualForm, customerName: event.target.value })} placeholder="Ex.: João da Silva" /></label>
         <label>Telefone<input value={manualForm.customerPhone} onChange={(event) => setManualForm({ ...manualForm, customerPhone: event.target.value })} placeholder="(11) 99999-9999" /></label>
         <label>E-mail<input type="email" value={manualForm.customerEmail} onChange={(event) => setManualForm({ ...manualForm, customerEmail: event.target.value })} placeholder="opcional" /></label>
       </div>
+      <div className="form-grid">
+        <label>CEP<input value={manualForm.cep} onChange={(event) => void lookupManualCep(event.target.value)} placeholder="00000-000" /></label>
+        <label>Endereço<input readOnly value={manualForm.address} placeholder="Preenchido pelo CEP" /></label>
+        <label>Número<input value={manualForm.number} onChange={(event) => setManualForm({ ...manualForm, number: event.target.value })} placeholder="Ex.: 123" /></label>
+        <label>Complemento<input value={manualForm.complement} onChange={(event) => setManualForm({ ...manualForm, complement: event.target.value })} placeholder="Ex.: ap. 33, bloco 12" /></label>
+        <label>Cidade / UF<input readOnly value={manualForm.city} placeholder="Preenchida pelo CEP" /></label>
+      </div>
       <div className="manual-order-items">
         {manualItems.map((item, index) => <div className="manual-order-item-row" key={index}>
           <select value={item.productId} onChange={(event) => selectManualProduct(index, event.target.value)}>
             <option value="">Selecione um produto</option>
+            {item.productId && !activeProducts.some((product) => product.id === item.productId) && <option value={item.productId}>{item.name || 'Item do pedido'}</option>}
             {activeProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
           </select>
           <label className="manual-order-item-field">Quantidade<input type="number" min="1" value={item.quantity} onChange={(event) => updateManualItem(index, { quantity: Math.max(1, Number(event.target.value) || 1) })} /></label>
@@ -263,7 +334,7 @@ export default function AdminOrders({ products, onMessage }: Props) {
         <label>Transportadora<input value={manualForm.carrier} onChange={(event) => setManualForm({ ...manualForm, carrier: event.target.value })} placeholder="opcional" /></label>
         <label>Código de rastreio<input value={manualForm.trackingCode} onChange={(event) => setManualForm({ ...manualForm, trackingCode: event.target.value })} placeholder="opcional" /></label>
       </div>
-      <button className="primary-button" type="button" onClick={() => void createManualOrder()}>Registrar pedido <span>→</span></button>
+      <button className="primary-button" type="button" onClick={() => void submitManualOrder()}>{editingOrderId ? 'Salvar alterações' : 'Registrar pedido'} <span>→</span></button>
     </div>}
     <nav className="order-status-tabs" aria-label="Status dos pedidos">
       {orderStatuses.map((status) => <button key={status} type="button" className={activeStatus === status ? `active ${status}` : ''} onClick={() => { setActiveStatus(status); setSelectedIds([]) }}><span>{orderLabel[status]}</span><strong>{orders.filter((order) => order.status === status).length + (status === 'pending' ? cartOpportunities.length : 0)}</strong></button>)}
@@ -332,6 +403,7 @@ export default function AdminOrders({ products, onMessage }: Props) {
               {destination.cep && <p>CEP: {destination.cep}</p>}
               {!order.customers && <small>Pedido manual</small>}
             </section>
+            {!order.customers && <button type="button" className="outline-button" onClick={() => startEditOrder(order)}>Editar pedido manual</button>}
             <p className="order-invoice-status">{order.invoice_url ? <a href={order.invoice_url} target="_blank" rel="noreferrer">Ver nota fiscal anexada</a> : 'Sem nota fiscal anexada'}</p>
             <div className="lead-actions"><select value={order.payment_status} onChange={(event) => void updateOrder(order, order.status, event.target.value as Order['payment_status'])}>{paymentStatuses.map((paymentStatus) => <option key={paymentStatus} value={paymentStatus}>{paymentLabel[paymentStatus]}</option>)}</select><select value={order.status} onChange={(event) => void updateOrder(order, event.target.value as Order['status'])}>{orderStatuses.map((status) => <option key={status} value={status}>{orderLabel[status]}</option>)}</select></div>
             <p className="order-carrier">{order.carrier ? <>{order.carrier} {order.tracking_code && <a href={getCarrierTrackingUrl(order.carrier, order.tracking_code) || '#'} target="_blank" rel="noreferrer">{order.tracking_code}</a>}</> : 'Transportadora não definida'}</p>

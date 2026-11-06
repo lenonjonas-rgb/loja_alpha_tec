@@ -13,11 +13,15 @@ const MEDIA_BOX = { x: 150, y: 150, width: 900, height: 900 }
 const DEFAULT_IMAGE_ZOOM = 1
 const DEFAULT_VIDEO_ZOOM = 1.8
 const BACKDROP_SRC = '/product-backdrop.jpg'
+const AI_VIDEO_FPS = 12
+const AI_VIDEO_MAX_SECONDS = 10
 
 // A biblioteca de recorte é carregada via CDN em runtime: o bundle ONNX dela não é compatível
 // com o empacotamento do Next/webpack, e os modelos de IA já são baixados de CDN de qualquer forma.
-type BackgroundRemovalModule = { removeBackground: (source: Blob, config?: { output?: { format?: 'image/png' | 'image/jpeg' | 'image/webp'; quality?: number }; progress?: (key: string, current: number, total: number) => void }) => Promise<Blob> }
-const BG_REMOVAL_MODULE_URL = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/+esm'
+// O especificador 'onnxruntime-web' do bundle é resolvido pelo import map em pages/_document.tsx.
+type BackgroundRemovalConfig = { device?: 'gpu' | 'cpu'; output?: { format?: 'image/png' | 'image/jpeg' | 'image/webp'; quality?: number }; progress?: (key: string, current: number, total: number) => void }
+type BackgroundRemovalModule = { removeBackground: (source: Blob, config?: BackgroundRemovalConfig) => Promise<Blob> }
+const BG_REMOVAL_MODULE_URL = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/dist/index.mjs'
 let backgroundRemovalPromise: Promise<BackgroundRemovalModule> | null = null
 function loadBackgroundRemoval() {
   if (!backgroundRemovalPromise) {
@@ -27,6 +31,24 @@ function loadBackgroundRemoval() {
     })
   }
   return backgroundRemovalPromise
+}
+
+// Usa a GPU (WebGPU) quando disponível — essencial para processar vídeos quadro a quadro —
+// e memoriza o modo que funcionou para as próximas execuções.
+let aiDevice: 'gpu' | 'cpu' | null = null
+async function removeBackgroundSmart(source: Blob, onProgress?: (key: string, current: number, total: number) => void): Promise<Blob> {
+  const { removeBackground } = await loadBackgroundRemoval()
+  const run = (device: 'gpu' | 'cpu') => removeBackground(source, { device, output: { format: 'image/png' }, progress: onProgress })
+  if (aiDevice) return run(aiDevice)
+  try {
+    const result = await run('gpu')
+    aiDevice = 'gpu'
+    return result
+  } catch {
+    aiDevice = 'cpu'
+    const result = await run('cpu')
+    return result
+  }
 }
 
 // Mesmo fundo técnico usado no vídeo de produto para o site (AdminPromotions).
@@ -64,14 +86,12 @@ function drawMedia(context: CanvasRenderingContext2D, media: CanvasImageSource, 
 
 // Recorta o PNG com transparência para a caixa que realmente contém o produto,
 // para que ele ocupe o quadro inteiro de composição (~75% da arte) como no padrão.
-function cropToAlphaBounds(image: HTMLImageElement): HTMLCanvasElement | null {
-  const source = document.createElement('canvas')
-  source.width = image.naturalWidth
-  source.height = image.naturalHeight
-  const sourceContext = source.getContext('2d')
-  if (!sourceContext || !source.width || !source.height) return null
-  sourceContext.drawImage(image, 0, 0)
-  const { data, width, height } = sourceContext.getImageData(0, 0, source.width, source.height)
+type AlphaBox = { x: number; y: number; width: number; height: number }
+
+function measureAlphaBox(source: HTMLCanvasElement): AlphaBox | null {
+  const context = source.getContext('2d')
+  if (!context || !source.width || !source.height) return null
+  const { data, width, height } = context.getImageData(0, 0, source.width, source.height)
   let minX = width
   let minY = height
   let maxX = -1
@@ -86,30 +106,82 @@ function cropToAlphaBounds(image: HTMLImageElement): HTMLCanvasElement | null {
       }
     }
   }
-  if (maxX < minX || maxY < minY) return source
-  const padding = Math.round(Math.max(maxX - minX, maxY - minY) * 0.02)
-  minX = Math.max(0, minX - padding)
-  minY = Math.max(0, minY - padding)
-  maxX = Math.min(width - 1, maxX + padding)
-  maxY = Math.min(height - 1, maxY + padding)
+  if (maxX < minX || maxY < minY) return null
+  return { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 }
+}
+
+function padAlphaBox(box: AlphaBox, maxWidth: number, maxHeight: number): AlphaBox {
+  const padding = Math.round(Math.max(box.width, box.height) * 0.02)
+  const x = Math.max(0, box.x - padding)
+  const y = Math.max(0, box.y - padding)
+  return { x, y, width: Math.min(maxWidth, box.x + box.width + padding) - x, height: Math.min(maxHeight, box.y + box.height + padding) - y }
+}
+
+function unionAlphaBox(a: AlphaBox | null, b: AlphaBox | null): AlphaBox | null {
+  if (!a) return b
+  if (!b) return a
+  const x = Math.min(a.x, b.x)
+  const y = Math.min(a.y, b.y)
+  return { x, y, width: Math.max(a.x + a.width, b.x + b.width) - x, height: Math.max(a.y + a.height, b.y + b.height) - y }
+}
+
+function cropCanvas(source: HTMLCanvasElement, box: AlphaBox): HTMLCanvasElement {
   const output = document.createElement('canvas')
-  output.width = maxX - minX + 1
-  output.height = maxY - minY + 1
-  const outputContext = output.getContext('2d')
-  if (!outputContext) return source
-  outputContext.drawImage(source, minX, minY, output.width, output.height, 0, 0, output.width, output.height)
+  output.width = box.width
+  output.height = box.height
+  output.getContext('2d')?.drawImage(source, box.x, box.y, box.width, box.height, 0, 0, box.width, box.height)
   return output
+}
+
+async function blobToCanvas(blob: Blob): Promise<HTMLCanvasElement> {
+  const bitmap = await createImageBitmap(blob)
+  const canvas = document.createElement('canvas')
+  canvas.width = bitmap.width
+  canvas.height = bitmap.height
+  canvas.getContext('2d')?.drawImage(bitmap, 0, 0)
+  bitmap.close()
+  return canvas
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
+  return new Promise((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Não foi possível gerar o quadro.')), type, quality))
+}
+
+function seekVideo(video: HTMLVideoElement, time: number) {
+  return new Promise<void>((resolve, reject) => {
+    if (Math.abs(video.currentTime - time) < 0.0005 && !video.seeking) return resolve()
+    const finish = () => {
+      window.clearTimeout(timeout)
+      video.removeEventListener('seeked', onSeeked)
+    }
+    const onSeeked = () => { finish(); resolve() }
+    const timeout = window.setTimeout(() => { finish(); reject(new Error('Não foi possível posicionar o vídeo para processar o quadro.')) }, 10_000)
+    video.addEventListener('seeked', onSeeked)
+    video.currentTime = time
+  })
+}
+
+function cropToAlphaBounds(image: HTMLImageElement): HTMLCanvasElement | null {
+  const source = document.createElement('canvas')
+  source.width = image.naturalWidth
+  source.height = image.naturalHeight
+  const sourceContext = source.getContext('2d')
+  if (!sourceContext || !source.width || !source.height) return null
+  sourceContext.drawImage(image, 0, 0)
+  const box = measureAlphaBox(source)
+  if (!box) return source
+  return cropCanvas(source, padAlphaBox(box, source.width, source.height))
 }
 
 // Composição com fundo padrão da marca: produto recortado pela IA sobre o backdrop técnico,
 // com sombra de contato elíptica e sombra projetada suaves para um resultado natural.
-function drawAiComposite(context: CanvasRenderingContext2D, backdrop: HTMLImageElement, cutout: HTMLCanvasElement, zoom: number, offsetX: number, offsetY: number) {
+function drawAiComposite(context: CanvasRenderingContext2D, backdrop: HTMLImageElement, cutout: CanvasImageSource, cutoutWidth: number, cutoutHeight: number, zoom: number, offsetX: number, offsetY: number) {
   context.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
   const scale = Math.max(CANVAS_SIZE / backdrop.naturalWidth, CANVAS_SIZE / backdrop.naturalHeight)
   const backdropWidth = backdrop.naturalWidth * scale
   const backdropHeight = backdrop.naturalHeight * scale
   context.drawImage(backdrop, (CANVAS_SIZE - backdropWidth) / 2, (CANVAS_SIZE - backdropHeight) / 2, backdropWidth, backdropHeight)
-  const placement = getMediaPlacement(cutout.width, cutout.height, MEDIA_BOX, true, zoom, offsetX, offsetY)
+  const placement = getMediaPlacement(cutoutWidth, cutoutHeight, MEDIA_BOX, true, zoom, offsetX, offsetY)
   const centerX = placement.x + placement.width / 2
   const baseY = placement.y + placement.height - placement.height * 0.015
   context.save()
@@ -151,6 +223,14 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
   const [cutoutImage, setCutoutImage] = useState<HTMLCanvasElement | null>(null)
   const [isRemovingBg, setIsRemovingBg] = useState(false)
   const [removalStatus, setRemovalStatus] = useState('')
+  const [aiFrames, setAiFrames] = useState<Blob[] | null>(null)
+  const [aiFrameSize, setAiFrameSize] = useState<{ width: number; height: number } | null>(null)
+  const [isProcessingAi, setIsProcessingAi] = useState(false)
+  const [aiProgress, setAiProgress] = useState('')
+  const aiCancelRef = useRef(false)
+  const aiPlaybackStartRef = useRef(0)
+  const aiBitmapRef = useRef<{ index: number; bitmap: ImageBitmap } | null>(null)
+  const aiDecodingRef = useRef(-1)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const recordingCleanupRef = useRef<(() => void) | null>(null)
@@ -177,15 +257,11 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
     let cancelled = false
     setIsRemovingBg(true)
     setRemovalStatus('Preparando a IA de recorte...')
-    loadBackgroundRemoval()
-      .then(({ removeBackground }) => removeBackground(mediaFile, {
-        output: { format: 'image/png' },
-        progress: (key, current, total) => {
-          if (cancelled) return
-          if (key.startsWith('fetch') && total > 0) setRemovalStatus(`Baixando o modelo de IA (${Math.round((current / total) * 100)}%)... só é necessário no primeiro uso.`)
-          else setRemovalStatus('Recortando o produto da foto...')
-        },
-      }))
+    removeBackgroundSmart(mediaFile, (key, current, total) => {
+      if (cancelled) return
+      if (key.startsWith('fetch') && total > 0) setRemovalStatus(`Baixando o modelo de IA (${Math.round((current / total) * 100)}%)... só é necessário no primeiro uso.`)
+      else setRemovalStatus('Recortando o produto da foto...')
+    })
       .then((blob) => { if (!cancelled) setCutoutUrl(URL.createObjectURL(blob)) })
       .catch(() => {
         if (cancelled) return
@@ -210,6 +286,75 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
   }, [cutoutUrl, onMessage])
 
   useEffect(() => () => { if (cutoutUrl) URL.revokeObjectURL(cutoutUrl) }, [cutoutUrl])
+
+  // Quadros processados com IA valem para um arquivo e um corte específicos:
+  // qualquer mudança invalida o resultado e cancela um processamento em andamento.
+  useEffect(() => {
+    setAiFrames(null)
+    setAiFrameSize(null)
+    aiBitmapRef.current?.bitmap.close()
+    aiBitmapRef.current = null
+    aiDecodingRef.current = -1
+    return () => { aiCancelRef.current = true }
+  }, [mediaUrl, clipStart, clipEnd])
+
+  async function processAiVideo() {
+    const video = videoRef.current
+    if (!video || videoDuration <= 0) return onMessage('Aguarde o vídeo terminar de carregar.')
+    let clip
+    try {
+      clip = getVideoClip(videoDuration, clipStart, clipEnd)
+    } catch (error) {
+      return onMessage(error instanceof Error ? error.message : 'Escolha um trecho válido do vídeo.')
+    }
+    if (clip.duration > AI_VIDEO_MAX_SECONDS) return onMessage(`Para a troca de fundo com IA, selecione um trecho de até ${AI_VIDEO_MAX_SECONDS} segundos.`)
+    aiCancelRef.current = false
+    setIsProcessingAi(true)
+    setAiFrames(null)
+    setAiFrameSize(null)
+    try {
+      setAiProgress('Preparando a IA de recorte...')
+      await loadBackgroundRemoval()
+      video.pause()
+      const frameCount = Math.max(1, Math.round(clip.duration * AI_VIDEO_FPS))
+      const grabScale = Math.min(1, 1024 / Math.max(video.videoWidth || 1, video.videoHeight || 1))
+      const grab = document.createElement('canvas')
+      grab.width = Math.max(1, Math.round((video.videoWidth || 1) * grabScale))
+      grab.height = Math.max(1, Math.round((video.videoHeight || 1) * grabScale))
+      const grabContext = grab.getContext('2d')
+      if (!grabContext) throw new Error('Não foi possível preparar o processamento do vídeo.')
+      const rawCutouts: Blob[] = []
+      let box: AlphaBox | null = null
+      for (let index = 0; index < frameCount; index++) {
+        if (aiCancelRef.current) throw new Error('Processamento cancelado.')
+        setAiProgress(`Recortando quadro ${index + 1} de ${frameCount}... mantenha esta tela aberta.`)
+        await seekVideo(video, Math.min(clip.start + index / AI_VIDEO_FPS, clip.end - 0.001))
+        grabContext.drawImage(video, 0, 0, grab.width, grab.height)
+        const cutBlob = await removeBackgroundSmart(await canvasToBlob(grab, 'image/jpeg', 0.92))
+        const cutCanvas = await blobToCanvas(cutBlob)
+        box = unionAlphaBox(box, measureAlphaBox(cutCanvas))
+        rawCutouts.push(cutBlob)
+      }
+      if (!box) throw new Error('A IA não encontrou o produto no vídeo. Tente outro trecho ou desligue a troca de fundo.')
+      const paddedBox = padAlphaBox(box, grab.width, grab.height)
+      const frames: Blob[] = []
+      for (let index = 0; index < rawCutouts.length; index++) {
+        if (aiCancelRef.current) throw new Error('Processamento cancelado.')
+        setAiProgress(`Preparando quadro ${index + 1} de ${rawCutouts.length}...`)
+        frames.push(await canvasToBlob(cropCanvas(await blobToCanvas(rawCutouts[index]), paddedBox), 'image/png'))
+      }
+      setAiFrames(frames)
+      setAiFrameSize({ width: paddedBox.width, height: paddedBox.height })
+      setZoom(DEFAULT_IMAGE_ZOOM)
+      aiPlaybackStartRef.current = performance.now()
+      onMessage(`Trecho processado com IA: ${frames.length} quadros prontos. Ajuste zoom e posição e gere o vídeo.`)
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : 'Não foi possível processar o vídeo com IA neste dispositivo.')
+    } finally {
+      setIsProcessingAi(false)
+      setAiProgress('')
+    }
+  }
 
   useEffect(() => {
     if (!mediaFile) {
@@ -263,7 +408,7 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
           context.textAlign = 'left'
           return
         }
-        drawAiComposite(context, backdrop, cutoutImage, zoom, offsetX, offsetY)
+        drawAiComposite(context, backdrop, cutoutImage, cutoutImage.width, cutoutImage.height, zoom, offsetX, offsetY)
         setCanvasReady(true)
         return
       }
@@ -274,7 +419,30 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
       return
     }
     let animationFrame = 0
+    const aiMode = aiBackground && aiFrames && aiFrames.length > 0 && aiFrameSize && backdrop
+    if (aiMode) videoRef.current?.pause()
     const drawFrame = () => {
+      if (aiMode) {
+        const frames = aiFrames
+        const totalMs = (frames.length / AI_VIDEO_FPS) * 1000
+        const elapsed = performance.now() - aiPlaybackStartRef.current
+        const position = recordingCleanupRef.current ? Math.min(elapsed, totalMs - 1) : elapsed % totalMs
+        const index = Math.min(frames.length - 1, Math.max(0, Math.floor((position / 1000) * AI_VIDEO_FPS)))
+        if (aiBitmapRef.current?.index !== index && aiDecodingRef.current !== index) {
+          aiDecodingRef.current = index
+          createImageBitmap(frames[index]).then((bitmap) => {
+            if (aiDecodingRef.current === index) {
+              aiBitmapRef.current?.bitmap.close()
+              aiBitmapRef.current = { index, bitmap }
+            } else bitmap.close()
+          }).catch(() => undefined)
+        }
+        const bitmap = aiBitmapRef.current?.bitmap
+        if (bitmap) drawAiComposite(context, backdrop, bitmap, aiFrameSize.width, aiFrameSize.height, zoom, offsetX, offsetY)
+        else drawTechnicalFrame(context)
+        animationFrame = requestAnimationFrame(drawFrame)
+        return
+      }
       drawTechnicalFrame(context)
       const video = videoRef.current
       if (recordingCleanupRef.current && video && video.currentTime >= clipEnd) video.pause()
@@ -288,7 +456,7 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
     }
     drawFrame()
     return () => cancelAnimationFrame(animationFrame)
-  }, [mediaUrl, mediaKind, image, zoom, offsetX, offsetY, clipStart, clipEnd, clipDuration, aiBackground, cutoutImage, backdrop])
+  }, [mediaUrl, mediaKind, image, zoom, offsetX, offsetY, clipStart, clipEnd, clipDuration, aiBackground, cutoutImage, backdrop, aiFrames, aiFrameSize])
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -355,11 +523,13 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
     if (!mimeType) return onMessage('Este navegador não oferece um formato de vídeo compatível para gravação.')
 
     let cleanup: (() => void) | undefined
+    const aiMode = Boolean(aiBackground && aiFrames && aiFrames.length > 0 && aiFrameSize)
+    if (aiBackground && !aiMode) return onMessage('Processe o trecho com IA antes de gerar o vídeo, ou desligue a troca de fundo.')
     try {
-      const duration = getVideoClip(videoDuration, clipStart, clipEnd).duration * 1000
+      const duration = aiMode && aiFrames ? (aiFrames.length / AI_VIDEO_FPS) * 1000 : getVideoClip(videoDuration, clipStart, clipEnd).duration * 1000
       setIsRecording(true)
       video.pause()
-      if (video.seeking || Math.abs(video.currentTime - clipStart) > 0.001) {
+      if (!aiMode && (video.seeking || Math.abs(video.currentTime - clipStart) > 0.001)) {
         await new Promise<void>((resolve, reject) => {
           const finish = () => {
             window.clearTimeout(timeout)
@@ -417,11 +587,16 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
       const begin = () => {
         if (failed || recorder.state !== 'recording') return
         window.clearTimeout(stopTimer)
+        if (aiMode) aiPlaybackStartRef.current = performance.now()
         const startedAt = Date.now()
         progressTimer = window.setInterval(() => setRecordingProgress(Math.min(100, Math.round(((Date.now() - startedAt) / duration) * 100))), 250)
         stopTimer = window.setTimeout(() => { if (recorder.state === 'recording') recorder.stop() }, duration)
       }
       recorder.onstart = () => {
+        if (aiMode) {
+          begin()
+          return
+        }
         void video.play().then(begin).catch(() => {
           cleanup?.()
           setIsRecording(false)
@@ -447,6 +622,7 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
 
   function handleExport() {
     if (busy) return
+    if (isProcessingAi) return onMessage('Aguarde o processamento com IA terminar.')
     if (mediaKind === 'video') void exportVideo()
     else void exportImage()
   }
@@ -485,7 +661,7 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
           <h2>Editor de mídia de produto</h2>
           <p className="form-hint">Envie a foto ou o vídeo da peça e gere a mídia padronizada 1200×1200 para o cadastro: produto centralizado com proporções preservadas, fundo cinza técnico e sombra suave.</p>
         </div>
-        <button className="primary-button" type="button" onClick={handleExport} disabled={!canvasReady || !mediaFile || busy}>
+        <button className="primary-button" type="button" onClick={handleExport} disabled={!canvasReady || !mediaFile || busy || isProcessingAi}>
           {isExporting ? 'Exportando...' : isRecording ? `Gravando ${recordingProgress}%` : mediaKind === 'video' ? 'Gerar vídeo para cadastro' : 'Gerar imagem para cadastro'} <span>↓</span>
         </button>
       </div>
@@ -502,6 +678,12 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
             {mediaKind === 'video' && videoDuration > 0 && <>
               <label>Início do corte (segundos)<input type="number" min="0" max={Math.max(0, clipEnd - 0.1)} step="0.1" value={clipStart} onChange={(event) => setClipStart(Math.max(0, Math.min(Number(event.target.value), clipEnd - Math.min(0.1, videoDuration))))} /></label>
               <label>Fim do corte (segundos)<input type="number" min={clipStart + Math.min(0.1, videoDuration)} max={videoDuration} step="0.1" value={clipEnd} onChange={(event) => setClipEnd(Math.max(clipStart + Math.min(0.1, videoDuration), Math.min(Number(event.target.value), videoDuration)))} /></label>
+              <label className="promotion-toggle"><input type="checkbox" checked={aiBackground} onChange={(event) => setAiBackground(event.target.checked)} /> Trocar fundo com IA (fundo técnico da marca)</label>
+              {aiBackground && <>
+                <p className="form-hint">{isProcessingAi ? aiProgress : aiFrames ? `Trecho processado: ${aiFrames.length} quadros a ${AI_VIDEO_FPS} qps. Ajuste zoom e posição e gere o vídeo. Alterar o corte exige novo processamento.` : `A IA recorta o produto quadro a quadro (${AI_VIDEO_FPS} qps) e o coloca sobre o fundo padrão da marca com sombra suave. Use um trecho de até ${AI_VIDEO_MAX_SECONDS} segundos; o processamento pode levar alguns minutos e a tela deve ficar aberta.`}</p>
+                {!aiFrames && !isProcessingAi && <button className="primary-button" type="button" onClick={() => void processAiVideo()}>Processar trecho com IA <span>→</span></button>}
+                {isProcessingAi && <button type="button" onClick={() => { aiCancelRef.current = true }}>Cancelar processamento</button>}
+              </>}
             </>}
             {mediaFile && <>
               <label className="promotion-site-zoom">Ampliação<input type="range" min="1" max="2.6" step="0.1" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} /><small>{zoom.toFixed(1)}× · proporções preservadas</small></label>
@@ -509,7 +691,7 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
               <label>Posição vertical<input type="range" min="-1" max="1" step="0.05" value={offsetY} onChange={(event) => setOffsetY(Number(event.target.value))} /></label>
               <button type="button" onClick={resetAdjustments}>Restaurar ajustes e centralizar</button>
             </>}
-            {mediaKind === 'video' && <p className="form-hint">Exportação silenciosa do trecho selecionado, em tempo real. O arquivo pode incluir um breve quadro inicial enquanto o codificador é preparado. Mantenha esta tela aberta. No app, o arquivo final deve ter até 32 MB. A troca de fundo com IA está disponível apenas para fotos.</p>}
+            {mediaKind === 'video' && <p className="form-hint">Exportação silenciosa do trecho selecionado, em tempo real. O arquivo pode incluir um breve quadro inicial enquanto o codificador é preparado. Mantenha esta tela aberta. No app, o arquivo final deve ter até 32 MB.</p>}
             {mediaKind === 'image' && mediaFile && <>
               <h3>Vincular ao produto</h3>
               <label>Produto cadastrado (opcional)<select value={linkedProductId} onChange={(event) => setLinkedProductId(event.target.value)}>

@@ -41,7 +41,11 @@ baixa ~40 MB, depois fica em cache; sem custo por imagem) e o posiciona
 sobre o fundo padrão da marca (`public/product-backdrop.jpg`: cinza-claro
 com desenhos técnicos em grafite e ferramentas em vermelho escuro) com
 sombra suave. Desligando a opção, a foto original é apenas enquadrada.
-A troca de fundo com IA não se aplica a vídeos.
+Para vídeos, ligue **Trocar fundo com IA** e use **Processar trecho com IA**:
+a IA recorta o produto quadro a quadro (12 qps, trecho de até 10 s, de
+preferência em aparelho com GPU/WebGPU) e a prévia e a exportação passam a
+usar o fundo padrão da marca com as mesmas sombras. Alterar o corte exige
+novo processamento; o processamento deve ser feito com a tela aberta.
 Ajuste ampliação (1×–2,6×) e posição horizontal/vertical; para vídeos,
 selecione início e fim do corte em segundos. Fotos são exportadas em PNG e
 vídeos são gravados em tempo real, sem áudio (MP4 quando o navegador

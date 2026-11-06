@@ -47,7 +47,9 @@ preferência em aparelho com GPU/WebGPU) e a prévia e a exportação passam a
 usar o fundo padrão da marca com as mesmas sombras. Alterar o corte exige
 novo processamento; o processamento deve ser feito com a tela aberta.
 Ajuste ampliação (1×–2,6×) e posição horizontal/vertical; para vídeos,
-selecione início e fim do corte em segundos. Fotos são exportadas em PNG e
+selecione início e fim do corte em segundos e a velocidade (normal, 0,75×,
+0,5× ou 0,25× para câmera lenta — o vídeo final fica proporcionalmente mais
+longo). Fotos são exportadas em PNG e
 vídeos são gravados em tempo real, sem áudio (MP4 quando o navegador
 suportar; caso contrário, WebM). Fotos padronizadas podem ser salvas
 diretamente em um produto cadastrado, como foto principal (substitui a

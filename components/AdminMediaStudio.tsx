@@ -175,7 +175,7 @@ function cropToAlphaBounds(image: HTMLImageElement): HTMLCanvasElement | null {
 
 // Composição com fundo padrão da marca: produto recortado pela IA sobre o backdrop técnico,
 // com sombra de contato elíptica e sombra projetada suaves para um resultado natural.
-function drawAiComposite(context: CanvasRenderingContext2D, backdrop: HTMLImageElement, cutout: CanvasImageSource, cutoutWidth: number, cutoutHeight: number, zoom: number, offsetX: number, offsetY: number) {
+function drawAiComposite(context: CanvasRenderingContext2D, backdrop: HTMLImageElement, cutout: CanvasImageSource, cutoutWidth: number, cutoutHeight: number, zoom: number, offsetX: number, offsetY: number, blend?: { cutout: CanvasImageSource; alpha: number }) {
   context.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
   const scale = Math.max(CANVAS_SIZE / backdrop.naturalWidth, CANVAS_SIZE / backdrop.naturalHeight)
   const backdropWidth = backdrop.naturalWidth * scale
@@ -197,6 +197,13 @@ function drawAiComposite(context: CanvasRenderingContext2D, backdrop: HTMLImageE
   context.shadowOffsetY = 14
   context.drawImage(cutout, placement.x, placement.y, placement.width, placement.height)
   context.restore()
+  // Interpolação entre quadros consecutivos para suavizar o vídeo processado com IA.
+  if (blend && blend.alpha > 0) {
+    context.save()
+    context.globalAlpha = Math.min(1, blend.alpha)
+    context.drawImage(blend.cutout, placement.x, placement.y, placement.width, placement.height)
+    context.restore()
+  }
 }
 
 export default function AdminMediaStudio({ products, onSaved, onMessage }: Props) {
@@ -210,6 +217,7 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
   const [videoDuration, setVideoDuration] = useState(0)
   const [clipStart, setClipStart] = useState(0)
   const [clipEnd, setClipEnd] = useState(0)
+  const [videoSpeed, setVideoSpeed] = useState(1)
   const [canvasReady, setCanvasReady] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingProgress, setRecordingProgress] = useState(0)
@@ -229,8 +237,8 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
   const [aiProgress, setAiProgress] = useState('')
   const aiCancelRef = useRef(false)
   const aiPlaybackStartRef = useRef(0)
-  const aiBitmapRef = useRef<{ index: number; bitmap: ImageBitmap } | null>(null)
-  const aiDecodingRef = useRef(-1)
+  const aiBitmapsRef = useRef<Map<number, ImageBitmap>>(new Map())
+  const aiDecodingRef = useRef<Set<number>>(new Set())
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const recordingCleanupRef = useRef<(() => void) | null>(null)
@@ -292,11 +300,17 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
   useEffect(() => {
     setAiFrames(null)
     setAiFrameSize(null)
-    aiBitmapRef.current?.bitmap.close()
-    aiBitmapRef.current = null
-    aiDecodingRef.current = -1
+    aiBitmapsRef.current.forEach((bitmap) => bitmap.close())
+    aiBitmapsRef.current.clear()
+    aiDecodingRef.current.clear()
     return () => { aiCancelRef.current = true }
   }, [mediaUrl, clipStart, clipEnd])
+
+  // A velocidade escolhida vale para a prévia e para a gravação do vídeo original.
+  useEffect(() => {
+    const video = videoRef.current
+    if (video) video.playbackRate = videoSpeed
+  }, [videoSpeed, mediaUrl, canvasReady])
 
   async function processAiVideo() {
     const video = videoRef.current
@@ -323,6 +337,7 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
       grab.height = Math.max(1, Math.round((video.videoHeight || 1) * grabScale))
       const grabContext = grab.getContext('2d')
       if (!grabContext) throw new Error('Não foi possível preparar o processamento do vídeo.')
+      grabContext.imageSmoothingQuality = 'high'
       const rawCutouts: Blob[] = []
       let box: AlphaBox | null = null
       for (let index = 0; index < frameCount; index++) {
@@ -386,6 +401,7 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
     canvas.height = CANVAS_SIZE
     const context = canvas.getContext('2d')
     if (!context) return
+    context.imageSmoothingQuality = 'high'
     if (!mediaUrl || !mediaKind) {
       setCanvasReady(false)
       drawTechnicalFrame(context)
@@ -421,24 +437,40 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
     let animationFrame = 0
     const aiMode = aiBackground && aiFrames && aiFrames.length > 0 && aiFrameSize && backdrop
     if (aiMode) videoRef.current?.pause()
+    const circularDistance = (a: number, b: number, length: number) => {
+      const difference = Math.abs(a - b)
+      return Math.min(difference, length - difference)
+    }
+    const ensureAiBitmap = (frames: Blob[], index: number) => {
+      const cache = aiBitmapsRef.current
+      if (cache.has(index) || aiDecodingRef.current.has(index)) return
+      aiDecodingRef.current.add(index)
+      createImageBitmap(frames[index]).then((bitmap) => {
+        aiDecodingRef.current.delete(index)
+        cache.set(index, bitmap)
+        cache.forEach((cached, key) => {
+          if (circularDistance(key, index, frames.length) > 3) {
+            cached.close()
+            cache.delete(key)
+          }
+        })
+      }).catch(() => aiDecodingRef.current.delete(index))
+    }
     const drawFrame = () => {
       if (aiMode) {
         const frames = aiFrames
-        const totalMs = (frames.length / AI_VIDEO_FPS) * 1000
+        const wallTotal = (frames.length / AI_VIDEO_FPS / videoSpeed) * 1000
         const elapsed = performance.now() - aiPlaybackStartRef.current
-        const position = recordingCleanupRef.current ? Math.min(elapsed, totalMs - 1) : elapsed % totalMs
-        const index = Math.min(frames.length - 1, Math.max(0, Math.floor((position / 1000) * AI_VIDEO_FPS)))
-        if (aiBitmapRef.current?.index !== index && aiDecodingRef.current !== index) {
-          aiDecodingRef.current = index
-          createImageBitmap(frames[index]).then((bitmap) => {
-            if (aiDecodingRef.current === index) {
-              aiBitmapRef.current?.bitmap.close()
-              aiBitmapRef.current = { index, bitmap }
-            } else bitmap.close()
-          }).catch(() => undefined)
-        }
-        const bitmap = aiBitmapRef.current?.bitmap
-        if (bitmap) drawAiComposite(context, backdrop, bitmap, aiFrameSize.width, aiFrameSize.height, zoom, offsetX, offsetY)
+        const wallPosition = recordingCleanupRef.current ? Math.min(elapsed, wallTotal - 1) : elapsed % wallTotal
+        const framePosition = (wallPosition / 1000) * videoSpeed * AI_VIDEO_FPS
+        const firstIndex = Math.min(frames.length - 1, Math.max(0, Math.floor(framePosition)))
+        const secondIndex = Math.min(frames.length - 1, firstIndex + 1)
+        const blendAlpha = Math.min(1, Math.max(0, framePosition - firstIndex))
+        ensureAiBitmap(frames, firstIndex)
+        if (secondIndex !== firstIndex) ensureAiBitmap(frames, secondIndex)
+        const first = aiBitmapsRef.current.get(firstIndex)
+        const second = aiBitmapsRef.current.get(secondIndex)
+        if (first) drawAiComposite(context, backdrop, first, aiFrameSize.width, aiFrameSize.height, zoom, offsetX, offsetY, second && secondIndex !== firstIndex ? { cutout: second, alpha: blendAlpha } : undefined)
         else drawTechnicalFrame(context)
         animationFrame = requestAnimationFrame(drawFrame)
         return
@@ -456,7 +488,7 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
     }
     drawFrame()
     return () => cancelAnimationFrame(animationFrame)
-  }, [mediaUrl, mediaKind, image, zoom, offsetX, offsetY, clipStart, clipEnd, clipDuration, aiBackground, cutoutImage, backdrop, aiFrames, aiFrameSize])
+  }, [mediaUrl, mediaKind, image, zoom, offsetX, offsetY, clipStart, clipEnd, clipDuration, aiBackground, cutoutImage, backdrop, aiFrames, aiFrameSize, videoSpeed])
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -478,6 +510,7 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
     setVideoDuration(0)
     setClipStart(0)
     setClipEnd(0)
+    setVideoSpeed(1)
   }
 
   function resetAdjustments() {
@@ -486,6 +519,7 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
     setOffsetY(0)
     setClipStart(0)
     setClipEnd(videoDuration)
+    setVideoSpeed(1)
   }
 
   async function saveMedia(blob: Blob, fileName: string) {
@@ -526,7 +560,7 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
     const aiMode = Boolean(aiBackground && aiFrames && aiFrames.length > 0 && aiFrameSize)
     if (aiBackground && !aiMode) return onMessage('Processe o trecho com IA antes de gerar o vídeo, ou desligue a troca de fundo.')
     try {
-      const duration = aiMode && aiFrames ? (aiFrames.length / AI_VIDEO_FPS) * 1000 : getVideoClip(videoDuration, clipStart, clipEnd).duration * 1000
+      const duration = aiMode && aiFrames ? (aiFrames.length / AI_VIDEO_FPS / videoSpeed) * 1000 : (getVideoClip(videoDuration, clipStart, clipEnd).duration / videoSpeed) * 1000
       setIsRecording(true)
       video.pause()
       if (!aiMode && (video.seeking || Math.abs(video.currentTime - clipStart) > 0.001)) {
@@ -543,9 +577,11 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
       }
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
       const stream = canvas.captureStream(30)
+      // Bitrate alto para preservar a qualidade; reduzido em vídeos longos para caber no limite do app.
+      const videoBitsPerSecond = duration <= 16_000 ? 14_000_000 : duration <= 32_000 ? 10_000_000 : 8_000_000
       let recorder: MediaRecorder
       try {
-        recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 })
+        recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond })
       } catch (error) {
         stream.getTracks().forEach((track) => track.stop())
         throw error
@@ -678,6 +714,13 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
             {mediaKind === 'video' && videoDuration > 0 && <>
               <label>Início do corte (segundos)<input type="number" min="0" max={Math.max(0, clipEnd - 0.1)} step="0.1" value={clipStart} onChange={(event) => setClipStart(Math.max(0, Math.min(Number(event.target.value), clipEnd - Math.min(0.1, videoDuration))))} /></label>
               <label>Fim do corte (segundos)<input type="number" min={clipStart + Math.min(0.1, videoDuration)} max={videoDuration} step="0.1" value={clipEnd} onChange={(event) => setClipEnd(Math.max(clipStart + Math.min(0.1, videoDuration), Math.min(Number(event.target.value), videoDuration)))} /></label>
+              <label>Velocidade do vídeo<select value={videoSpeed} onChange={(event) => setVideoSpeed(Number(event.target.value))}>
+                <option value={1}>Normal (1×)</option>
+                <option value={0.75}>Lenta (0,75×)</option>
+                <option value={0.5}>Câmera lenta (0,5×)</option>
+                <option value={0.25}>Super lenta (0,25×)</option>
+              </select></label>
+              {videoSpeed !== 1 && <p className="form-hint">O vídeo final fica {videoSpeed < 1 ? 'mais longo' : 'mais curto'}: {(clipDuration / videoSpeed).toFixed(1)}s em vez de {clipDuration.toFixed(1)}s.</p>}
               <label className="promotion-toggle"><input type="checkbox" checked={aiBackground} onChange={(event) => setAiBackground(event.target.checked)} /> Trocar fundo com IA (fundo técnico da marca)</label>
               {aiBackground && <>
                 <p className="form-hint">{isProcessingAi ? aiProgress : aiFrames ? `Trecho processado: ${aiFrames.length} quadros a ${AI_VIDEO_FPS} qps. Ajuste zoom e posição e gere o vídeo. Alterar o corte exige novo processamento.` : `A IA recorta o produto quadro a quadro (${AI_VIDEO_FPS} qps) e o coloca sobre o fundo padrão da marca com sombra suave. Use um trecho de até ${AI_VIDEO_MAX_SECONDS} segundos; o processamento pode levar alguns minutos e a tela deve ficar aberta.`}</p>
@@ -711,7 +754,7 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
           </fieldset>
         </div>
         <div className="promotion-preview-panel">
-          <div className="promotion-preview-toolbar"><span>{mediaKind === 'video' ? 'Prévia do vídeo de produto' : 'Prévia da imagem de produto'}</span><small>1200 x 1200px{mediaKind === 'video' && clipDuration > 0 ? ` · ${clipDuration.toFixed(1)}s` : ''}</small></div>
+          <div className="promotion-preview-toolbar"><span>{mediaKind === 'video' ? 'Prévia do vídeo de produto' : 'Prévia da imagem de produto'}</span><small>1200 x 1200px{mediaKind === 'video' && clipDuration > 0 ? ` · ${(clipDuration / videoSpeed).toFixed(1)}s${videoSpeed !== 1 ? ` · ${videoSpeed.toLocaleString('pt-BR')}×` : ''}` : ''}</small></div>
           <canvas ref={canvasRef} className="promotion-canvas is-site-video" aria-label="Prévia da mídia padronizada do produto" />
           {mediaKind === 'video' && mediaUrl && <video ref={videoRef} src={mediaUrl} className="promotion-source-video" muted playsInline loop={!isRecording} aria-hidden="true" onLoadedMetadata={(event) => {
             const duration = event.currentTarget.duration

@@ -62,18 +62,67 @@ function drawMedia(context: CanvasRenderingContext2D, media: CanvasImageSource, 
   context.restore()
 }
 
-// Composição com fundo padrão da marca: produto recortado pela IA sobre o backdrop técnico, com sombra suave.
-function drawAiComposite(context: CanvasRenderingContext2D, backdrop: HTMLImageElement, cutout: HTMLImageElement, zoom: number, offsetX: number, offsetY: number) {
+// Recorta o PNG com transparência para a caixa que realmente contém o produto,
+// para que ele ocupe o quadro inteiro de composição (~75% da arte) como no padrão.
+function cropToAlphaBounds(image: HTMLImageElement): HTMLCanvasElement | null {
+  const source = document.createElement('canvas')
+  source.width = image.naturalWidth
+  source.height = image.naturalHeight
+  const sourceContext = source.getContext('2d')
+  if (!sourceContext || !source.width || !source.height) return null
+  sourceContext.drawImage(image, 0, 0)
+  const { data, width, height } = sourceContext.getImageData(0, 0, source.width, source.height)
+  let minX = width
+  let minY = height
+  let maxX = -1
+  let maxY = -1
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (data[(y * width + x) * 4 + 3] > 16) {
+        if (x < minX) minX = x
+        if (x > maxX) maxX = x
+        if (y < minY) minY = y
+        if (y > maxY) maxY = y
+      }
+    }
+  }
+  if (maxX < minX || maxY < minY) return source
+  const padding = Math.round(Math.max(maxX - minX, maxY - minY) * 0.02)
+  minX = Math.max(0, minX - padding)
+  minY = Math.max(0, minY - padding)
+  maxX = Math.min(width - 1, maxX + padding)
+  maxY = Math.min(height - 1, maxY + padding)
+  const output = document.createElement('canvas')
+  output.width = maxX - minX + 1
+  output.height = maxY - minY + 1
+  const outputContext = output.getContext('2d')
+  if (!outputContext) return source
+  outputContext.drawImage(source, minX, minY, output.width, output.height, 0, 0, output.width, output.height)
+  return output
+}
+
+// Composição com fundo padrão da marca: produto recortado pela IA sobre o backdrop técnico,
+// com sombra de contato elíptica e sombra projetada suaves para um resultado natural.
+function drawAiComposite(context: CanvasRenderingContext2D, backdrop: HTMLImageElement, cutout: HTMLCanvasElement, zoom: number, offsetX: number, offsetY: number) {
   context.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
   const scale = Math.max(CANVAS_SIZE / backdrop.naturalWidth, CANVAS_SIZE / backdrop.naturalHeight)
   const backdropWidth = backdrop.naturalWidth * scale
   const backdropHeight = backdrop.naturalHeight * scale
   context.drawImage(backdrop, (CANVAS_SIZE - backdropWidth) / 2, (CANVAS_SIZE - backdropHeight) / 2, backdropWidth, backdropHeight)
-  const placement = getMediaPlacement(cutout.naturalWidth, cutout.naturalHeight, MEDIA_BOX, true, zoom, offsetX, offsetY)
+  const placement = getMediaPlacement(cutout.width, cutout.height, MEDIA_BOX, true, zoom, offsetX, offsetY)
+  const centerX = placement.x + placement.width / 2
+  const baseY = placement.y + placement.height - placement.height * 0.015
   context.save()
-  context.shadowColor = 'rgba(28,32,35,.35)'
-  context.shadowBlur = 48
-  context.shadowOffsetY = 30
+  context.filter = 'blur(18px)'
+  context.fillStyle = 'rgba(28,32,35,.30)'
+  context.beginPath()
+  context.ellipse(centerX, baseY, placement.width * 0.44, Math.max(14, placement.width * 0.05), 0, 0, Math.PI * 2)
+  context.fill()
+  context.restore()
+  context.save()
+  context.shadowColor = 'rgba(28,32,35,.20)'
+  context.shadowBlur = 26
+  context.shadowOffsetY = 14
   context.drawImage(cutout, placement.x, placement.y, placement.width, placement.height)
   context.restore()
 }
@@ -99,7 +148,7 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
   const [aiBackground, setAiBackground] = useState(true)
   const [backdrop, setBackdrop] = useState<HTMLImageElement | null>(null)
   const [cutoutUrl, setCutoutUrl] = useState('')
-  const [cutoutImage, setCutoutImage] = useState<HTMLImageElement | null>(null)
+  const [cutoutImage, setCutoutImage] = useState<HTMLCanvasElement | null>(null)
   const [isRemovingBg, setIsRemovingBg] = useState(false)
   const [removalStatus, setRemovalStatus] = useState('')
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -154,7 +203,7 @@ export default function AdminMediaStudio({ products, onSaved, onMessage }: Props
     }
     let cancelled = false
     const element = new Image()
-    element.onload = () => { if (!cancelled) setCutoutImage(element) }
+    element.onload = () => { if (!cancelled) setCutoutImage(cropToAlphaBounds(element)) }
     element.onerror = () => { if (!cancelled) { setCutoutImage(null); onMessage('Não foi possível abrir o recorte gerado pela IA. Tente novamente.') } }
     element.src = cutoutUrl
     return () => { cancelled = true }
